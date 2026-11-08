@@ -137,3 +137,11 @@ Run command: `xminal`. Project folder: `/workspace/projects/ff` (folder name onl
 ## 14. REPL pipe fix (2026-11-08)
 
 - Piped stdin previously echoed all lines, got stuck after the first command, and could spin forever on EOF. Now queue-based input; piped lines processed in order; exits on EOF/`/exit`. Demo from pipe: banner → `/mode plan` → `/status` → `/cost` → `/tools` → `/exit`.
+
+## 15. Distribution findings (2026-11-08)
+
+- `npm view xminal` → 404 (name free). npm registry reachable. Not logged in.
+- npm GitHub-URL installs (`github:` and `git+https://…`) deterministically fail in this environment with `TAR_ENTRY_ERROR ENOENT …assets/logo.svg`-like errors regardless of file content/name — npm quirk; a plain ASCII text file under the same dir fails too. Codeload direct tarball works. Release-asset tgz works (verified: `xminal version` runs).
+- README quickstart now recommends the release-asset single command until npm publish happens.
+- npm-pack tarball installs work fine (release asset = same file).
+- Pending: user to paste an npm automation token; then `npm publish` → `npm i -g xminal` everywhere.
