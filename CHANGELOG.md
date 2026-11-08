@@ -4,6 +4,19 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-11-08
+
+**Published on npm: `xminal@0.4.1`** (`npm install -g xminal`).
+
+### Fixed
+
+- **Frame overflow bug**: header(3) + sidebar/chat + rule(1) + input(3) + footer(1) now exactly equals `rows()`; previously emitted `rows()+3` lines causing flicker/scroll corruption.
+- **Stale cache**: wrapped-lines cache used `lines.length` as key — appends to an assistant line returned old content; now keys on `(lines.length, totalChars)`.
+- **PTY height**: `sbHeight()` now reserves header+rule+input+footer — `rows()-8`.
+- Palette overlay clamped to `effSb` rows so it never overflows the body area.
+- Removed unused `inCodeBlock` state and tightened palette index clamping.
+
+
 ## [0.4.0] — 2026-11-08
 
 **Published on npm: `xminal@0.4.0`** (`npm install -g xminal`).

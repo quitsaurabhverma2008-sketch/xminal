@@ -104,12 +104,11 @@ async function startTui(runtime) {
     let input = "";
     let cursor = 0;
     let pendingPermission = null;
-    let inCodeBlock = false;
     const cols = () => Math.max(40, process.stdout.columns ?? 80);
     const rows = () => Math.max(16, process.stdout.rows ?? 24);
     const sidebarWidth = () => (sidebarVisible ? 44 : 0);
     const chatWidth = () => Math.max(20, cols() - sidebarWidth());
-    const sbHeight = () => Math.max(4, rows() - 5);
+    const sbHeight = () => Math.max(4, rows() - 8);
     const sessionTitle = runtime.session.meta.title === "untitled" ? "new session" : runtime.session.meta.title;
     const shortId = runtime.session.id.slice(0, 8);
     // ---------- rendering helpers ----------
@@ -124,16 +123,29 @@ async function startTui(runtime) {
             default: return { prefix: engine_1.theme.muted + " · " + engine_1.reset, body: w - 3 };
         }
     };
+    let _wrappedCache = null;
+    let _wrappedKey = -1;
+    let _wrappedChars = -1;
+    const contentKey = () => lines.reduce((n, line) => n + line.text.length, 0);
     const renderLines = () => {
-        const out = [];
-        for (const line of lines) {
-            const { prefix, body } = wrapKindPrefix(line.kind);
-            const parts = (0, layout_1.wrapText)(line.text, Math.max(4, body));
-            for (let i = 0; i < parts.length; i++) {
-                out.push((i === 0 ? prefix : " ".repeat(2)) + parts[i]);
+        const chars = contentKey();
+        if (_wrappedCache && _wrappedKey === lines.length && _wrappedChars === chars)
+            return _wrappedCache;
+        _wrappedCache = null;
+        _wrappedKey = lines.length;
+        _wrappedChars = chars;
+        {
+            const out = [];
+            for (const line of lines) {
+                const { prefix, body } = wrapKindPrefix(line.kind);
+                const parts = (0, layout_1.wrapText)(line.text, Math.max(4, body));
+                for (let i = 0; i < parts.length; i++) {
+                    out.push((i === 0 ? prefix : " ".repeat(2)) + parts[i]);
+                }
             }
+            _wrappedCache = out;
+            return out;
         }
-        return out;
     };
     const fgClip = (line, width, bg) => {
         // Fill a line with the raised background and clip inner resets to foreground-only.
@@ -228,8 +240,9 @@ async function startTui(runtime) {
             out.push(engine_1.theme.border + "│ " + engine_1.theme.muted + "no matches" + engine_1.reset + (0, ansi_1.pad)("", w - 13) + engine_1.theme.border + "│" + engine_1.reset);
         }
         else {
+            const clampedIndex = Math.min(paletteIndex, Math.max(0, shown.length - 1));
             shown.forEach((item, i) => {
-                const selected = i === paletteIndex;
+                const selected = i === clampedIndex;
                 const marker = selected ? engine_1.theme.accent + "› " + engine_1.reset : "  ";
                 const text = `${marker}${engine_1.theme.text}${item.name}${engine_1.reset} ${engine_1.theme.muted}— ${item.desc}${engine_1.reset}`;
                 out.push(engine_1.theme.border + "│ " + engine_1.reset + (0, ansi_1.pad)((0, ansi_1.truncate)(text, w - 3), w - 3) + engine_1.theme.border + "│" + engine_1.reset);
@@ -280,7 +293,6 @@ async function startTui(runtime) {
         render();
     };
     const appendAssistant = (text) => {
-        inCodeBlock = text.includes("```") ? !inCodeBlock : inCodeBlock;
         const last = lines[lines.length - 1];
         if (last && last.kind === "assistant") {
             last.text += text;

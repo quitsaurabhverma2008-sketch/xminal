@@ -76,13 +76,12 @@ export async function startTui(runtime: Runtime): Promise<void> {
   let input = "";
   let cursor = 0;
   let pendingPermission: PermissionAsk | null = null;
-  let inCodeBlock = false;
 
   const cols = () => Math.max(40, process.stdout.columns ?? 80);
   const rows = () => Math.max(16, process.stdout.rows ?? 24);
   const sidebarWidth = () => (sidebarVisible ? 44 : 0);
   const chatWidth = () => Math.max(20, cols() - sidebarWidth());
-  const sbHeight = () => Math.max(4, rows() - 5);
+  const sbHeight = () => Math.max(4, rows() - 8);
 
   const sessionTitle = runtime.session.meta.title === "untitled" ? "new session" : runtime.session.meta.title;
   const shortId = runtime.session.id.slice(0, 8);
@@ -100,7 +99,17 @@ export async function startTui(runtime: Runtime): Promise<void> {
     }
   };
 
+  let _wrappedCache: string[] | null = null;
+  let _wrappedKey = -1;
+  let _wrappedChars = -1;
+  const contentKey = () => lines.reduce((n, line) => n + line.text.length, 0);
   const renderLines = (): string[] => {
+    const chars = contentKey();
+    if (_wrappedCache && _wrappedKey === lines.length && _wrappedChars === chars) return _wrappedCache;
+    _wrappedCache = null;
+    _wrappedKey = lines.length;
+    _wrappedChars = chars;
+    {
     const out: string[] = [];
     for (const line of lines) {
       const { prefix, body } = wrapKindPrefix(line.kind);
@@ -109,7 +118,9 @@ export async function startTui(runtime: Runtime): Promise<void> {
         out.push((i === 0 ? prefix : " ".repeat(2)) + parts[i]);
       }
     }
+    _wrappedCache = out;
     return out;
+    }
   };
 
   const fgClip = (line: string, width: number, bg: [number, number, number]): string => {
@@ -205,8 +216,9 @@ export async function startTui(runtime: Runtime): Promise<void> {
     if (shown.length === 0) {
       out.push(theme.border + "│ " + theme.muted + "no matches" + reset + pad("", w - 13) + theme.border + "│" + reset);
     } else {
+      const clampedIndex = Math.min(paletteIndex, Math.max(0, shown.length - 1));
       shown.forEach((item, i) => {
-        const selected = i === paletteIndex;
+        const selected = i === clampedIndex;
         const marker = selected ? theme.accent + "› " + reset : "  ";
         const text = `${marker}${theme.text}${item.name}${reset} ${theme.muted}— ${item.desc}${reset}`;
         out.push(theme.border + "│ " + reset + pad(truncate(text, w - 3), w - 3) + theme.border + "│" + reset);
@@ -258,7 +270,6 @@ export async function startTui(runtime: Runtime): Promise<void> {
     render();
   };
   const appendAssistant = (text: string) => {
-    inCodeBlock = text.includes("```") ? !inCodeBlock : inCodeBlock;
     const last = lines[lines.length - 1];
     if (last && last.kind === "assistant") {
       last.text += text;
