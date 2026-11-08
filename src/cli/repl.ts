@@ -23,30 +23,36 @@ export async function startRepl(initial: Runtime, options: ReplOptions = {}): Pr
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    terminal: true,
+    terminal: process.stdin.isTTY === true,
     historySize: 500,
     removeHistoryDuplicates: true,
   });
 
   const callbacks = options.callbacks ?? rendererCallbacks(renderer);
 
-  const ask = (text: string): Promise<string> =>
-    new Promise((resolve) => {
-      let settled = false;
-      const finish = (answer: string) => {
-        if (settled) return;
-        settled = true;
-        rl.removeListener("close", onClose);
-        resolve(answer);
-      };
-      const onClose = () => finish("");
-      rl.once("close", onClose);
-      rl.question(text, finish);
-    });
+  const lineQueue: string[] = [];
+  let rlClosed = false;
+  const waiters: Array<(line: string | null) => void> = [];
+  rl.on("line", (line) => {
+    const waiter = waiters.shift();
+    if (waiter) waiter(line);
+    else lineQueue.push(line);
+  });
+  rl.on("close", () => {
+    rlClosed = true;
+    while (waiters.length > 0) waiters.shift()?.(null);
+  });
+
+  const ask = (text: string): Promise<string | null> => {
+    process.stdout.write(text);
+    if (lineQueue.length > 0) return Promise.resolve(lineQueue.shift() as string);
+    if (rlClosed) return Promise.resolve(null);
+    return new Promise((resolve) => waiters.push(resolve));
+  };
 
   const permissionAsk = async (tool: string, reason?: string): Promise<boolean> => {
     const answer = await ask(`${ansi.yellow("?")} Allow ${ansi.bold(tool)} (${reason ?? "needs approval"})? [y/N] `);
-    return /^y(es)?$/i.test(answer.trim());
+    return answer !== null && /^y(es)?$/i.test(answer.trim());
   };
 
   const attach = (next: Runtime) => {
@@ -119,6 +125,7 @@ export async function startRepl(initial: Runtime, options: ReplOptions = {}): Pr
   while (!closed) {
     const input = await ask(ansi.magenta("› "));
     if (closed) break;
+    if (input === null) break;
     const text = input.trim();
     if (!text) continue;
 

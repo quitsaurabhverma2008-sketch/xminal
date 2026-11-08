@@ -24,7 +24,7 @@ export interface CommandContext {
   cwd: string;
   exit: () => void;
   restart: (options?: { sessionId?: string; newSession?: boolean }) => void;
-  ask: (question: string) => Promise<string>;
+  ask: (question: string) => Promise<string | null>;
 }
 
 const MODES: AgentMode[] = ["plan", "build", "compose", "review", "yolo"];

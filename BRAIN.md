@@ -133,3 +133,7 @@ Run command: `xminal`. Project folder: `/workspace/projects/ff` (folder name onl
 
 - `Agent.compactHistory` used a naive cut that could orphan tool results. Now backs off to the assistant-with-toolCalls boundary; unit-tested (`tests/compact.test.js`).
 - 28/28 tests.
+
+## 14. REPL pipe fix (2026-11-08)
+
+- Piped stdin previously echoed all lines, got stuck after the first command, and could spin forever on EOF. Now queue-based input; piped lines processed in order; exits on EOF/`/exit`. Demo from pipe: banner → `/mode plan` → `/status` → `/cost` → `/tools` → `/exit`.
