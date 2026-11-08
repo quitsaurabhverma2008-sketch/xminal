@@ -36,7 +36,10 @@ XMINAL is a provider-agnostic terminal coding agent and orchestration platform. 
 ## Quickstart
 
 ```bash
-# single command — no npm account needed:
+# single command (npm registry):
+npm install -g xminal
+
+# or from the GitHub release asset without npm:
 npm install -g https://github.com/quitsaurabhverma2008-sketch/xminal/releases/download/v0.1.1/xminal-0.1.1.tgz
 
 # or from source:

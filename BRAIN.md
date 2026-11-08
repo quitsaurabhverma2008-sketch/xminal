@@ -145,3 +145,10 @@ Run command: `xminal`. Project folder: `/workspace/projects/ff` (folder name onl
 - README quickstart now recommends the release-asset single command until npm publish happens.
 - npm-pack tarball installs work fine (release asset = same file).
 - Pending: user to paste an npm automation token; then `npm publish` → `npm i -g xminal` everywhere.
+
+## 16. npm release (2026-11-08)
+
+- Published `xminal@0.1.1` to npm (tag `latest`) — `npm i -g xminal` works everywhere. Token used via temp userconfig (deleted after).
+- Release page: https://github.com/quitsaurabhverma2008-sketch/xminal/releases/tag/v0.1.1
+- Note: npm tokens for publish need 2FA-bypass (or classic Automation); first token was 403, second worked.
+- User pasted both tokens in chat — they should rotate them on npmjs.com if they want strict hygiene.

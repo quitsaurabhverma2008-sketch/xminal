@@ -6,6 +6,8 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [0.1.1] — 2026-11-08
 
+**Published on npm: `xminal@0.1.1`** (`npm install -g xminal`).
+
 Patch release: hardening + distribution fixes + community-ready install path.
 
 ### Added
