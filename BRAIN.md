@@ -104,7 +104,7 @@ Run command: `xminal`. Project folder: `/workspace/projects/ff` (folder name onl
 ## 9. Branding (2026-11-08)
 
 - Tagline: **EVERY CODING AGENT. ONE TERMINAL.**
-- Wordmark logo: `brand/logo.svg` (dark rounded tile, cyan→blue→violet gradient, monospace "XMINAL").
+- Wordmark logo: `assets/logo.svg` (dark rounded tile, cyan→blue→violet gradient, monospace "XMINAL").
 - Banner in REPL / README hero identical. `xminal --version` prints tagline.
 - `LICENSE` MIT · `CHANGELOG.md` v0.1.0 · `scripts/install.sh` (npm or source fallback) · package `files` includes brand assets (111-file tarball).
 
@@ -120,7 +120,7 @@ Run command: `xminal`. Project folder: `/workspace/projects/ff` (folder name onl
 - Public repo: https://github.com/quitsaurabhverma2008-sketch/xminal
 - Initial commit "XMINAL v0.1.0 — initial open-source release" on `main` (identity used: gh login noreply; repo created via user-provided PAT used only as env var, never written to any file).
 - GitHub Release `v0.1.0` with tarball `xminal-0.1.0.tgz`; topics set; CI (`.github/workflows/ci.yml`) ran → **success** on first push.
-- README hero now references `brand/logo.svg`; clone URL + release link added.
+- README hero now references `assets/logo.svg`; clone URL + release link added.
 
 ## 12. Hardening pass (2026-11-08)
 

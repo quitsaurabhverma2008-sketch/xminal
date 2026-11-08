@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="brand/logo.svg" width="720" alt="XMINAL — Every coding agent. One terminal." />
+<img src="assets/logo.svg" width="720" alt="XMINAL — Every coding agent. One terminal." />
 
 ```
 ██╗  ██╗███╗   ███╗██╗███╗   ██╗ █████╗ ██╗

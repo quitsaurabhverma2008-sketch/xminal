@@ -16,7 +16,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` pending
 
 ## Phase 1 — Brand identity `[x]`
 
-- **Deliverables:** name `XMINAL`, tagline `EVERY CODING AGENT. ONE TERMINAL.`, signature cyan gradient, ASCII banner (`render.ts` + README hero), SVG logo (`brand/logo.svg`), `LICENSE`, `CHANGELOG.md`, `xminal --version` prints tagline.
+- **Deliverables:** name `XMINAL`, tagline `EVERY CODING AGENT. ONE TERMINAL.`, signature cyan gradient, ASCII banner (`render.ts` + README hero), SVG logo (`assets/logo.svg`), `LICENSE`, `CHANGELOG.md`, `xminal --version` prints tagline.
 - **Acceptance:** `xminal --version` → `xminal 0.1.0 — EVERY CODING AGENT. ONE TERMINAL.` ✓ logo on dark background ✓.
 
 ## Phase 2 — CLI surface `[x]`
@@ -73,7 +73,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` pending
 
 ## Phase 12 — Branding & docs `[x]`
 
-- **Deliverables:** `README.md` (hero, quickstart, commands, config, safety model, honest v0.1 status), `CHANGELOG.md` (v0.1.0), `LICENSE` (MIT), `brand/logo.svg`, `scripts/install.sh`, `package.json` verify script + full `files` manifest.
+- **Deliverables:** `README.md` (hero, quickstart, commands, config, safety model, honest v0.1 status), `CHANGELOG.md` (v0.1.0), `LICENSE` (MIT), `assets/logo.svg`, `scripts/install.sh`, `package.json` verify script + full `files` manifest.
 - **Acceptance:** first screen explains XMINAL in 5 seconds; every CLI command documented with example.
 
 ## Phase 13 — Testing & quality gates `[x/~]`
