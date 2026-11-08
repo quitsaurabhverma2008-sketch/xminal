@@ -4,6 +4,16 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-11-08
+
+**Published on npm: `xminal@0.1.2`** (`npm install -g xminal`).
+
+### Added
+
+- Self-hosted landing page at `GET /landing` on `xminal serve` — full product showcase (hero, stats, 12 features, quickstart, 47-provider grid, safety model, comparison, roadmap, FAQ, npm/GitHub CTAs). Built via XMINAL's own headless agent (dogfooded), completed after OpenRouter free-tier daily quota exhausted.
+- `site/` ships inside the npm package; `/landing` resolves the bundled asset first, cwd fallback for development.
+
+
 ## [0.1.1] — 2026-11-08
 
 **Published on npm: `xminal@0.1.1`** (`npm install -g xminal`).

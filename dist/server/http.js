@@ -38,13 +38,19 @@ async function startServer(options) {
                 return;
             }
             if (req.method === "GET" && url.pathname === "/landing") {
-                const file = node_path_1.default.join(options.cwd, "site", "index.html");
+                const packageSite = node_path_1.default.resolve(__dirname, "../../site/index.html");
+                const cwdSite = node_path_1.default.join(options.cwd, "site", "index.html");
                 let body;
                 try {
-                    body = node_fs_1.default.readFileSync(file, "utf8");
+                    body = node_fs_1.default.readFileSync(packageSite, "utf8");
                 }
                 catch {
-                    body = undefined;
+                    try {
+                        body = node_fs_1.default.readFileSync(cwdSite, "utf8");
+                    }
+                    catch {
+                        body = undefined;
+                    }
                 }
                 if (body === undefined) {
                     sendJson(res, 404, { error: { message: "site/index.html not found (build it first)", type: "not_found" } });

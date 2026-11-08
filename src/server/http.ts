@@ -52,12 +52,17 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
       }
 
       if (req.method === "GET" && url.pathname === "/landing") {
-        const file = path.join(options.cwd, "site", "index.html");
+        const packageSite = path.resolve(__dirname, "../../site/index.html");
+        const cwdSite = path.join(options.cwd, "site", "index.html");
         let body: string | undefined;
         try {
-          body = fs.readFileSync(file, "utf8");
+          body = fs.readFileSync(packageSite, "utf8");
         } catch {
-          body = undefined;
+          try {
+            body = fs.readFileSync(cwdSite, "utf8");
+          } catch {
+            body = undefined;
+          }
         }
         if (body === undefined) {
           sendJson(res, 404, { error: { message: "site/index.html not found (build it first)", type: "not_found" } });
