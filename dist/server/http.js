@@ -5,6 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startServer = startServer;
 const node_http_1 = __importDefault(require("node:http"));
+const node_fs_1 = __importDefault(require("node:fs"));
+const node_path_1 = __importDefault(require("node:path"));
 const node_url_1 = require("node:url");
 const runtime_1 = require("../runtime");
 const session_1 = require("../core/session");
@@ -23,7 +25,7 @@ async function startServer(options) {
             return;
         }
         const url = new node_url_1.URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-        const publicPaths = new Set(["/health", "/", "/web"]);
+        const publicPaths = new Set(["/health", "/", "/web", "/landing"]);
         if (options.token && !publicPaths.has(url.pathname) && req.headers.authorization !== `Bearer ${options.token}`) {
             sendJson(res, 401, { error: { message: "unauthorized", type: "auth_error" } });
             return;
@@ -31,6 +33,23 @@ async function startServer(options) {
         try {
             if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/web")) {
                 const body = web_1.WEB_PAGE;
+                res.writeHead(200, { "content-type": "text/html; charset=utf-8", "content-length": Buffer.byteLength(body) });
+                res.end(body);
+                return;
+            }
+            if (req.method === "GET" && url.pathname === "/landing") {
+                const file = node_path_1.default.join(options.cwd, "site", "index.html");
+                let body;
+                try {
+                    body = node_fs_1.default.readFileSync(file, "utf8");
+                }
+                catch {
+                    body = undefined;
+                }
+                if (body === undefined) {
+                    sendJson(res, 404, { error: { message: "site/index.html not found (build it first)", type: "not_found" } });
+                    return;
+                }
                 res.writeHead(200, { "content-type": "text/html; charset=utf-8", "content-length": Buffer.byteLength(body) });
                 res.end(body);
                 return;

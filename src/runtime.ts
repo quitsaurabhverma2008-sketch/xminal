@@ -42,13 +42,16 @@ export class Runtime {
     this.tools.registerAll(allTools());
 
     const mode = this.options.mode ?? (this.config.permissions.mode === "full" ? "yolo" : "build");
+    const effectiveModel = this.options.model ?? this.config.defaultModel;
     if (this.options.sessionId) {
       this.session = Session.load(cwd, this.options.sessionId);
+      if (this.options.model) this.session.setModel(this.options.model);
     } else if (!this.options.newSession) {
       const latest = Session.latest(cwd);
-      this.session = latest ?? Session.create(cwd, { model: this.config.defaultModel, mode: this.config.permissions.mode, agentMode: mode });
+      this.session = latest ?? Session.create(cwd, { model: effectiveModel, mode: this.config.permissions.mode, agentMode: mode });
+      if (this.options.model && this.session.meta.model !== this.options.model) this.session.setModel(this.options.model);
     } else {
-      this.session = Session.create(cwd, { model: this.config.defaultModel, mode: this.config.permissions.mode, agentMode: mode });
+      this.session = Session.create(cwd, { model: effectiveModel, mode: this.config.permissions.mode, agentMode: mode });
     }
 
     const permissionMode = mode === "yolo" ? "full" : this.config.permissions.mode;

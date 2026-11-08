@@ -1,4 +1,6 @@
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
 import { URL } from "node:url";
 import { Runtime } from "../runtime";
 import { Session } from "../core/session";
@@ -35,7 +37,7 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
       return;
     }
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-    const publicPaths = new Set(["/health", "/", "/web"]);
+    const publicPaths = new Set(["/health", "/", "/web", "/landing"]);
     if (options.token && !publicPaths.has(url.pathname) && req.headers.authorization !== `Bearer ${options.token}`) {
       sendJson(res, 401, { error: { message: "unauthorized", type: "auth_error" } });
       return;
@@ -44,6 +46,23 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
     try {
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/web")) {
         const body = WEB_PAGE;
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "content-length": Buffer.byteLength(body) });
+        res.end(body);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/landing") {
+        const file = path.join(options.cwd, "site", "index.html");
+        let body: string | undefined;
+        try {
+          body = fs.readFileSync(file, "utf8");
+        } catch {
+          body = undefined;
+        }
+        if (body === undefined) {
+          sendJson(res, 404, { error: { message: "site/index.html not found (build it first)", type: "not_found" } });
+          return;
+        }
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "content-length": Buffer.byteLength(body) });
         res.end(body);
         return;

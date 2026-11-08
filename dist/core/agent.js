@@ -127,7 +127,7 @@ class Agent {
                         this.callbacks.onReasoning?.(event.text);
                     }
                     else if (event.type === "tool_call") {
-                        toolCalls.push(event.call);
+                        toolCalls.push({ ...event.call, arguments: normalizeToolArguments(event.call.arguments) });
                     }
                     else if (event.type === "usage") {
                         const actualModel = event.model ?? model;
@@ -334,6 +334,18 @@ function compactHistory(messages, keepRecent) {
         { role: "user", content: `[Earlier conversation summary — ${older.length} messages]\n${summary}` },
         ...recent,
     ];
+}
+function normalizeToolArguments(raw) {
+    const trimmed = (raw ?? "").trim();
+    if (!trimmed)
+        return "{}";
+    try {
+        const parsed = JSON.parse(trimmed);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? JSON.stringify(parsed) : "{}";
+    }
+    catch {
+        return "{}";
+    }
 }
 function safeParseArgs(text) {
     if (!text || !text.trim())

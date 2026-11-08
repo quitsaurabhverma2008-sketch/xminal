@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XMINAL — Every coding agent. One terminal.</title>
+  <meta name="description" content="Provider-agnostic terminal coding agent & orchestration platform — 125 MIT projects fused into one hackable CLI">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --surface: #0f172a;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent-cyan: #22d3ee;
+      --accent-blue: #38bdf8;
+      --accent-violet: #a78bfa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    a { color: var(--accent-cyan); text-decoration: none; }
+    a:hover { color: var(--accent-blue); }
+    img { max-width: 100%; height: auto; }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--surface); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+    /* Focus visible */
+    :focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; animation: none !important; }
+    }
+    /* ===== STICKY NAV ===== */
+    nav {
+      position: sticky;
+      top: 0;
+      background: rgba(11, 15, 25, 0.8);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-container {
+      max-width: max(1200px, 100% - 2rem);
+      margin: 0 auto;
+      padding: 1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .nav-logo { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.05em; }
+    .nav-links { display: flex; gap: 2rem; }
+    .nav-links a { color: var(--muted); transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text); }
+    .nav-chip { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background: var(--accent-cyan); color: var(--bg); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    /* ===== HERO ===== */
+    .hero { min-height: 80vh; display: flex; align-items: center; justify-content: center; position: relative; padding: 2rem 1.5rem; }
+    .hero-content { max-width: max(800px, 100% - 2rem); width: 100%; display: flex; flex-direction: column; gap: 1.5rem; }
+    .headline { font-size: clamp(3rem, 8vw, 5rem); font-weight: 900; line-height: 1.1; }
+    .headline .gradient { background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue), var(--accent-violet)); background-size: 200% 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: gradientShift 3s ease-in-out infinite; }
+    @keyframes gradientShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+    .subhead { font-size: clamp(1rem, 2vw, 1.25rem); color: var(--muted); max-width: 600px; }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+    .cta-btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; background: var(--accent-blue); color: var(--bg); font-weight: 600; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
+    .cta-btn:hover { background: var(--accent-violet); }
+    .cta-btn .copy-icon { width: 1em; height: 1em; }
+    /* Terminal mock */
+.terminal-mock {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  margin-top: 2rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.terminal-mock .title-bar {
+  display: flex;
+  background: var(--border);
+  padding: 4px 8px;
+}
+.terminal-mock .title-bar .dot {
+  width: 12px; height: 12px; border-radius: 50%; margin-right: 4px;
+  flex-shrink: 0;
+}
+.terminal-mock .dot-accent { background: var(--accent-cyan); }
+.terminal-mock .dot-warning { background: #f87171; }
+.terminal-mock .dot-info { background: #fbbf24; }
+.terminal-mock .terminal-body {
+  padding: 1rem;
+  font-family: ui-monospace, Menlo, Monaco, monospace;
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: pre;
+  line-height: 1.6;
+}
+  </style>
+</head>
+<body>
+  <!-- ===== NAV ===== -->
+  <nav>
+    <div class="nav-container">
+      <span class="nav-logo">XMINAL</span>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#providers">Providers</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="#safety">Safety</a>
+      </div>
+      <button class="nav-chip" id="installChip">npm i -g xminal</button>
+    </div>
+  </nav>
+
+  <!-- ===== HERO ===== -->
+  <section class="hero" aria-label="hero">
+    <div class="hero-content">
+      <h1 class="headline">Every coding agent.<span class="gradient"> One terminal.</span></h1>
+      <p class="subhead">XMINAL is a provider-agnostic terminal coding agent & orchestration platform — 125 MIT projects fused into one hackable CLI. Streams, edits, verifies, remembers.</p>
+      <div class="cta-row">
+        <button class="cta-btn" id="copyBtn" aria-label="Copy npm install command">
+          npm install -g xminal
+          <svg class="copy-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13"></rect><path d="M5 12h14"></path></svg>
+        </button>
+        <a class="cta-btn" href="https://github.com/quitsaurabhverma2008-sketch/xminal" target="_blank" rel="noopener" aria-label="Read the docs">Read the docs →</a>
+      </div>
+      <div class="terminal-mock" aria-label="terminal session mock">
+        <div class="title-bar">
+          <div class="dot dot-accent"></div>
+          <div class="dot dot-warning"></div>
+          <div class="dot dot-info"></div>
+        </div>
+        <div class="terminal-body" id="terminalBody">
+XMINAL SESSION BANNER
+xminal run "fix the failing test"
+✓ test passed in 2.4s
+✓ 2 turns · $0.00 cost
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- ===== STATS BAR ===== -->
+  <section class="stats-bar" aria-label="stats">
+    <div class="stats-container" style="max-width: max(1200px, 100% - 2rem); margin: 0 auto; padding: 2rem 1.5rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; text-align: center;">
+      <div><div class="stat-number" id="stat-1">47</div><div class="stat-label">built-in providers</div></div>
+      <div><div class="stat-number" id="stat-2">258</div><div class="stat-model-alias">model aliases</div></div>
+      <div><div class="stat-number" id="stat-3">125</div><div class="stat-projects-mapped">projects mapped</div></div>
+      <div><div class="stat-number" id="stat-4">28</div><div class="stat-tests-passing">tests passing</div></div>
+      <div><div class="stat-number" id="stat-5">MIT</div><div class="stat-license">license</div></div>
+    </div>
+  </section>
+
+  <!-- ===== FEATURES GRID (12 CARDS) ===== -->
+  <section id="features" class="features-grid" aria-label="features">
+    <div class="container" style="max-width: max(1200px, 100% - 2rem); margin: 0 auto; padding: 2rem 1.5rem;">
+      <div class="section-header" style="text-align: center; margin-bottom: 3rem;">
+        <h2 style="font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; margin-bottom: 1rem;">Features</h2>
+        <p style="color: var(--muted); max-width: 600px; margin: 0 auto;">Provider-agnostic terminal coding agent capabilities</p>
+      </div>
+      <div class="cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+<!-- Feature card 1: Provider-agnostic -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Provider-agnostic</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">Failover and cost routing across 47 built-in providers, automatically selecting the best model for each task.</p>
+  </div>
+</div>
+
+<!-- Feature card 2: Plan/Build/Compose/Review/YOLO modes -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #f97316, #ef4444); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><path d="M3 3v7h7l5-3h3L12 7l-5 3h7v7H3zm6-2c.83 0 1.5.67 1.5 1.5S6.83 6 6 6s-1.5.67-1.5-1.5S4.17 3 5 3zM7 12h2v2H7zm0-4h2v6H7zm4 8h2v2h-2zm0-4h2v6h-2z"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Plan/Build/Compose/Review/YOLO modes</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">Flexible workflow modes from structured planning to unassisted execution.</p>
+  </div>
+</div>
+
+<!-- Feature card 3: Sessions -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #a855f7, #8b5cf6); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5.5l-4.5-3.5zM13 22h-2v-2h2zm2-4h-2v-6h2zm-7 0H5v-2h2zm7 0h-2V8h2zm7 4h-2V12h2z"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Sessions</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">Resume sessions, branch histories, and undo changes with full session persistence.</p>
+  </div>
+</div>
+
+<!-- Feature card 4: Memory -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #ec4899, #f472b6); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Memory</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">Markdown storage with search — ~/.agents/skills discovery and lockfile-based lock coordination.</p>
+  </div>
+</div>
+
+<!-- Feature card 5: Skills -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #f472b6, #f87171); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Skills</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">~/.agents/skills discovery + lockfile — auto-discover and coordinate agent skills.</p>
+  </div>
+</div>
+
+<!-- Feature card 6: MCP client -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #22d3ee, #38bdf8); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">MCP client + XMINAL-as-MCP-server</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">Model Context Protocol support — run XMINAL as your local MCP server.</p>
+  </div>
+</div>
+
+<!-- Feature card 7: Subagents & Ralph loops -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #ec4899, #f472b6); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Subagents & Ralph loops</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">Autonomous subagent spawning and Ralph-style feedback loops for complex tasks.</p>
+  </div>
+</div>
+
+<!-- Feature card 8: Worktree fleets -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #14b8a6, #0d9488); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Worktree fleets</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">Parallel branch management across multiple worktrees for concurrent development.</p>
+  </div>
+</div>
+
+<!-- Feature card 9: Audit receipts -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #f59e0b, #fbbf24); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Audit receipts</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">Hash-chained audit logs with checkpoints and undo receipts for accountability.</p>
+  </div>
+</div>
+
+<!-- Feature card 10: Web UI -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #a855f7); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Web UI built in</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">Embedded web interface for visual task monitoring and control.</p>
+  </div>
+</div>
+
+<!-- Feature card 11: OpenAI-compatible HTTP server (SSE) -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #06b6d4, #0891b2); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">OpenAI-compatible HTTP (SSE)</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">SSE endpoint compatible with OpenAI API specs for seamless integration.</p>
+  </div>
+</div>
+
+<!-- Feature card 12: Telegram bridge -->
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #14b8a6, #0d9488); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+  </div>
+  <div class="card-content" style="flex: 1;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Telegram bridge</h3>
+    <p style="color: var(--muted); font-size: 0.85rem; line-height: 1.5;">Telegram integration for remote task monitoring and notifications.</p>
+  </div>
+</div>
+      </div>
+    </div>
+  </section>
+  <!-- ===== QUICKSTART ===== -->
+  <section id="quickstart" class="quickstart" aria-label="quickstart">
+    <div class="container" style="max-width: max(1200px, 100% - 2rem); margin: 0 auto; padding: 2rem 1.5rem;">
+      <div class="section-header" style="text-align: center; margin-bottom: 3rem;">
+        <h2 style="font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; margin-bottom: 1rem;">Quickstart</h2>
+        <p style="color: var(--muted); max-width: 600px; margin: 0 auto;">Get up and running in minutes</p>
+      </div>
+      <div class="tabs" role="tablist" style="display: flex; justify-content: center; margin-bottom: 2rem; gap: 1rem;">
+        <button class="tab-btn active" data-tab="macos">macOS / Linux</button>
+        <button class="tab-btn" data-tab="termux">Termux</button>
+      </div>
+      <div id="macosTab" class="tab-content active" style="display: block;">
+        <pre style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; font-family: ui-monospace, Menlo, Monaco, monospace; color: var(--text); overflow-x: auto;">
+npm install -g xminal
+export OPENROUTER_API_KEY=your_key_here
+xminal doctor
+xminal
+</pre>
+      </div>
+      <div id="termuxTab" class="tab-content" style="display: none;">
+        <pre style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; font-family: ui-monospace, Menlo, Monaco, monospace; color: var(--text); overflow-x: auto;">
+pkg install nodejs
+npm install -g xminal
+export OPENROUTER_API_KEY=your_key_here
+xminal doctor
+xminal
+</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PROVIDERS (real 47) ===== -->
+  <section id="providers" class="providers-section" aria-label="providers">
+    <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 3rem 1.5rem;">
+      <div style="text-align: center; margin-bottom: 2.5rem;">
+        <h2 style="font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; margin-bottom: 0.75rem;">Providers</h2>
+        <p style="color: var(--muted); max-width: 640px; margin: 0 auto;">47 built-in providers — OpenAI-compatible, native adapters, and local servers. Default is keyless OpenCode free models.</p>
+      </div>
+      <div id="providerGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;"></div>
+    </div>
+  </section>
+
+  <!-- ===== SAFETY ===== -->
+  <section id="safety" aria-label="safety">
+    <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 3rem 1.5rem;">
+      <div style="text-align: center; margin-bottom: 2.5rem;">
+        <h2 style="font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; margin-bottom: 0.75rem;">Safety is a feature</h2>
+        <p style="color: var(--muted); max-width: 640px; margin: 0 auto;">Autonomy without footguns — from first run to production CI.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem;">
+        <div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.5rem;"><span style="color: var(--accent-cyan);">01</span> Permission modes</h3>
+          <p style="color: var(--muted); font-size: 0.9rem;"><code>ask</code> asks before every risky action · <code>auto</code> auto-approves low risk, asks for dangerous · <code>full</code> approves everything except protected paths.</p>
+        </div>
+        <div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.5rem;"><span style="color: var(--accent-blue);">02</span> Protected paths</h3>
+          <p style="color: var(--muted); font-size: 0.9rem;"><code>.env</code> · <code>~/.ssh</code> · <code>~/.aws</code> · <code>~/.gnupg</code> · <code>~/.config/gh</code> — denied even in full mode.</p>
+        </div>
+        <div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.5rem;"><span style="color: var(--accent-violet);">03</span> Checkpoints</h3>
+          <p style="color: var(--muted); font-size: 0.9rem;">Every edit snapshots the file first. <code>/undo</code> rewinds instantly — no git needed, no branches harmed.</p>
+        </div>
+        <div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.5rem;"><span style="color: var(--accent-cyan);">04</span> Audit receipts</h3>
+          <p style="color: var(--muted); font-size: 0.9rem;">Every allow/deny appended to a SHA-256 hash-chained log: <code>.xminal/receipts/audit.jsonl</code> · verify with <code>xminal audit verify</code>.</p>
+        </div>
+        <div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.5rem;"><span style="color: var(--accent-blue);">05</span> Secret redaction</h3>
+          <p style="color: var(--muted); font-size: 0.9rem;">Keys and tokens (<code>sk-*</code>, <code>ghp_*</code>, PEM blocks, JWTs…) are stripped from tool output before the model ever sees them.</p>
+        </div>
+        <div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.5rem;"><span style="color: var(--accent-violet);">06</span> Sandbox hooks</h3>
+          <p style="color: var(--muted); font-size: 0.9rem;">Optional <code>bwrap</code>/Docker sandbox for shell commands, plus a never-prompt safe list for read-only tools — all logged.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== COMPARISON ===== -->
+  <section id="compare" aria-label="comparison">
+    <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 3rem 1.5rem;">
+      <div style="text-align: center; margin-bottom: 2.5rem;">
+        <h2 style="font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; margin-bottom: 0.75rem;">XMINAL vs the rest</h2>
+        <p style="color: var(--muted); max-width: 640px; margin: 0 auto;">Honest checkmarks, not vibes.</p>
+      </div>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 720px;">
+          <thead>
+            <tr>
+              <th style="text-align: left; padding: 0.75rem; border-bottom: 2px solid var(--border); color: var(--muted); font-weight: 600;">Capability</th>
+              <th style="padding: 0.75rem; border-bottom: 2px solid var(--border); color: var(--accent-cyan);">XMINAL</th>
+              <th style="padding: 0.75rem; border-bottom: 2px solid var(--border); color: var(--muted);">Aider</th>
+              <th style="padding: 0.75rem; border-bottom: 2px solid var(--border); color: var(--muted);">Codex CLI</th>
+              <th style="padding: 0.75rem; border-bottom: 2px solid var(--border); color: var(--muted);">OpenCode</th>
+              <th style="padding: 0.75rem; border-bottom: 2px solid var(--border); color: var(--muted);">Gemini CLI</th>
+            </tr>
+          </thead>
+          <tbody id="compareBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ROADMAP ===== -->
+  <section id="roadmap" aria-label="roadmap">
+    <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 3rem 1.5rem;">
+      <div style="text-align: center; margin-bottom: 2.5rem;">
+        <h2 style="font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; margin-bottom: 0.75rem;">Roadmap</h2>
+        <p style="color: var(--muted); max-width: 640px; margin: 0 auto;">From v0.1 to v1.0 — the 18-phase plan.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
+        <div class="card" style="background: var(--surface); border: 1px solid var(--accent-cyan); border-radius: 8px; padding: 1.5rem;">
+          <p style="font-size: 0.75rem; letter-spacing: 0.1em; color: var(--accent-cyan); margin-bottom: 0.5rem;">SHIPPED · v0.1.1</p>
+          <ul style="color: var(--muted); font-size: 0.9rem; padding-left: 1.1rem; line-height: 1.8;">
+            <li>Agent runtime: streaming, tools, modes</li>
+            <li>47 providers · 258 model aliases</li>
+            <li>Sessions, checkpoints, undo</li>
+            <li>Ralph verify loops · subagents · worktrees</li>
+            <li>MCP client <em>and</em> XMINAL-as-MCP-server</li>
+            <li>Web UI at <code>/</code> · HTTP/SSE API · Telegram</li>
+          </ul>
+        </div>
+        <div class="card" style="background: var(--surface); border: 1px solid var(--accent-blue); border-radius: 8px; padding: 1.5rem;">
+          <p style="font-size: 0.75rem; letter-spacing: 0.1em; color: var(--accent-blue); margin-bottom: 0.5rem;">NEXT · v0.2</p>
+          <ul style="color: var(--muted); font-size: 0.9rem; padding-left: 1.1rem; line-height: 1.8;">
+            <li>LSP diagnostics wiring</li>
+            <li>Ink-class streaming TUI</li>
+            <li>ACP (Agent Client Protocol)</li>
+            <li>Skills marketplace + <code>xminal skills install</code></li>
+            <li>Per-model router: quota/cost-aware</li>
+          </ul>
+        </div>
+        <div class="card" style="background: var(--surface); border: 1px solid var(--accent-violet); border-radius: 8px; padding: 1.5rem;">
+          <p style="font-size: 0.75rem; letter-spacing: 0.1em; color: var(--accent-violet); margin-bottom: 0.5rem;">VISION · v1.0</p>
+          <ul style="color: var(--muted); font-size: 0.9rem; padding-left: 1.1rem; line-height: 1.8;">
+            <li>Parallel worktree fleets with merge arbitrage</li>
+            <li>Background agents + cron/interval runs</li>
+            <li>Sandboxed cloud execution tiers</li>
+            <li>Cost-optimal planner/executor split</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FAQ ===== -->
+  <section id="faq" aria-label="faq">
+    <div class="container" style="max-width: 900px; margin: 0 auto; padding: 3rem 1.5rem;">
+      <div style="text-align: center; margin-bottom: 2.5rem;">
+        <h2 style="font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700;">FAQ</h2>
+      </div>
+      <div id="faqList"></div>
+    </div>
+  </section>
+
+  <!-- ===== FINAL CTA ===== -->
+  <section id="cta" aria-label="call to action" style="text-align: center; padding: 4rem 1.5rem; border-top: 1px solid var(--border);">
+    <h2 style="font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; margin-bottom: 1rem;">Ship faster.<br><span style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue), var(--accent-violet)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Own your agent.</span></h2>
+    <p style="color: var(--muted); margin-bottom: 1.5rem;">MIT. Local-first. No telemetry. Yours.</p>
+    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+      <button class="cta-btn" id="copyBtn2" style="font-size: 1rem; padding: 0.9rem 1.75rem;">npm install -g xminal
+        <svg class="copy-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13"></rect><path d="M5 12h14"></path></svg>
+      </button>
+      <a class="cta-btn" href="https://github.com/quitsaurabhverma2008-sketch/xminal" target="_blank" rel="noopener" style="background: var(--surface); border: 1px solid var(--border); color: var(--text);">View on GitHub →</a>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer style="border-top: 1px solid var(--border); padding: 2rem 1.5rem; text-align: center; color: var(--muted); font-size: 0.85rem;">
+    <p style="font-weight: 700; letter-spacing: 0.15em; color: var(--text); margin-bottom: 0.5rem;">XMINAL</p>
+    <p>MIT License · <a href="https://github.com/quitsaurabhverma2008-sketch/xminal">GitHub</a> · <a href="https://www.npmjs.com/package/xminal">npm</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.75rem;">Built from 125 MIT terminal-agent projects — see <code>FEATURE_MATRIX.md</code></p>
+  </footer>
+
+  <script>
+    const providers = [
+      ["opencode","keyless default"],["openai","cloud"],["anthropic","native"],["gemini","native"],
+      ["openrouter","cloud"],["groq","cloud"],["deepseek","cloud"],["mistral","cloud"],["xai","cloud"],
+      ["cerebras","cloud"],["cohere","cloud"],["togetherai","cloud"],["fireworks","cloud"],["perplexity","cloud"],
+      ["moonshotai","cloud"],["moonshotai_cn","cloud"],["huggingface","cloud"],["github","GitHub Models"],
+      ["nvidia","cloud"],["deepinfra","cloud"],["sambanova","cloud"],["novita","cloud"],["friendli","cloud"],
+      ["nebius","cloud"],["poe","cloud"],["ollama_cloud","cloud"],["zai","cloud"],["zhipuai","cloud"],
+      ["minimax","cloud"],["stepfun","cloud"],["stepfun_cn","cloud"],["siliconflow","cloud"],["volcengine","cloud"],
+      ["302ai","cloud"],["venice","cloud"],["vercel","cloud"],["alibaba","cloud"],["ollama","local"],
+      ["ollama_cn","local"],["lmstudio","local"],["vllm","local"],["llama_cpp","local"],["koboldcpp","local"],
+      ["textgen","local"],["gpt4all","local"],["openwebui","local"],
+    ];
+    const grid = document.getElementById('providerGrid');
+    for (const [name, kind] of providers) {
+      const el = document.createElement('div');
+      el.style.cssText = 'background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.7rem; text-align: center; font-size: 0.8rem;';
+      el.innerHTML = `<div style="color: var(--text); font-weight: 600;">${name}</div><div style="color: var(--muted); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.15rem;">${kind}</div>`;
+      grid.appendChild(el);
+    }
+
+    const compareRows = [
+      ["Providers (built-in)","47","~10","~20","many via plugins","few"],
+      ["Open-source (MIT)","✓","✓","—","✓","✓"],
+      ["MCP client + server","✓","—","—","✓","—"],
+      ["Subagents / worktrees","✓","—","—","✓","—"],
+      ["Local models (Ollama)","✓","✓","—","✓","—"],
+      ["Web UI built-in","✓","—","—","✓","—"],
+      ["Telegram bridge","✓","—","—","—","—"],
+      ["Hash-chained audit log","✓","—","—","—","—"],
+      ["Cost / token tracking","✓","✓","✓","✓","✓"],
+    ];
+    const tbody = document.getElementById('compareBody');
+    for (const [cap, ...cells] of compareRows) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td style="padding: 0.75rem; border-bottom: 1px solid var(--border);">${cap}</td>` +
+        cells.map((c, i) => `<td style="padding: 0.75rem; text-align: center; border-bottom: 1px solid var(--border); color: ${i===0 ? 'var(--accent-cyan)' : 'var(--muted)'};">${c}</td>`).join('');
+      tbody.appendChild(tr);
+    }
+
+    const faqs = [
+      ["Which models can I use?", "Any of 258 aliased models across OpenCode (keyless default), OpenAI, Anthropic, Gemini, OpenRouter, Groq, DeepSeek, Mistral, xAI, Cerebras, Cohere, Together, Fireworks, Moonshot and more. Local Ollama/LM Studio/vLLM included."],
+      ["Is it free?", "Yes — MIT, zero telemetry, zero SaaS lock-in. The default OpenCode free models cost nothing. Bring your own keys for everything else."],
+      ["Does it phone home?", "No. No analytics, no telemetry, no accounts. Your code stays on your machine; the only network calls are to the model providers you configure."],
+      ["Can I use a local model?", "Yes — install Ollama, run `ollama pull qwen3:0.6b`, then `xminal -m ollama/qwen3:0.6b`. It's fully offline and unlimited."],
+    ];
+    const faqList = document.getElementById('faqList');
+    for (const [q, a] of faqs) {
+      const details = document.createElement('details');
+      details.style.cssText = 'border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 0.75rem; background: var(--surface);';
+      details.innerHTML = `<summary style="cursor: pointer; font-weight: 600;">${q}</summary><p style="color: var(--muted); margin-top: 0.75rem; font-size: 0.9rem;">${a}</p>`;
+      faqList.appendChild(details);
+    }
+
+    function wireCopy(id, text) {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(text); } catch {}
+        const original = btn.firstChild.textContent;
+        btn.firstChild.textContent = 'Copied ✓';
+        setTimeout(() => { btn.firstChild.textContent = original; }, 1500);
+      });
+    }
+    wireCopy('copyBtn', 'npm install -g xminal');
+    wireCopy('copyBtn2', 'npm install -g xminal');
+    wireCopy('installChip', 'npm install -g xminal');
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => { c.style.display = 'none'; });
+        btn.classList.add('active');
+        const target = document.getElementById(btn.dataset.tab === 'macos' ? 'macosTab' : 'termuxTab');
+        if (target) target.style.display = 'block';
+      });
+    });
+
+    const reveal = document.querySelectorAll('section');
+    const io = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) e.target.style.opacity = '1';
+    }, { threshold: 0.05 });
+    reveal.forEach(s => { s.style.transition = 'opacity 0.6s'; if (getComputedStyle(s).opacity === '1') return; s.style.opacity = '0.35'; io.observe(s); });
+  </script>
+</body>
+</html>

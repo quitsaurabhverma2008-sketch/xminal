@@ -172,7 +172,7 @@ export class Agent {
           } else if (event.type === "reasoning") {
             this.callbacks.onReasoning?.(event.text);
           } else if (event.type === "tool_call") {
-            toolCalls.push(event.call);
+            toolCalls.push({ ...event.call, arguments: normalizeToolArguments(event.call.arguments) });
           } else if (event.type === "usage") {
             const actualModel = event.model ?? model;
             this.cost.add(event.usage, actualModel);
@@ -384,6 +384,17 @@ function compactHistory(messages: ChatMessage[], keepRecent: number): ChatMessag
     { role: "user", content: `[Earlier conversation summary — ${older.length} messages]\n${summary}` },
     ...recent,
   ];
+}
+
+function normalizeToolArguments(raw: string): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return "{}";
+  try {
+    const parsed = JSON.parse(trimmed);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? JSON.stringify(parsed) : "{}";
+  } catch {
+    return "{}";
+  }
 }
 
 function safeParseArgs(text: string): Record<string, unknown> {

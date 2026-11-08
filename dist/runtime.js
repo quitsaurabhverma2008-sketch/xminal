@@ -33,15 +33,20 @@ class Runtime {
         this.tools = new registry_1.ToolRegistry();
         this.tools.registerAll((0, index_1.allTools)());
         const mode = this.options.mode ?? (this.config.permissions.mode === "full" ? "yolo" : "build");
+        const effectiveModel = this.options.model ?? this.config.defaultModel;
         if (this.options.sessionId) {
             this.session = session_1.Session.load(cwd, this.options.sessionId);
+            if (this.options.model)
+                this.session.setModel(this.options.model);
         }
         else if (!this.options.newSession) {
             const latest = session_1.Session.latest(cwd);
-            this.session = latest ?? session_1.Session.create(cwd, { model: this.config.defaultModel, mode: this.config.permissions.mode, agentMode: mode });
+            this.session = latest ?? session_1.Session.create(cwd, { model: effectiveModel, mode: this.config.permissions.mode, agentMode: mode });
+            if (this.options.model && this.session.meta.model !== this.options.model)
+                this.session.setModel(this.options.model);
         }
         else {
-            this.session = session_1.Session.create(cwd, { model: this.config.defaultModel, mode: this.config.permissions.mode, agentMode: mode });
+            this.session = session_1.Session.create(cwd, { model: effectiveModel, mode: this.config.permissions.mode, agentMode: mode });
         }
         const permissionMode = mode === "yolo" ? "full" : this.config.permissions.mode;
         this.permissions = new permissions_1.PermissionManager(cwd, permissionMode, this.config.permissions.protectedPaths, this.options.askHandler);
