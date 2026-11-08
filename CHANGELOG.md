@@ -4,6 +4,19 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-11-08
+
+**Published on npm: `xminal@0.3.0`** (`npm install -g xminal`).
+
+### Added
+
+- **OpenCode-class TUI layout**: fullscreen alternate-screen UI with header (logo + session + model/mode/permission/cost), role-colored streaming chat, right-hand sidebar (session, location + git branch, TODOS synced from state, MCP servers + tool counts, skills/tools counters), boxed input, and footer.
+- **`/`-command palette** with fuzzy prefix match, ↑/↓ navigation, Tab completion.
+- **Ctrl+B** toggles sidebar · **Tab** cycles agent mode · **PgUp/PgDn** scrollback · **Ctrl+C** abort/quit.
+- Sidebar collapses under 100 columns; `--no-tui` still falls back to classic REPL for non-TTY.
+- Multiline paste now submits per line (embedded `\r`/`\n`).
+
+
 ## [0.2.0] — 2026-11-08
 
 **Published on npm: `xminal@0.2.0`** (`npm install -g xminal`).

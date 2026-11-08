@@ -32,14 +32,19 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startTui = startTui;
 const config_1 = require("../config/config");
+const node_path_1 = __importDefault(require("node:path"));
 const ansi_1 = require("../util/ansi");
 const version_1 = require("../version");
-const render_1 = require("../cli/render");
-const tool_usage_1 = require("../core/tool-usage");
+const engine_1 = require("./engine");
+const state_1 = require("./state");
 const layout_1 = require("./layout");
+const render_1 = require("../cli/render");
 const LOGO = [
     "███╗   ███╗██╗███╗   ██╗ █████╗ ██╗     ",
     "████╗ ████║██║████╗  ██║██╔══██╗██║     ",
@@ -49,207 +54,225 @@ const LOGO = [
     "╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝",
 ];
 const COMMANDS = [
-    "/help", "/model", "/models", "/mode", "/permissions", "/status", "/cost", "/tools",
-    "/sessions", "/resume", "/new", "/undo", "/rewind", "/checkpoints", "/compact", "/clear",
-    "/memory", "/skills", "/mcp", "/audit", "/doctor", "/verify", "/ralph", "/init",
-    "/diff", "/git", "/tasks", "/brain", "/features", "/version", "/exit",
+    { name: "/help", desc: "show all commands" },
+    { name: "/model", desc: "show or switch model (provider/model)" },
+    { name: "/models", desc: "list providers and aliases" },
+    { name: "/mode", desc: "switch plan/build/compose/review/yolo" },
+    { name: "/permissions", desc: "show or set ask/auto/full" },
+    { name: "/status", desc: "session and agent status" },
+    { name: "/cost", desc: "token usage and spend" },
+    { name: "/tools", desc: "per-tool token usage" },
+    { name: "/sessions", desc: "list sessions" },
+    { name: "/new", desc: "start a new session" },
+    { name: "/resume", desc: "resume a session (latest)" },
+    { name: "/undo", desc: "undo last checkpoint" },
+    { name: "/rewind", desc: "restore a checkpoint" },
+    { name: "/checkpoints", desc: "list checkpoints" },
+    { name: "/compact", desc: "compact conversation" },
+    { name: "/memory", desc: "memory list/add/search/forget" },
+    { name: "/skills", desc: "list skills; --lock/--verify to trust" },
+    { name: "/mcp", desc: "list MCP servers + per-tool usage" },
+    { name: "/audit", desc: "verify hash-chained audit log" },
+    { name: "/doctor", desc: "environment diagnostics" },
+    { name: "/verify", desc: "run project verification" },
+    { name: "/ralph", desc: "iterate until verify passes" },
+    { name: "/tasks", desc: "show the task list" },
+    { name: "/diff", desc: "git diff" },
+    { name: "/git", desc: "run a git command" },
+    { name: "/init", desc: "initialize .xminal in this project" },
+    { name: "/brain", desc: "show BRAIN.md" },
+    { name: "/features", desc: "show the feature matrix" },
+    { name: "/clear", desc: "clear this screen" },
+    { name: "/exit", desc: "quit XMINAL" },
 ];
 async function startTui(runtime) {
-    const renderer = new render_1.Renderer();
-    let busy = false;
+    const cwd = runtime.cwd;
     let closed = false;
-    let panel = "none";
+    let busy = false;
     let scroll = 0;
-    let statusLine = "ready";
-    let pendingPermission = null;
+    let statusHint = "";
+    let panelMode = "chat";
+    let sidebarVisible = (process.stdout.columns ?? 80) >= 100;
+    let paletteOpen = false;
+    let paletteIndex = 0;
+    let todos = (0, state_1.loadTodos)(cwd);
+    const gitBranch = (0, state_1.detectGitBranch)(cwd);
+    let mcpSummary = runtime.mcp
+        .listServerNames()
+        .map((server) => ({ server, tools: "?" }));
     const lines = [];
-    const cols = () => Math.max(40, process.stdout.columns ?? 80);
-    const rows = () => Math.max(14, process.stdout.rows ?? 24);
     let input = "";
     let cursor = 0;
-    const sgr = {
-        reset: "\x1b[0m",
-        bold: "\x1b[1m",
-        dim: "\x1b[2m",
-        cyan: "\x1b[36m",
-        brightCyan: "\x1b[96m",
-        magenta: "\x1b[35m",
-        yellow: "\x1b[33m",
-        green: "\x1b[32m",
-        red: "\x1b[31m",
-        gray: "\x1b[90m",
-        accent: "\x1b[38;5;51m",
-        violet: "\x1b[38;5;141m",
+    let pendingPermission = null;
+    let inCodeBlock = false;
+    const cols = () => Math.max(40, process.stdout.columns ?? 80);
+    const rows = () => Math.max(16, process.stdout.rows ?? 24);
+    const sidebarWidth = () => (sidebarVisible ? 44 : 0);
+    const chatWidth = () => Math.max(20, cols() - sidebarWidth());
+    const sbHeight = () => Math.max(4, rows() - 5);
+    const sessionTitle = runtime.session.meta.title === "untitled" ? "new session" : runtime.session.meta.title;
+    const shortId = runtime.session.id.slice(0, 8);
+    // ---------- rendering helpers ----------
+    const wrapKindPrefix = (kind) => {
+        const w = chatWidth();
+        switch (kind) {
+            case "user": return { prefix: engine_1.theme.cyan + "you ▸ " + engine_1.reset, body: w - 6 };
+            case "assistant": return { prefix: engine_1.theme.accent + "xminal ▸ " + engine_1.reset, body: w - 9 };
+            case "tool": return { prefix: engine_1.theme.yellow + " ● " + engine_1.reset, body: w - 3 };
+            case "ok": return { prefix: engine_1.theme.green + " ✓ " + engine_1.reset, body: w - 3 };
+            case "err": return { prefix: engine_1.theme.red + " ✗ " + engine_1.reset, body: w - 3 };
+            default: return { prefix: engine_1.theme.muted + " · " + engine_1.reset, body: w - 3 };
+        }
     };
-    const scrollbackHeight = () => Math.max(3, rows() - 6);
-    const rolePrefix = (kind) => kind === "user" ? sgr.cyan + "  you › " + sgr.reset
-        : kind === "assistant" ? sgr.accent + "agent › " + sgr.reset
-            : kind === "tool" ? sgr.yellow + "  ●   " + sgr.reset
-                : kind === "ok" ? sgr.green + "  ✓   " + sgr.reset
-                    : kind === "err" ? sgr.red + "  ✗   " + sgr.reset
-                        : sgr.gray + "  ·   " + sgr.reset;
-    const allWrapped = () => {
-        const width = cols();
-        const body = Math.max(8, width - 8);
-        const pad = " ".repeat(8);
+    const renderLines = () => {
         const out = [];
         for (const line of lines) {
-            const prefix = rolePrefix(line.kind);
-            const parts = (0, layout_1.wrapText)(line.text, body);
+            const { prefix, body } = wrapKindPrefix(line.kind);
+            const parts = (0, layout_1.wrapText)(line.text, Math.max(4, body));
             for (let i = 0; i < parts.length; i++) {
-                out.push((i === 0 ? prefix : pad) + parts[i]);
+                out.push((i === 0 ? prefix : " ".repeat(2)) + parts[i]);
             }
         }
         return out;
     };
-    const buildPanelLines = (width) => {
-        const inner = Math.max(10, width - 4);
+    const renderSidebar = (x, y, width, height) => {
+        const inner = width - 2;
         const out = [];
-        const hr = (title) => {
-            const label = ` ${title} `;
-            out.push(sgr.brightCyan + "┌─" + label + "─".repeat(Math.max(0, inner - label.length - 1)) + "┐" + sgr.reset);
-        };
-        const row = (text) => out.push(sgr.gray + "│ " + sgr.reset + (0, ansi_1.truncate)(text, inner - 2) + " ".repeat(Math.max(0, inner - 2 - (0, ansi_1.visibleLength)(text))) + sgr.gray + " │" + sgr.reset);
-        const close = () => out.push(sgr.gray + "└" + "─".repeat(Math.max(0, inner)) + "┘" + sgr.reset);
-        if (panel === "mcp") {
-            hr("MCP · F1");
-            const servers = runtime.mcp.listServerNames();
-            row(servers.length ? `servers (${servers.length}): ${servers.join(", ")}` : "(no MCP servers configured — add mcpServers to ~/.xminal/config.json)");
-            row("");
-            row("tool usage (all-time, ≈ tokens from chars/4):");
-            const usage = (0, tool_usage_1.loadToolUsage)(runtime.cwd);
-            if (usage.byTool.length === 0) {
-                row("  (no calls recorded yet)");
-            }
-            else {
-                for (const bucket of usage.byTool.slice(0, Math.max(4, scrollbackHeight() - 8))) {
-                    const name = bucket.name.padEnd(34).slice(0, 34);
-                    const calls = String(bucket.calls).padStart(5);
-                    const tokens = (0, tool_usage_1.formatTokens)(bucket.tokens).padStart(7);
-                    const errs = bucket.errors > 0 ? ` ${bucket.errors} err` : "";
-                    row(`  ${name} ${calls} ${tokens} tok${errs}`);
-                }
-                row(`total: ${usage.totalCalls} calls · ${(0, tool_usage_1.formatTokens)(usage.totalTokens)} tokens · ${usage.totalErrors} errors`);
-            }
-            close();
+        const line = (content) => engine_1.theme.border + "│" + engine_1.reset + (0, ansi_1.pad)((0, ansi_1.truncate)(content, inner), inner) + engine_1.theme.border + "│" + engine_1.reset;
+        out.push(engine_1.theme.border + "┌" + "─".repeat(width === 44 ? 1 : 0) + "─".repeat(Math.max(0, inner - 1)) + "┐" + engine_1.reset);
+        out.push(line(`${engine_1.theme.accent}◆${engine_1.reset} ${engine_1.theme.text}${(0, ansi_1.truncate)(sessionTitle, inner - 4)}`));
+        out.push(line(`${engine_1.theme.muted}${shortId}${engine_1.reset}`));
+        out.push(line(""));
+        out.push(line(`${engine_1.theme.muted}LOCATION${engine_1.reset}`));
+        out.push(line(`${engine_1.theme.text}${node_path_1.default.basename(cwd)}${engine_1.reset}`));
+        if (gitBranch)
+            out.push(line(`${engine_1.theme.muted}⎇ ${engine_1.theme.accent2}${(0, ansi_1.truncate)(gitBranch, inner - 4)}${engine_1.reset}`));
+        out.push(line(""));
+        const done = todos.filter((t) => t.status === "completed").length;
+        out.push(line(`${engine_1.theme.muted}TODOS${engine_1.reset} ${engine_1.theme.muted}${done}/${todos.length}${engine_1.reset}`));
+        if (todos.length === 0) {
+            out.push(line(`${engine_1.theme.muted}(no tasks — ask xminal to plan one)${engine_1.reset}`));
         }
-        else if (panel === "skills") {
-            hr("SKILLS · F2");
-            const skills = runtime.skills.list();
-            if (skills.length === 0) {
-                row("(no skills installed — place SKILL.md folders in .xminal/skills or ~/.agents/skills)");
+        else {
+            for (const todo of todos.slice(0, 8)) {
+                out.push(line(`${(0, engine_1.statusPill)(todo.status)}${engine_1.theme.text}${(0, ansi_1.truncate)(todo.text, inner - 4)}${engine_1.reset}`));
             }
-            else {
-                for (const skill of skills.slice(0, Math.max(4, scrollbackHeight() - 6))) {
-                    row(`${sgr.brightCyan}${skill.name}${sgr.reset} ${sgr.gray}(${skill.source})${sgr.reset}`);
-                    row(`  ${(0, ansi_1.truncate)(skill.description, inner - 4)}`);
-                }
-                row(`${skills.length} skill(s)`);
+            if (todos.length > 8)
+                out.push(line(`${engine_1.theme.muted}… +${todos.length - 8} more${engine_1.reset}`));
+        }
+        out.push(line(""));
+        const anyMcp = mcpSummary.length > 0;
+        out.push(line(`${engine_1.theme.muted}MCP SERVERS${engine_1.reset}`));
+        if (!anyMcp) {
+            out.push(line(`${engine_1.theme.muted}(none configured)${engine_1.reset}`));
+        }
+        else {
+            for (const { server, tools } of mcpSummary) {
+                out.push(line(`${engine_1.theme.green}●${engine_1.reset} ${engine_1.theme.text}${(0, ansi_1.truncate)(server, inner - 8)}${engine_1.reset} ${engine_1.theme.muted}${tools}t${engine_1.reset}`));
             }
-            close();
         }
-        else if (panel === "status") {
-            hr("STATUS · F3");
-            const cost = runtime.agent.getCost();
-            const rows = [
-                ["model", runtime.agent.modelSpec],
-                ["mode", runtime.agent.mode],
-                ["permission", runtime.permissions.mode],
-                ["session", runtime.session.id.slice(0, 8)],
-                ["cwd", runtime.cwd],
-                ["turns", String(cost.turns)],
-                ["tokens", `${cost.inputTokens} in / ${cost.outputTokens} out`],
-                ["cost", `$${cost.costUsd.toFixed(6)}`],
-                ["tools", String(runtime.tools.names().length)],
-                ["skills", String(runtime.skills.list().length)],
-                ["mcp servers", String(runtime.mcp.listServerNames().length)],
-                ["session messages", String(runtime.session.messages.length)],
-            ];
-            for (const [key, value] of rows)
-                row(`${sgr.gray}${key.padEnd(16)}${sgr.reset} ${value}`);
-            close();
+        out.push(line(""));
+        out.push(line(`${engine_1.theme.muted}SKILLS${engine_1.reset} ${engine_1.theme.text}${runtime.skills.list().length}${engine_1.reset}`));
+        out.push(line(`${engine_1.theme.muted}TOOLS${engine_1.reset} ${engine_1.theme.text}${runtime.tools.names().length}${engine_1.reset}`));
+        out.push(engine_1.theme.border + "└" + "─".repeat(inner) + "┘" + engine_1.reset);
+        return out.slice(0, height);
+    };
+    const renderHeader = () => {
+        const w = cols();
+        const cost = runtime.agent.getCost();
+        const logo = engine_1.theme.accent + LOGO[0] + engine_1.reset;
+        const titleRight = engine_1.theme.muted + (sessionTitle === "new session" ? "new session" : sessionTitle) + engine_1.reset;
+        const line0 = engine_1.theme.accent + logo + " " + engine_1.reset + titleRight;
+        const metaLeft = `${engine_1.theme.accent}${runtime.agent.modelSpec}${engine_1.reset} ${engine_1.theme.muted}·${engine_1.reset} ${(0, engine_1.modeColor)(runtime.agent.mode)}${runtime.agent.mode}${engine_1.reset} ${engine_1.theme.muted}·${engine_1.reset} ${engine_1.theme.yellow}${runtime.permissions.mode}${engine_1.reset}`;
+        const metaRight = `${engine_1.theme.muted}${(0, engine_1.formatCost)(cost.costUsd)} · ${cost.turns} turns${engine_1.reset}`;
+        const line1 = (0, ansi_1.truncate)(metaLeft, Math.max(10, w - (0, ansi_1.visibleLength)(metaRight) - 2)) +
+            " ".repeat(Math.max(1, w - (0, ansi_1.visibleLength)(metaLeft) - (0, ansi_1.visibleLength)(metaRight) - 1)) + metaRight;
+        return [(0, ansi_1.pad)((0, ansi_1.truncate)(line0, w), w), (0, ansi_1.pad)((0, ansi_1.truncate)(line1, w), w), (0, engine_1.rule)(w)];
+    };
+    const renderInput = () => {
+        const w = chatWidth();
+        const out = [];
+        const border = engine_1.theme.border;
+        const line = `${border}│${engine_1.reset} `;
+        out.push(border + "┌" + "─".repeat(Math.max(0, w - 2)) + "┐" + engine_1.reset);
+        if (pendingPermission) {
+            const ask = pendingPermission;
+            const prompt = `${engine_1.theme.yellow}? allow ${ask.tool}${engine_1.reset} ${engine_1.theme.muted}(${(0, ansi_1.truncate)(ask.reason, w - 20)})${engine_1.reset} ${engine_1.theme.cyan}[y/N]${engine_1.reset}`;
+            out.push(line + (0, ansi_1.pad)((0, ansi_1.truncate)(prompt, w - 3), w - 3) + border + "│" + engine_1.reset);
         }
+        else {
+            const placeholder = input === "" ? `${engine_1.theme.muted}ask anything…  ( / for commands )${engine_1.reset}` : "";
+            out.push(line + (0, ansi_1.pad)((0, ansi_1.truncate)(engine_1.theme.accent + "› " + engine_1.reset + input + placeholder, w - 3), w - 3) + border + "│" + engine_1.reset);
+        }
+        out.push(border + "└" + "─".repeat(Math.max(0, w - 2)) + "┘" + engine_1.reset);
         return out;
+    };
+    const renderPalette = () => {
+        if (!paletteOpen)
+            return [];
+        const w = Math.min(64, cols() - 8);
+        const q = input.toLowerCase();
+        const items = COMMANDS.filter((c) => c.name.startsWith(q));
+        const shown = items.slice(0, 8);
+        const out = [];
+        out.push(engine_1.theme.border + "┌─ " + engine_1.theme.accent + "COMMANDS" + engine_1.theme.muted + `  ${items.length} match${items.length === 1 ? "" : "es"}` + engine_1.theme.border + " " + "─".repeat(Math.max(0, w - 22)) + "┐" + engine_1.reset);
+        if (shown.length === 0) {
+            out.push(engine_1.theme.border + "│ " + engine_1.theme.muted + "no matches" + engine_1.reset + (0, ansi_1.pad)("", w - 13) + engine_1.theme.border + "│" + engine_1.reset);
+        }
+        else {
+            shown.forEach((item, i) => {
+                const selected = i === paletteIndex;
+                const marker = selected ? engine_1.theme.accent + "› " + engine_1.reset : "  ";
+                const text = `${marker}${engine_1.theme.text}${item.name}${engine_1.reset} ${engine_1.theme.muted}— ${item.desc}${engine_1.reset}`;
+                out.push(engine_1.theme.border + "│ " + engine_1.reset + (0, ansi_1.pad)((0, ansi_1.truncate)(text, w - 3), w - 3) + engine_1.theme.border + "│" + engine_1.reset);
+            });
+        }
+        out.push(engine_1.theme.border + "└" + "─".repeat(Math.max(0, w - 2)) + "┘" + engine_1.reset);
+        return out;
+    };
+    const renderFooter = () => {
+        const w = cols();
+        const left = `${engine_1.theme.muted} / commands  ·  Tab mode  ·  Ctrl+B sidebar  ·  Ctrl+C ${busy ? "abort" : "quit"}  ·  Esc palette${engine_1.reset}`;
+        return [(0, ansi_1.pad)((0, ansi_1.truncate)(left, w), w)];
     };
     const render = () => {
-        const width = cols();
-        const sbHeight = scrollbackHeight();
-        const wrapped = allWrapped();
-        const end = Math.max(0, wrapped.length - scroll);
-        const view = wrapped.slice(Math.max(0, end - sbHeight), end);
-        const buf = [];
-        const padLine = (s) => (s.length >= width ? s.slice(0, width) : s + " ".repeat(Math.max(0, width - s.length)));
-        // 0: logo + session
-        const sessionShort = runtime.session.id.slice(0, 8);
-        buf.push(padLine((0, ansi_1.truncate)(sgr.accent + LOGO[0] + " " + sgr.reset + sgr.gray + "session " + sessionShort + " · " + runtime.cwd + sgr.reset, width)));
-        // 1: model/mode/cost
-        const cost = runtime.agent.getCost();
-        const metaLeft = `${sgr.brightCyan}${runtime.agent.modelSpec}${sgr.reset}  ${sgr.gray}· mode ${sgr.reset}${sgr.violet}${runtime.agent.mode}${sgr.reset}  ${sgr.gray}· perm ${sgr.reset}${sgr.yellow}${runtime.permissions.mode}${sgr.reset}`;
-        const metaRight = `${sgr.gray}$${cost.costUsd.toFixed(4)} · ${cost.turns} turns${sgr.reset}`;
-        buf.push(padLine((0, ansi_1.truncate)(metaLeft + " ".repeat(Math.max(1, width - (0, ansi_1.visibleLength)(metaLeft) - (0, ansi_1.visibleLength)(metaRight))) + metaRight, width)));
-        // 2: separator
-        buf.push(padLine(sgr.gray + "─".repeat(width) + sgr.reset));
-        // messages / panel
-        if (panel !== "none") {
-            const panelLines = buildPanelLines(width);
-            for (let row = 0; row < sbHeight; row++) {
-                buf.push(padLine((0, ansi_1.truncate)(panelLines[row] ?? "", width)));
+        const w = cols();
+        const messageLines = renderLines();
+        const end = Math.max(0, messageLines.length - scroll);
+        const view = messageLines.slice(Math.max(0, end - sbHeight()), end);
+        const out = [];
+        out.push(...renderHeader());
+        const palette = paletteOpen ? renderPalette() : [];
+        const effSb = Math.max(2, sbHeight() - palette.length);
+        for (let row = 0; row < effSb; row++) {
+            const line = view[row] ?? "";
+            const chatCol = (0, ansi_1.pad)((0, ansi_1.truncate)(line, chatWidth()), chatWidth());
+            if (sidebarVisible) {
+                const sidebar = renderSidebar(0, row, sidebarWidth(), effSb);
+                const sideCol = sidebar[row] ?? " ".repeat(sidebarWidth());
+                out.push(chatCol + sideCol);
+            }
+            else {
+                out.push(chatCol);
             }
         }
-        else {
-            for (let row = 0; row < sbHeight; row++) {
-                buf.push(padLine((0, ansi_1.truncate)(view[row] ?? "", width)));
-            }
+        if (palette.length) {
+            for (const p of palette)
+                out.push((0, ansi_1.pad)((0, ansi_1.truncate)(p, w), w));
         }
-        // scrollback indicator / separator
-        if (scroll > 0) {
-            buf.push(padLine(sgr.gray + `··· ${scroll} line(s) above · PgDn to return` + sgr.reset));
-        }
-        else {
-            buf.push(padLine(sgr.gray + "─".repeat(width) + sgr.reset));
-        }
-        // palette popup (above input box)
-        const palette = paletteItems();
-        const paletteShown = palette.slice(0, 6);
-        if (paletteShown.length > 0) {
-            buf.push(padLine(sgr.gray + "  commands matching " + input + sgr.reset));
-            for (const item of paletteShown) {
-                const marker = item === paletteShown[0] ? sgr.brightCyan + "▸ " : "  ";
-                buf.push(padLine(sgr.brightCyan + marker + item + sgr.reset));
-            }
-        }
-        // input box (or permission prompt)
-        const border = sgr.gray;
-        buf.push(padLine(border + "┌" + "─".repeat(Math.max(0, width - 2)) + "┐" + sgr.reset));
-        const inputWidth = Math.max(8, width - 4);
-        if (pendingPermission) {
-            const prompt = sgr.yellow + `? Allow ${pendingPermission.tool}` + sgr.reset + sgr.gray + ` (${pendingPermission.reason})` + sgr.reset;
-            const hint = sgr.gray + " [y/N]" + sgr.reset;
-            buf.push(padLine(border + "│" + sgr.reset + " " + (0, ansi_1.truncate)(prompt + hint, inputWidth) + " ".repeat(Math.max(0, inputWidth - (0, ansi_1.visibleLength)(prompt + hint))) + border + "│" + sgr.reset));
-        }
-        else {
-            const prompt = sgr.accent + "› " + sgr.reset;
-            const placeholder = input === "" ? sgr.gray + "ask xminal anything…  ( / for commands )" : "";
-            buf.push(padLine(border + "│" + sgr.reset + " " + (0, ansi_1.pad)((0, ansi_1.truncate)(prompt + input + placeholder, inputWidth), inputWidth) + border + "│" + sgr.reset));
-        }
-        buf.push(padLine(border + "└" + "─".repeat(Math.max(0, width - 2)) + "┘" + sgr.reset));
-        // hints (with status when busy)
-        const hints = busy
-            ? `  ${sgr.accent}●${sgr.reset} ${statusLine} · Ctrl+C abort`
-            : `  / commands · F1 mcp · F2 skills · F3 status · PgUp scroll · Ctrl+C quit`;
-        buf.push(padLine(sgr.gray + hints + sgr.reset));
-        process.stdout.write("\x1b[H" + buf.map((l) => l + "\x1b[K").join("\n"));
+        out.push((0, engine_1.rule)(w));
+        out.push(...renderInput());
+        out.push(...renderFooter());
+        process.stdout.write("\x1b[H" + out.map((l) => l + "\x1b[K").join("\n"));
     };
-    const paletteItems = () => (0, layout_1.matchCommands)(input, COMMANDS);
+    // ---------- runtime plumbing ----------
     const push = (kind, text) => {
         lines.push({ kind, text });
-        if (lines.reduce((acc, l) => acc + l.text.length, 0) > 400_000) {
-            lines.splice(0, Math.floor(lines.length / 2));
-        }
         scroll = 0;
         render();
     };
     const appendAssistant = (text) => {
+        inCodeBlock = text.includes("```") ? !inCodeBlock : inCodeBlock;
         const last = lines[lines.length - 1];
         if (last && last.kind === "assistant") {
             last.text += text;
@@ -260,49 +283,12 @@ async function startTui(runtime) {
             push("assistant", text);
         }
     };
-    const classic = async (cmdLine) => {
-        // Temporarily leave the alternate screen for classic rendering of the command.
-        process.stdout.write("\x1b[?1049l\x1b[?25h\n");
-        const { handleCommand } = await Promise.resolve().then(() => __importStar(require("../cli/commands")));
-        const cliRenderer = new render_1.Renderer();
-        const ctx = {
-            runtime,
-            renderer: cliRenderer,
-            cwd: runtime.cwd,
-            exit: () => {
-                closed = true;
-            },
-            restart: () => undefined,
-            ask: async () => null,
-        };
-        try {
-            await handleCommand(cmdLine, ctx);
-        }
-        catch (error) {
-            cliRenderer.error(error.message);
-        }
-        process.stdout.write("\npress Enter to return to XMINAL…\n");
-        await new Promise((resolve) => {
-            const onData = (chunk) => {
-                clearTimeout(timer);
-                process.stdin.removeListener("data", onData);
-                resolve();
-            };
-            const timer = setTimeout(() => {
-                process.stdin.removeListener("data", onData);
-                resolve();
-            }, 3000);
-            process.stdin.once("data", onData);
-        });
-        process.stdout.write("\x1b[?1049h\x1b[?25l");
-        render();
-    };
     const callbacks = {
         onText: (t) => appendAssistant(t),
-        onToolCall: (call) => push("tool", `${call.name}(${call.arguments.slice(0, 120)})`),
-        onToolResult: (name, result) => push(result.isError ? "err" : "ok", (result.content.split("\n")[0] ?? "").slice(0, 200)),
+        onToolCall: (call) => push("tool", `${call.name}(${(0, ansi_1.truncate)(call.arguments, 100)})`),
+        onToolResult: (_name, result) => push(result.isError ? "err" : "ok", (result.content.split("\n")[0] ?? "").slice(0, 200)),
+        onStatus: (m) => push("system", m),
         onUsage: () => render(),
-        onStatus: (message) => push("system", message),
     };
     runtime.agent.setCallbacks?.(callbacks);
     const askPermission = (tool, reason) => new Promise((resolve) => {
@@ -312,52 +298,63 @@ async function startTui(runtime) {
     runtime.setAskHandler(askPermission);
     const runAgent = async (text) => {
         busy = true;
-        statusLine = "working…";
+        statusHint = "working…";
         push("user", text);
         try {
             const result = await runtime.agent.run(text);
             if (result.stoppedReason !== "done")
                 push("err", `stopped: ${result.stoppedReason}`);
-            else
-                push("ok", "");
         }
         catch (error) {
             push("err", error.message);
         }
         finally {
             busy = false;
-            statusLine = "ready";
+            statusHint = "";
             render();
         }
     };
+    const refreshTodos = () => {
+        todos = (0, state_1.loadTodos)(cwd);
+        render();
+    };
     const close = () => {
+        if (closed)
+            return;
         closed = true;
         process.stdout.write("\x1b[?1049l\x1b[?25h\x1b[0m\n");
         runtime.close();
         process.exit(0);
     };
-    // enter alternate screen
-    process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l");
-    const onResize = () => render();
-    process.stdout.on("resize", onResize);
-    const appendInput = (text) => {
-        for (const ch of text) {
-            if (ch >= " " && ch !== "\x7f") {
-                input = input.slice(0, cursor) + ch + input.slice(cursor);
-                cursor += 1;
-            }
+    // MCP summary (async, best effort)
+    void (async () => {
+        try {
+            const tools = await Promise.race([
+                runtime.mcp.listAllTools(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 15_000)),
+            ]);
+            const counts = new Map();
+            for (const { server } of tools)
+                counts.set(server, (counts.get(server) ?? 0) + 1);
+            mcpSummary = runtime.mcp.listServerNames().map((server) => ({ server, tools: counts.get(server) ?? 0 }));
         }
-    };
+        catch {
+            mcpSummary = runtime.mcp.listServerNames().map((server) => ({ server, tools: 0 }));
+        }
+        render();
+    })();
+    // ---------- raw key handling ----------
     const submitInput = () => {
         const text = input.trim();
         input = "";
         cursor = 0;
+        paletteOpen = false;
         if (!text) {
             render();
             return;
         }
         if (text.startsWith("/")) {
-            const cmd = text.trim();
+            const cmd = text;
             if (cmd === "/exit" || cmd === "/quit") {
                 if (busy)
                     runtime.agent.abort();
@@ -369,13 +366,47 @@ async function startTui(runtime) {
                 render();
                 return;
             }
-            void classic(cmd);
-            return;
+            return classicCommand(cmd);
         }
         scroll = 0;
         render();
         void runAgent(text);
     };
+    const classicCommand = async (cmdLine) => {
+        process.stdout.write("\x1b[?1049l\x1b[?25h\n");
+        const { handleCommand } = await Promise.resolve().then(() => __importStar(require("../cli/commands")));
+        const cliRenderer = new render_1.Renderer();
+        const ctx = {
+            runtime,
+            renderer: cliRenderer,
+            cwd,
+            exit: () => { closed = true; },
+            restart: () => undefined,
+            ask: async () => null,
+        };
+        try {
+            await handleCommand(cmdLine, ctx);
+        }
+        catch (error) {
+            cliRenderer.error(error.message);
+        }
+        refreshTodos();
+        process.stdout.write("\npress any key to return…\n");
+        await new Promise((resolve) => {
+            const onData = () => { process.stdin.removeListener("data", onData); resolve(); };
+            process.stdin.once("data", onData);
+        });
+        process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l");
+        render();
+    };
+    const cycleMode = () => {
+        const modes = ["build", "plan", "compose", "review", "yolo"];
+        const index = modes.indexOf(runtime.agent.mode);
+        const next = modes[(index + 1) % modes.length];
+        runtime.setMode(next);
+        push("system", `mode → ${next}`);
+    };
+    const submitLine = () => submitInput();
     const onData = (chunk) => {
         const s = chunk.toString("utf8");
         if (pendingPermission) {
@@ -388,7 +419,6 @@ async function startTui(runtime) {
             return;
         }
         if (s === "\x03") {
-            // Ctrl+C
             if (busy) {
                 runtime.agent.abort();
                 push("err", "aborted current turn");
@@ -402,46 +432,68 @@ async function startTui(runtime) {
             render();
             return;
         } // Ctrl+L
-        if (s === "\x1b[1;5D")
-            return; // Ctrl+Left (ignore)
-        if (s === "\x1b[1;5C")
-            return; // Ctrl+Right (ignore)
-        if (s === "\x1bP")
-            return; // ignore
         if (s === "\x1b[5~") {
-            scroll = Math.min(scroll + scrollbackHeight(), Math.max(0, allWrapped().length - scrollbackHeight()));
+            scroll = Math.min(scroll + Math.floor(sbHeight() / 2), Math.max(0, renderLines().length - sbHeight()));
             render();
             return;
         } // PgUp
         if (s === "\x1b[6~") {
-            scroll = Math.max(0, scroll - scrollbackHeight());
+            scroll = Math.max(0, scroll - Math.floor(sbHeight() / 2));
             render();
             return;
         } // PgDn
-        if (s === "\x1bOP" || s === "\x1b[11~") {
-            panel = panel === "mcp" ? "none" : "mcp";
+        if (s === "\x1b[H" || s === "\x1b[1~") {
+            scroll = Math.max(0, renderLines().length - sbHeight());
             render();
             return;
-        } // F1
-        if (s === "\x1bOQ" || s === "\x1b[12~") {
-            panel = panel === "skills" ? "none" : "skills";
+        } // Home
+        if (s === "\x1b[F" || s === "\x1b[4~") {
+            scroll = 0;
             render();
             return;
-        } // F2
-        if (s === "\x1bOR" || s === "\x1b[13~") {
-            panel = panel === "status" ? "none" : "status";
-            render();
-            return;
-        } // F3
+        } // End
         if (s === "\x1b") {
-            panel = "none";
+            paletteOpen = false;
             render();
             return;
-        } // Esc closes panel
+        } // Esc
+        if (s === "\t") {
+            if (paletteOpen) {
+                const items = COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase()));
+                if (items.length > 0) {
+                    input = items[paletteIndex % items.length].name + " ";
+                    cursor = input.length;
+                    paletteOpen = false;
+                    render();
+                }
+                return;
+            }
+            cycleMode();
+            return;
+        }
+        if (s === "\x1b[B" || s === "\x1b[A") { // down/up in palette
+            if (paletteOpen) {
+                const items = COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase()));
+                paletteIndex = Math.max(0, Math.min(items.length - 1, paletteIndex + (s === "\x1b[B" ? 1 : -1)));
+                render();
+                return;
+            }
+        }
+        if (s === "\x02") {
+            sidebarVisible = !sidebarVisible;
+            render();
+            return;
+        } // Ctrl+B sidebar
+        if (s === "\r" || s === "\n") {
+            submitInput();
+            return;
+        }
         if (s === "\x7f" || s === "\b") {
             if (cursor > 0) {
                 input = input.slice(0, cursor - 1) + input.slice(cursor);
                 cursor -= 1;
+                if (!input.startsWith("/"))
+                    paletteOpen = false;
                 render();
             }
             return;
@@ -450,75 +502,68 @@ async function startTui(runtime) {
             cursor = Math.max(0, cursor - 1);
             render();
             return;
-        } // left
+        }
         if (s === "\x1b[C") {
             cursor = Math.min(input.length, cursor + 1);
             render();
             return;
-        } // right
-        if (s === "\x1b[H") {
-            cursor = 0;
-            render();
-            return;
-        } // home
-        if (s === "\x1b[F") {
-            cursor = input.length;
-            render();
-            return;
-        } // end
-        if (s === "\x1b[3~") {
-            if (cursor < input.length) {
-                input = input.slice(0, cursor) + input.slice(cursor + 1);
-                render();
-            }
-            return;
-        } // delete
-        if (s === "\t") {
-            const items = paletteItems();
-            if (items.length > 0) {
-                input = items[0] + " ";
-                cursor = input.length;
-                render();
-            }
-            return;
         }
-        // split embedded newlines: append text, submit each line
+        // split embedded newlines: text before each newline is submitted
         let rest = s;
         for (;;) {
             const idx = rest.search(/[\r\n]/);
             if (idx === -1) {
-                if (rest)
-                    appendInput(rest);
+                if (rest) {
+                    for (const ch of rest) {
+                        if (ch === "\x1b")
+                            continue;
+                        if (ch >= " " && ch !== "\x7f") {
+                            input = input.slice(0, cursor) + ch + input.slice(cursor);
+                            cursor += 1;
+                        }
+                    }
+                    if (input.startsWith("/")) {
+                        paletteOpen = true;
+                        paletteIndex = 0;
+                    }
+                    else if (paletteOpen && !input.startsWith("/")) {
+                        paletteOpen = false;
+                    }
+                }
                 break;
             }
             const head = rest.slice(0, idx);
-            if (head)
-                appendInput(head);
-            submitInput();
+            for (const ch of head) {
+                if (ch === "\x1b")
+                    continue;
+                if (ch >= " " && ch !== "\x7f") {
+                    input = input.slice(0, cursor) + ch + input.slice(cursor);
+                    cursor += 1;
+                }
+            }
+            submitLine();
             rest = rest.slice(idx + 1);
             if (closed)
                 return;
         }
         render();
     };
+    // ---------- enter alternate screen ----------
+    process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l");
+    process.stdout.on("resize", render);
     process.stdin.setRawMode?.(true);
     process.stdin.resume();
     process.stdin.on("data", onData);
-    push("system", `XMINAL v${version_1.VERSION} — ${version_1.TAGLINE}`);
-    push("system", `session ${runtime.session.id} · model ${runtime.agent.modelSpec} · mode ${runtime.agent.mode} · folder ${runtime.cwd}`);
+    push("system", `xminal v${version_1.VERSION} — ${version_1.TAGLINE}`);
+    push("system", `session ${shortId} · model ${runtime.agent.modelSpec} · folder ${node_path_1.default.basename(cwd)}`);
     try {
         (0, config_1.resolveModel)(runtime.config, runtime.agent.modelSpec);
     }
     catch {
-        push("err", "No working provider yet. Set one up:");
-        push("err", "  • OPENROUTER_API_KEY=sk-or-...  (free tier: https://openrouter.ai/keys)");
-        push("err", "  • or OPENCODE_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY");
-        push("err", "  • or a local Ollama:  ollama serve && ollama pull qwen3:0.6b");
-        push("err", "  • then restart xminal — or /model to switch");
+        push("err", "no working provider yet — run /doctor or set OPENROUTER_API_KEY / ANTHROPIC_API_KEY");
     }
-    render();
     await new Promise((resolve) => {
-        const check = () => (closed ? resolve() : setTimeout(check, 250));
+        const check = () => (closed ? resolve() : setTimeout(check, 200));
         check();
     });
 }
