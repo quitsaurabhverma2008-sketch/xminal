@@ -6,6 +6,7 @@ import { parseArgs, parseNumberFlag, CLI_HELP } from "./cli/args";
 import { Renderer } from "./cli/render";
 import { rendererCallbacks } from "./cli/callbacks";
 import { startRepl } from "./cli/repl";
+import { startTui } from "./tui/tui";
 import { Runtime } from "./runtime";
 import { loadConfig, defaultConfig, saveGlobalConfig, initProject, providerReady, listModelAliases } from "./config/config";
 import { globalConfigPath, projectConfigPath, globalXminalDir } from "./config/paths";
@@ -189,7 +190,17 @@ async function main(): Promise<void> {
         newSession: Boolean(args.flags.new) || !stringFlag(args.flags.session),
         callbacks: rendererCallbacks(renderer),
       });
-      await startRepl(runtime, { renderer });
+      if ((process.stdin.isTTY && !args.flags["no-tui"]) || process.env.XMINAL_TUI === "1") {
+        try {
+          await startTui(runtime);
+          return;
+        } catch (error) {
+          renderer.warn(`TUI failed (${(error as Error).message}); falling back to classic REPL.`);
+        }
+      }
+      {
+        await startRepl(runtime, { renderer });
+      }
       return;
     }
   }

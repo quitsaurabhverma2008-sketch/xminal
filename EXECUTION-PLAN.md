@@ -68,7 +68,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` pending
 ## Phase 11 — Interfaces: REPL · headless · HTTP · Telegram · TUI `[x/~]`
 
 - **Deliverables:** readline REPL with slash commands, headless `xminal run --json`, OpenAI-compatible HTTP server (`/v1/chat/completions` SSE + `/v1/agent`), **built-in streaming web UI (`/`)**, Telegram bridge (long-poll), cost status bar, banner.
-- **Pending:** Ink-class streaming TUI.
+- **Done:** Fullscreen TUI (alternate screen, palette, F1/F2/F3 panels, inline permission prompts).
 - **Acceptance:** `curl /health` public; `/v1/agent` runs; Telegram responds (needs `TELEGRAM_BOT_TOKEN`).
 
 ## Phase 12 — Branding & docs `[x]`

@@ -4,6 +4,22 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-11-08
+
+**Published on npm: `xminal@0.2.0`** (`npm install -g xminal`).
+
+### Added
+
+- **Fullscreen TUI** (XMINAL-branded): alternate-screen terminal UI with logo, model/mode/permission/cost status header, scrolling message area, boxed input with placeholder, `/`-command palette (prefix-match, Tab to complete), permission prompt rendered inline, PgUp/PgDn scrollback, manual scroll + position indicator.
+- **F1** MCP/tool-usage panel · **F2** skills panel · **F3** status panel — `xminal` now looks like OpenCode but on-brand.
+- `xminal --no-tui` flag and `XMINAL_TUI=1` env to force/fallback; automatic fallback to the classic REPL on TUI failure or non-TTY.
+- Quitting mid-run (busy `/exit` or Ctrl+C) now aborts the agent before exiting.
+
+### Fixed
+
+- REPL multiline pasted input: embedded `\r`/`\n` are now processed as line submissions (was dropping all lines after the first).
+
+
 ## [0.1.2] — 2026-11-08
 
 **Published on npm: `xminal@0.1.2`** (`npm install -g xminal`).

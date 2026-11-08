@@ -29,6 +29,7 @@ const BOOLEAN_FLAGS = new Set([
     "v",
     "no-color",
     "stream",
+    "no-tui",
 ]);
 const KNOWN_COMMANDS = new Set([
     "run",

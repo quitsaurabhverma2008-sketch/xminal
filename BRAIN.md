@@ -25,6 +25,7 @@ Run command: `xminal`. Project folder: `/workspace/projects/ff` (folder name onl
 | Feature matrix 125/125 (`FEATURE_MATRIX.md`) | done |
 | Skills installed (`~/.agents/skills`) | done |
 | Repo scaffold | done |
+| Fullscreen TUI (F1/F2/F3 panels, palette) | done |
 | Config + profiles + doctor | done |
 | Provider adapters (OpenAI-compatible, Anthropic, Gemini, local) | done |
 | Provider router (failover/cost/capability) | done (basic failover) |

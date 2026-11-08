@@ -15,7 +15,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.1.1` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.2.0` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 

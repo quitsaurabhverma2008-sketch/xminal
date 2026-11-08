@@ -91,6 +91,15 @@ export class Agent {
     this.options.session.setModel(spec);
   }
 
+  setCallbacks(callbacks: AgentCallbacks): void {
+    (this as unknown as { callbacks: AgentCallbacks }).callbacks.onText = callbacks.onText;
+    (this as unknown as { callbacks: AgentCallbacks }).callbacks.onReasoning = callbacks.onReasoning;
+    (this as unknown as { callbacks: AgentCallbacks }).callbacks.onToolCall = callbacks.onToolCall;
+    (this as unknown as { callbacks: AgentCallbacks }).callbacks.onToolResult = callbacks.onToolResult;
+    (this as unknown as { callbacks: AgentCallbacks }).callbacks.onUsage = callbacks.onUsage;
+    (this as unknown as { callbacks: AgentCallbacks }).callbacks.onStatus = callbacks.onStatus;
+  }
+
   getCost(): CostSummary {
     return this.cost.summary();
   }

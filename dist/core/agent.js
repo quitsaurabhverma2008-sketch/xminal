@@ -47,6 +47,14 @@ class Agent {
         this.modelSpec = spec;
         this.options.session.setModel(spec);
     }
+    setCallbacks(callbacks) {
+        this.callbacks.onText = callbacks.onText;
+        this.callbacks.onReasoning = callbacks.onReasoning;
+        this.callbacks.onToolCall = callbacks.onToolCall;
+        this.callbacks.onToolResult = callbacks.onToolResult;
+        this.callbacks.onUsage = callbacks.onUsage;
+        this.callbacks.onStatus = callbacks.onStatus;
+    }
     getCost() {
         return this.cost.summary();
     }

@@ -11,6 +11,7 @@ const args_1 = require("./cli/args");
 const render_1 = require("./cli/render");
 const callbacks_1 = require("./cli/callbacks");
 const repl_1 = require("./cli/repl");
+const tui_1 = require("./tui/tui");
 const runtime_1 = require("./runtime");
 const config_1 = require("./config/config");
 const paths_1 = require("./config/paths");
@@ -179,7 +180,18 @@ async function main() {
                 newSession: Boolean(args.flags.new) || !stringFlag(args.flags.session),
                 callbacks: (0, callbacks_1.rendererCallbacks)(renderer),
             });
-            await (0, repl_1.startRepl)(runtime, { renderer });
+            if ((process.stdin.isTTY && !args.flags["no-tui"]) || process.env.XMINAL_TUI === "1") {
+                try {
+                    await (0, tui_1.startTui)(runtime);
+                    return;
+                }
+                catch (error) {
+                    renderer.warn(`TUI failed (${error.message}); falling back to classic REPL.`);
+                }
+            }
+            {
+                await (0, repl_1.startRepl)(runtime, { renderer });
+            }
             return;
         }
     }
