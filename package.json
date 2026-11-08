@@ -1,0 +1,53 @@
+{
+  "name": "xminal",
+  "version": "0.1.0",
+  "description": "XMINAL \u2014 Every coding agent. One terminal. Provider-agnostic terminal coding agent and orchestration platform.",
+  "license": "MIT",
+  "author": "XMINAL contributors",
+  "bin": {
+    "xminal": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "PLAN.md",
+    "EXECUTION-PLAN.md",
+    "FEATURE_MATRIX.md",
+    "brand",
+    "scripts",
+    "SECURITY.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build",
+    "pretest": "npm run build",
+    "test": "node --test tests/*.test.js",
+    "dev": "node dist/index.js",
+    "verify": "npm run build && npm test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "xminal",
+    "ai",
+    "agentic-ai",
+    "coding-agent",
+    "terminal",
+    "cli",
+    "tui",
+    "mcp",
+    "acp",
+    "orchestration",
+    "openrouter",
+    "ollama",
+    "local-llm"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}
