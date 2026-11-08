@@ -45,6 +45,8 @@ Run command: `xminal`. Project folder: `/workspace/projects/ff` (folder name onl
 | Skill lockfile (`.xminal/skills.lock.json`) | done |
 | AGENTS.md | done |
 | `xminal audit verify` + secret-scan test | done |
+| Web UI (`GET /` on `xminal serve`) | done |
+| Gemini provider dead-code cleanup | done |
 | CI workflow (`.github/workflows/ci.yml`) | done |
 | Install `xminal` on PATH | done (~/.local/bin/xminal → dist/index.js) |
 

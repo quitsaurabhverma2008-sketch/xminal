@@ -105,6 +105,7 @@ curl -H "Authorization: Bearer $TOKEN" localhost:8787/v1/models
 curl -H "Authorization: Bearer $TOKEN" -X POST -H 'content-type: application/json' \
      -d '{"prompt":"list TODOs in this repo"}' localhost:8787/v1/agent
 # or drop-in OpenAI-compatible: POST /v1/chat/completions (streams SSE)
+# built-in web UI: open http://127.0.0.1:8787/ in a browser
 ```
 
 ## Status (honest)

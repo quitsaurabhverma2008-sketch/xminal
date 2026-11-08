@@ -4,6 +4,7 @@ import { Runtime } from "../runtime";
 import { Session } from "../core/session";
 import { loadConfig } from "../config/config";
 import { VERSION } from "../version";
+import { WEB_PAGE } from "./web";
 import type { AgentMode } from "../core/agent";
 import type { AgentCallbacks } from "../core/agent";
 
@@ -34,12 +35,20 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
       return;
     }
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-    if (options.token && url.pathname !== "/health" && req.headers.authorization !== `Bearer ${options.token}`) {
+    const publicPaths = new Set(["/health", "/", "/web"]);
+    if (options.token && !publicPaths.has(url.pathname) && req.headers.authorization !== `Bearer ${options.token}`) {
       sendJson(res, 401, { error: { message: "unauthorized", type: "auth_error" } });
       return;
     }
 
     try {
+      if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/web")) {
+        const body = WEB_PAGE;
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "content-length": Buffer.byteLength(body) });
+        res.end(body);
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/health") {
         sendJson(res, 200, { status: "ok", name: "xminal", version: VERSION });
         return;
