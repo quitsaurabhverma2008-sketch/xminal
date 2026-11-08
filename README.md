@@ -2,6 +2,8 @@
 
 <img src="assets/logo.svg" width="720" alt="XMINAL — Every coding agent. One terminal." />
 
+[![ci](https://github.com/quitsaurabhverma2008-sketch/xminal/actions/workflows/ci.yml/badge.svg)](https://github.com/quitsaurabhverma2008-sketch/xminal/actions/workflows/ci.yml)
+
 ```
 ██╗  ██╗███╗   ███╗██╗███╗   ██╗ █████╗ ██╗
 ╚██╗██╔╝████╗ ████║██║████╗  ██║██╔══██╗██║
@@ -13,7 +15,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.1.0` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.1.1` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
@@ -35,7 +37,7 @@ XMINAL is a provider-agnostic terminal coding agent and orchestration platform. 
 
 ```bash
 # single command — no npm account needed:
-npm install -g https://github.com/quitsaurabhverma2008-sketch/xminal/releases/download/v0.1.0/xminal-0.1.0.tgz
+npm install -g https://github.com/quitsaurabhverma2008-sketch/xminal/releases/download/v0.1.1/xminal-0.1.1.tgz
 
 # or from source:
 git clone https://github.com/quitsaurabhverma2008-sketch/xminal.git
@@ -114,7 +116,7 @@ curl -H "Authorization: Bearer $TOKEN" -X POST -H 'content-type: application/jso
 
 ## Status (honest)
 
-**v0.1.0** — build green, 28/28 tests, packaged and on PATH as `xminal`. Released: [v0.1.0](https://github.com/quitsaurabhverma2008-sketch/xminal/releases/tag/v0.1.0) · CI green on `main`. Not yet verified against live LLM endpoints from this machine (OpenCode free tier is rate-limited here; no API keys present). Bedrock/Vertex/Azure native adapters are not built. npm publish pending maintainer approval. See `EXECUTION-PLAN.md` (18 phases), `PLAN.md`, `FEATURE_MATRIX.md`, `BRAIN.md`.
+**v0.1.1** — build green, 28/28 tests, packaged and on PATH as `xminal`. Releases: [v0.1.1](https://github.com/quitsaurabhverma2008-sketch/xminal/releases/tag/v0.1.1) · CI green on `main`. Not yet verified against live LLM endpoints from this machine (OpenCode free tier is rate-limited here; no API keys present). Bedrock/Vertex/Azure native adapters are not built. npm publish pending maintainer approval. See `EXECUTION-PLAN.md` (18 phases), `PLAN.md`, `FEATURE_MATRIX.md`, `BRAIN.md`.
 
 ## Development
 
