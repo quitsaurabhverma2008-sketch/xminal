@@ -90,8 +90,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` pending
 
 ## Phase 15 — Security hardening `[~]`
 
-- **Deliverables done:** `SECURITY.md`, repo secret-scan test, `xminal audit verify` (hash-chain verifier), skills load from disk read-only.
-- **Pending:** prompt-injection boundary guards, skill signature/lockfile.
+- **Deliverables done:** `SECURITY.md`, repo secret-scan test, `xminal audit verify` (hash-chain verifier), prompt-injection boundary guards (system prompt + tool-output redaction with `src/util/redact.ts`), skill hash lockfile (`xminal skills --lock|--verify`).
 - **Acceptance:** planted canary secret never reaches the model; audit chain verifies ✓.
 
 ## Phase 16 — Ecosystem & skills marketplace `[ ]`

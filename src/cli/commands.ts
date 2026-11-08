@@ -15,6 +15,7 @@ import { VERSION } from "../version";
 import type { Runtime } from "../runtime";
 import type { Renderer } from "./render";
 import { rendererCallbacks } from "./callbacks";
+import { verifySkills, writeSkillsLock } from "../skills/loader";
 
 export interface CommandContext {
   runtime: Runtime;
@@ -59,7 +60,7 @@ Work
 
 Context
   /memory [list|add <text>|search <q>|forget <id>]
-  /skills                    list installed skills
+  /skills [--lock|--verify]  list skills; lock (trust) or verify the lockfile
   /skill <name>              print a skill
   /mcp                       list MCP servers + per-MCP token usage
   /tools                     per-tool token usage (calls / est. tokens / errors)
@@ -390,12 +391,30 @@ export async function handleCommand(input: string, ctx: CommandContext): Promise
     }
 
     case "skills": {
+      if (rest === "--lock") {
+        const count = writeSkillsLock(runtime.cwd);
+        renderer.success(`skills lock written: ${count} skill(s)`);
+        return true;
+      }
+      if (rest === "--verify") {
+        const verification = verifySkills(runtime.cwd);
+        if (verification.ok) {
+          renderer.success(`skills lock OK · ${verification.total} skill(s) trusted`);
+        } else {
+          renderer.warn(`skills lock drift: +${verification.added.length} ~${verification.changed.length} -${verification.removed.length} (run /skills --lock to trust)`);
+        }
+        return true;
+      }
       const skills = runtime.skills.list();
+      const verification = verifySkills(runtime.cwd);
       renderer.info(
         skills.length
           ? skills.map((skill) => `${skill.name} (${skill.source}) · ${skill.description.slice(0, 140)}`).join("\n")
           : "(no skills installed)",
       );
+      if (!verification.ok) {
+        renderer.warn(`skills lock drift: +${verification.added.length} added · ${verification.changed.length} changed · ${verification.removed.length} removed → /skills --lock`);
+      }
       return true;
     }
 

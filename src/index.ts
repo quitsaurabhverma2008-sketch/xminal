@@ -11,7 +11,7 @@ import { loadConfig, defaultConfig, saveGlobalConfig, initProject, providerReady
 import { globalConfigPath, projectConfigPath, globalXminalDir } from "./config/paths";
 import { runDoctor, formatDoctor } from "./config/doctor";
 import { Session } from "./core/session";
-import { SkillRegistry } from "./skills/loader";
+import { SkillRegistry, verifySkills, writeSkillsLock } from "./skills/loader";
 import { McpManager } from "./mcp/client";
 import { runRalph } from "./orchestration/ralph";
 import { detectVerifyCommand } from "./tools/verify-tool";
@@ -60,6 +60,26 @@ async function main(): Promise<void> {
       return;
 
     case "skills": {
+      if (args.flags.lock) {
+        const count = writeSkillsLock(cwd);
+        renderer.success(`skills lock written: ${count} skill(s) → ${path.join(cwd, ".xminal", "skills.lock.json")}`);
+        return;
+      }
+      if (args.flags.verify) {
+        const verification = verifySkills(cwd);
+        const drift = [
+          verification.added.length ? `+${verification.added.join(", ")}` : "",
+          verification.changed.length ? `~${verification.changed.join(", ")}` : "",
+          verification.removed.length ? `-${verification.removed.join(", ")}` : "",
+        ].filter(Boolean).join(" ");
+        if (verification.ok) {
+          renderer.success(`skills lock OK · ${verification.total} skill(s) trusted (${verification.lockPath})`);
+        } else {
+          renderer.warn(`skills lock drift: ${drift || "unknown"} — run xminal skills --lock to trust`);
+          process.exitCode = 1;
+        }
+        return;
+      }
       const skills = new SkillRegistry(cwd).list();
       renderer.info(
         skills.length

@@ -2,6 +2,18 @@
 
 All notable changes to XMINAL are documented here. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning: semver.
 
+## [Unreleased]
+
+### Added
+
+- Secret redaction before the model sees tool output: `redactSecrets` strips private-key blocks, `sk-*`/`ghp_*`/`github_pat_*`/`AIza*`/`xox*-*`/`sk-or-*`/`sk-ant-*` and JWTs from tool results (marked `[REDACTED:…]`), and the system prompt now treats tool output as untrusted data (prompt-injection boundary).
+- Skill trust/lockfile: project skills hashed into `.xminal/skills.lock.json` (`xminal skills --lock`, `xminal skills --verify`, `/skills --lock|--verify`); REPL warns on drift.
+- Global agent instructions (`AGENTS.md`).
+
+### Changed
+
+- Repo secret-scan test now honors a `secret-scan: allow` marker for intentional test fixtures.
+
 ## [0.1.0] — 2026-11-08
 
 First runnable release.

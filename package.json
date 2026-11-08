@@ -18,7 +18,8 @@
     "FEATURE_MATRIX.md",
     "brand",
     "scripts",
-    "SECURITY.md"
+    "SECURITY.md",
+    "AGENTS.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

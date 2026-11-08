@@ -1,13 +1,62 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { exists, readText } from "../util/fs";
+import { exists, readJson, readText, writeJson, sha256 } from "../util/fs";
 
 export interface SkillInfo {
   name: string;
   description: string;
   path: string;
   source: string;
+}
+
+export interface SkillVerification {
+  total: number;
+  added: string[];
+  changed: string[];
+  removed: string[];
+  ok: boolean;
+  lockPath: string;
+}
+
+export function skillLockPath(cwd: string, lockPath?: string): string {
+  return lockPath ?? path.join(cwd, ".xminal", "skills.lock.json");
+}
+
+export function hashSkills(skills: SkillInfo[]): Record<string, string> {
+  const hashes: Record<string, string> = {};
+  for (const skill of skills) {
+    hashes[skill.name] = sha256(readText(skill.path));
+  }
+  return hashes;
+}
+
+export function hashProjectSkills(cwd: string): Record<string, string> {
+  const projectSkills = new SkillRegistry(cwd).list().filter((skill) => skill.source === "project");
+  return hashSkills(projectSkills);
+}
+
+export function verifySkills(cwd: string, lockPath?: string): SkillVerification {
+  const file = skillLockPath(cwd, lockPath);
+  const current = hashProjectSkills(cwd);
+  const lock = readJson<Record<string, string>>(file, {});
+  const added = Object.keys(current).filter((name) => !(name in lock));
+  const removed = Object.keys(lock).filter((name) => !(name in current));
+  const changed = Object.keys(current).filter((name) => lock[name] && lock[name] !== current[name]);
+  return {
+    total: Object.keys(current).length,
+    added,
+    changed,
+    removed,
+    ok: added.length + changed.length + removed.length === 0,
+    lockPath: file,
+  };
+}
+
+export function writeSkillsLock(cwd: string, lockPath?: string): number {
+  const hashes = hashProjectSkills(cwd);
+  writeJson(skillLockPath(cwd, lockPath), hashes);
+  return Object.keys(hashes).length;
 }
 
 export class SkillRegistry {
