@@ -64,6 +64,7 @@ Run command: `xminal`. Project folder: `/workspace/projects/ff` (folder name onl
 4. npm release + GitHub release once user confirms repo URL and publish.
 5. Provider live smoke once user adds credentials (or OpenCode Go / local Ollama).
 6. Iterate roadmap v0.2+ from `PLAN.md` + `EXECUTION-PLAN.md`.
+7. npm registry publish — user to decide (goal: `npm install -g xminal`).
 
 ## 6. Learnings applied
 
@@ -106,3 +107,10 @@ Run command: `xminal`. Project folder: `/workspace/projects/ff` (folder name onl
 - `/mcp` and `/tools` render the aggregate table (all-time, project); `xminal run --json` adds `toolUsage`.
 - MCP calls attribute as `server/tool` via the `mcp_call` args; builtins attribute as `xminal/<tool>`.
 - Honest limitation: provider-side input/output token split is not per tool; values are local estimates (cost shows in /cost, tool tokens shown separately).
+
+## 11. GitHub (2026-11-08)
+
+- Public repo: https://github.com/quitsaurabhverma2008-sketch/xminal
+- Initial commit "XMINAL v0.1.0 — initial open-source release" on `main` (identity used: gh login noreply; repo created via user-provided PAT used only as env var, never written to any file).
+- GitHub Release `v0.1.0` with tarball `xminal-0.1.0.tgz`; topics set; CI (`.github/workflows/ci.yml`) ran → **success** on first push.
+- README hero now references `brand/logo.svg`; clone URL + release link added.

@@ -82,9 +82,10 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` pending
 - **Pending:** live provider contract tests (blocked: no credentials on this box), perf budget (startup <1s), npm publish dry-run.
 - **Acceptance:** `npm test` 18/18; contract suite runs in CI once secrets exist.
 
-## Phase 14 — Distribution & release `[ ]`
+## Phase 14 — Distribution & release `[~]`
 
-- **Deliverables:** npm `xminal` package publish, GitHub Release v0.1.0 with tarball + release notes, `npx xminal` works, install script `scripts/install.sh` (npm or source build), update PATH docs.
+- **Deliverables:** GitHub Release v0.1.0 with tarball + release notes ✓, repo PUBLIC with CI green ✓, `scripts/install.sh`.
+- **Pending:** npm registry publish (`npm install -g xminal`) — needs user go-ahead; `npx xminal`.
 - **Acceptance:** fresh machine: `npm i -g xminal && xminal doctor` → green in <5 min. **Needs user go-ahead for publish.**
 
 ## Phase 15 — Security hardening `[~]`
