@@ -23,7 +23,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepare": "npm run build",
+    "prepare": "node scripts/prepare.cjs",
     "pretest": "npm run build",
     "test": "node --test tests/*.test.js",
     "dev": "node dist/index.js",
