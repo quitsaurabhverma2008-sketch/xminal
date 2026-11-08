@@ -50,5 +50,11 @@
   "devDependencies": {
     "@types/node": "^20.19.43",
     "typescript": "^5.9.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/quitsaurabhverma2008-sketch/xminal.git"
+  },
+  "homepage": "https://github.com/quitsaurabhverma2008-sketch/xminal",
+  "bugs": "https://github.com/quitsaurabhverma2008-sketch/xminal/issues"
 }
