@@ -12,6 +12,10 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 - Skill trust/lockfile: project skills hashed into `.xminal/skills.lock.json` (`xminal skills --lock`, `xminal skills --verify`, `/skills --lock|--verify`); REPL warns on drift.
 - Global agent instructions (`AGENTS.md`).
 
+### Fixed
+
+- `Agent.compactHistory("/compact")` could cut inside an assistant↔tool run, producing a session OpenAI/Anthropic reject ("tool call does not have a tool result"). Compaction now backs the boundary off to the assistant with tool calls. Same boundary handling as the model-context compactor (which was already safe).
+
 ### Changed
 
 - Repo secret-scan test now honors a `secret-scan: allow` marker for intentional test fixtures.

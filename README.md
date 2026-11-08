@@ -112,7 +112,7 @@ curl -H "Authorization: Bearer $TOKEN" -X POST -H 'content-type: application/jso
 
 ## Status (honest)
 
-**v0.1.0** — build green, 26/26 tests, packaged and on PATH as `xminal`. Released: [v0.1.0](https://github.com/quitsaurabhverma2008-sketch/xminal/releases/tag/v0.1.0) · CI green on `main`. Not yet verified against live LLM endpoints from this machine (OpenCode free tier is rate-limited here; no API keys present). Bedrock/Vertex/Azure native adapters are not built. npm publish pending maintainer approval. See `EXECUTION-PLAN.md` (18 phases), `PLAN.md`, `FEATURE_MATRIX.md`, `BRAIN.md`.
+**v0.1.0** — build green, 28/28 tests, packaged and on PATH as `xminal`. Released: [v0.1.0](https://github.com/quitsaurabhverma2008-sketch/xminal/releases/tag/v0.1.0) · CI green on `main`. Not yet verified against live LLM endpoints from this machine (OpenCode free tier is rate-limited here; no API keys present). Bedrock/Vertex/Azure native adapters are not built. npm publish pending maintainer approval. See `EXECUTION-PLAN.md` (18 phases), `PLAN.md`, `FEATURE_MATRIX.md`, `BRAIN.md`.
 
 ## Development
 

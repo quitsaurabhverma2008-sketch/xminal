@@ -97,7 +97,9 @@ export class Agent {
 
   compactHistory(keep = 8): number {
     if (this.history.length <= keep) return 0;
-    const removed = this.history.length - keep;
+    let removed = this.history.length - keep;
+    while (removed > 0 && this.history[removed].role === "tool") removed -= 1;
+    if (removed === 0) return 0;
     const older = this.history.slice(0, removed);
     const summary = older
       .map((message) => `${message.role}: ${message.content.replace(/\s+/g, " ").slice(0, 200)}`)
@@ -107,7 +109,7 @@ export class Agent {
       content: `[Compacted ${older.length} earlier messages]\n${truncateText(summary, 4000)}`,
     };
     this.history.splice(0, this.history.length, compacted, ...this.history.slice(removed));
-    this.options.session.appendEvent("compact", { removed, kept: keep });
+    this.options.session.appendEvent("compact", { removed, kept: this.history.length });
     return removed;
   }
 
