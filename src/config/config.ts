@@ -19,11 +19,6 @@ export function defaultConfig(): XminalConfig {
       baseUrl: "https://generativelanguage.googleapis.com",
       apiKeyEnv: "GEMINI_API_KEY",
     },
-    google: {
-      type: "gemini",
-      baseUrl: "https://generativelanguage.googleapis.com",
-      apiKeyEnv: "GEMINI_API_KEY",
-    },
     openrouter: {
       type: "openai",
       baseUrl: "https://openrouter.ai/api/v1",

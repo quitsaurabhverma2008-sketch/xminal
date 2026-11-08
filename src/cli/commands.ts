@@ -16,6 +16,7 @@ import type { Runtime } from "../runtime";
 import type { Renderer } from "./render";
 import { rendererCallbacks } from "./callbacks";
 import { verifySkills, writeSkillsLock } from "../skills/loader";
+import { installSkill } from "../skills/install";
 
 export interface CommandContext {
   runtime: Runtime;
@@ -61,6 +62,7 @@ Work
 Context
   /memory [list|add <text>|search <q>|forget <id>]
   /skills [--lock|--verify]  list skills; lock (trust) or verify the lockfile
+  /skills install <path|git-url> [--global]   install a skill
   /skill <name>              print a skill
   /mcp                       list MCP servers + per-MCP token usage
   /tools                     per-tool token usage (calls / est. tokens / errors)
@@ -391,6 +393,17 @@ export async function handleCommand(input: string, ctx: CommandContext): Promise
     }
 
     case "skills": {
+      if (rest.startsWith("install ")) {
+        const target = rest.slice("install ".length).trim();
+        const isGlobal = target.endsWith(" --global");
+        try {
+          const result = installSkill(runtime.cwd, isGlobal ? target.slice(0, -" --global".length).trim() : target, { global: isGlobal });
+          renderer.success(`installed skill ${result.name}`);
+        } catch (error) {
+          renderer.error((error as Error).message);
+        }
+        return true;
+      }
       if (rest === "--lock") {
         const count = writeSkillsLock(runtime.cwd);
         renderer.success(`skills lock written: ${count} skill(s)`);

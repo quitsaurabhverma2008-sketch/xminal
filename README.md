@@ -65,6 +65,8 @@ xminal serve [--port 8787] [--host 127.0.0.1] [--token T]
 xminal telegram [--token T]
 xminal mcp --serve            # expose XMINAL tools as an MCP stdio server
 xminal audit [verify|tail]    # inspect / verify the hash-chained audit log
+xminal skills install <path|git-url>   # add a skill (also --global)
+xminal skills --lock | --verify         # trust / verify the skills lockfile
 xminal init | doctor | models | sessions | skills | mcp | config | version
 ```
 
@@ -110,7 +112,7 @@ curl -H "Authorization: Bearer $TOKEN" -X POST -H 'content-type: application/jso
 
 ## Status (honest)
 
-**v0.1.0** — build green, 20/20 tests, packaged and on PATH as `xminal`. Released: [v0.1.0](https://github.com/quitsaurabhverma2008-sketch/xminal/releases/tag/v0.1.0) · CI green on `main`. Not yet verified against live LLM endpoints from this machine (OpenCode free tier is rate-limited here; no API keys present). Bedrock/Vertex/Azure native adapters are not built. npm publish pending maintainer approval. See `EXECUTION-PLAN.md` (18 phases), `PLAN.md`, `FEATURE_MATRIX.md`, `BRAIN.md`.
+**v0.1.0** — build green, 26/26 tests, packaged and on PATH as `xminal`. Released: [v0.1.0](https://github.com/quitsaurabhverma2008-sketch/xminal/releases/tag/v0.1.0) · CI green on `main`. Not yet verified against live LLM endpoints from this machine (OpenCode free tier is rate-limited here; no API keys present). Bedrock/Vertex/Azure native adapters are not built. npm publish pending maintainer approval. See `EXECUTION-PLAN.md` (18 phases), `PLAN.md`, `FEATURE_MATRIX.md`, `BRAIN.md`.
 
 ## Development
 

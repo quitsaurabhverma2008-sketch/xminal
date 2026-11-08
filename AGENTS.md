@@ -3,7 +3,7 @@
 ## Commands
 
 - Build: `npm run build` (tsc → `dist/`)
-- Verify everything (build + 24 tests): `npm run verify`
+- Verify everything (build + 26 tests): `npm run verify`
 - Run the CLI from source: `npm run build && node dist/index.js doctor`
 - Tests: `npm test` (node:test, no network required)
 

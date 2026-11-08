@@ -10,7 +10,6 @@ export const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   "friendli": "zai-org/GLM-5.3-Flash",
   "gemini": "gemini-4-argon",
   "github": "openai/gpt-4o-mini",
-  "google": "gemini-4-argon",
   "gpt4all": "llama3.2",
   "groq": "openai/gpt-oss-120b",
   "huggingface": "MiniMaxAI/MiniMax-M3.1-Flash",

@@ -12,6 +12,7 @@ import { globalConfigPath, projectConfigPath, globalXminalDir } from "./config/p
 import { runDoctor, formatDoctor } from "./config/doctor";
 import { Session } from "./core/session";
 import { SkillRegistry, verifySkills, writeSkillsLock } from "./skills/loader";
+import { installSkill } from "./skills/install";
 import { McpManager } from "./mcp/client";
 import { runRalph } from "./orchestration/ralph";
 import { detectVerifyCommand } from "./tools/verify-tool";
@@ -60,6 +61,22 @@ async function main(): Promise<void> {
       return;
 
     case "skills": {
+      if (args.positionals[0] === "install") {
+        const target = args.positionals[1];
+        if (!target) {
+          console.error("Usage: xminal skills install <path|git-url> [--global]");
+          process.exitCode = 1;
+          return;
+        }
+        try {
+          const result = installSkill(cwd, target, { global: Boolean(args.flags.global) });
+          console.log(`installed skill ${result.name} → ${result.destination}`);
+        } catch (error) {
+          console.error((error as Error).message);
+          process.exitCode = 1;
+        }
+        return;
+      }
       if (args.flags.lock) {
         const count = writeSkillsLock(cwd);
         renderer.success(`skills lock written: ${count} skill(s) → ${path.join(cwd, ".xminal", "skills.lock.json")}`);

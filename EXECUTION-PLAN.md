@@ -93,10 +93,11 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` pending
 - **Deliverables done:** `SECURITY.md`, repo secret-scan test, `xminal audit verify` (hash-chain verifier), prompt-injection boundary guards (system prompt + tool-output redaction with `src/util/redact.ts`), skill hash lockfile (`xminal skills --lock|--verify`).
 - **Acceptance:** planted canary secret never reaches the model; audit chain verifies ✓.
 
-## Phase 16 — Ecosystem & skills marketplace `[ ]`
+## Phase 16 — Ecosystem & skills marketplace `[~]`
 
-- **Deliverables:** XMINAL skill pack (repo maintenance, release, docs), MCP bundles curated list, plugin API stability, `xminal skills install` scaffold.
-- **Acceptance:** 10 skills ship; skill install from folder + git works.
+- **Deliverables done:** `xminal skills install <path|git-url> [--global]` (local folder or git clone + SKILL.md validation), `xminal skills --lock|--verify` trust layer, `tests/skills-*.test.js`.
+- **Pending:** XMINAL skill pack (10 curated skills), MCP bundle list, plugin API stability, marketplace UI.
+- **Acceptance:** skill install from folder + git works ✓; 10 skills ship.
 
 ## Phase 17 — Advanced orchestration `[ ]`
 
