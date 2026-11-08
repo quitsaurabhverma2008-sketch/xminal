@@ -152,3 +152,11 @@ Run command: `xminal`. Project folder: `/workspace/projects/ff` (folder name onl
 - Release page: https://github.com/quitsaurabhverma2008-sketch/xminal/releases/tag/v0.1.1
 - Note: npm tokens for publish need 2FA-bypass (or classic Automation); first token was 403, second worked.
 - User pasted both tokens in chat — they should rotate them on npmjs.com if they want strict hygiene.
+
+## 17. Live end-to-end verification (2026-11-08)
+
+- OpenRouter key (free tier, unlimited) wired into `~/.xminal/config.json` (chmod 600): `defaultModel = openrouter/cohere/north-mini-code:free` (256K ctx, 64K output, tools+reasoning).
+- `xminal run "pong"` → ✅; multi-step tool task (create hello-xminal.txt → read back) → ✅ — agent wrote the file (auto-checkpoint), read it, answered correctly. exit 0.
+- Tool usage meter → `xminal/write` + `xminal/read` recorded with model id and ≈tokens (28 / 23); `xminal audit tail` → allow/allow entries; `.xminal/receipts/tool-usage.jsonl` verified.
+- OpenCode key (`oc_sk_…`) valid for `/v1/models` but all chat calls return 429 FreeUsageLimitError (free quota exhausted, Retry-After ≈ 9.9h); paid models need funds/disabled — OpenCode path unusable for now.
+- NOTE: Both keys were pasted in chat; user should rotate them if desired. Never commit them; `~/.xminal/config.json` is 600 and outside the repo.
