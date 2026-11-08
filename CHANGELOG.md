@@ -4,6 +4,21 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-11-08
+
+**Published on npm: `xminal@0.4.0`** (`npm install -g xminal`).
+
+### Changed
+
+- **Tokyo Night theme** — the same palette opencode ships by default (`assets/tokyonight.json`): `darkStep1` background, `darkStep2` raised sidebar, `darkStep9` primary `#82aaff`, `darkStep11` muted `#828bb8`.
+- **Sidebar restyled to match opencode**: full-height raised background (`raised` bg with fg-only resets), compact todo rows (`▶/✓/!/○`), MCP dot rows, session meta, location + git branch.
+- Footer split into rule + muted keybinding line; logo line slimmer.
+
+### Added
+
+- `bgFill` helper for raised-bg sidebar rows; `fgClip` clips inner resets to foreground-only so the raised fill survives colored tokens.
+
+
 ## [0.3.0] — 2026-11-08
 
 **Published on npm: `xminal@0.3.0`** (`npm install -g xminal`).

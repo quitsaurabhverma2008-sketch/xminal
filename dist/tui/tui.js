@@ -135,46 +135,54 @@ async function startTui(runtime) {
         }
         return out;
     };
+    const fgClip = (line, width, bg) => {
+        // Fill a line with the raised background and clip inner resets to foreground-only.
+        const safe = line.replace(/\x1b\[0m/g, "\x1b[39m");
+        const visible = (0, ansi_1.visibleLength)(safe);
+        const fill = Math.max(0, width - visible);
+        return `\x1b[48;2;${bg[0]};${bg[1]};${bg[2]}m${safe}${" ".repeat(fill)}${engine_1.reset}`;
+    };
     const renderSidebar = (x, y, width, height) => {
-        const inner = width - 2;
+        const inner = width;
+        const raised = engine_1.theme.raisedRgb;
+        const line = (content) => fgClip(content, inner, raised);
+        const blank = () => (0, engine_1.bgFill)(raised, inner);
         const out = [];
-        const line = (content) => engine_1.theme.border + "│" + engine_1.reset + (0, ansi_1.pad)((0, ansi_1.truncate)(content, inner), inner) + engine_1.theme.border + "│" + engine_1.reset;
-        out.push(engine_1.theme.border + "┌" + "─".repeat(width === 44 ? 1 : 0) + "─".repeat(Math.max(0, inner - 1)) + "┐" + engine_1.reset);
         out.push(line(`${engine_1.theme.accent}◆${engine_1.reset} ${engine_1.theme.text}${(0, ansi_1.truncate)(sessionTitle, inner - 4)}`));
-        out.push(line(`${engine_1.theme.muted}${shortId}${engine_1.reset}`));
-        out.push(line(""));
-        out.push(line(`${engine_1.theme.muted}LOCATION${engine_1.reset}`));
-        out.push(line(`${engine_1.theme.text}${node_path_1.default.basename(cwd)}${engine_1.reset}`));
+        out.push(line(`${engine_1.theme.muted}${shortId}`));
+        out.push(blank());
+        out.push(line(`${engine_1.theme.muted}LOCATION`));
+        out.push(line(`${engine_1.theme.text}${node_path_1.default.basename(cwd)}`));
         if (gitBranch)
-            out.push(line(`${engine_1.theme.muted}⎇ ${engine_1.theme.accent2}${(0, ansi_1.truncate)(gitBranch, inner - 4)}${engine_1.reset}`));
-        out.push(line(""));
+            out.push(line(`${engine_1.theme.muted}⎇ ${engine_1.theme.accent2}${(0, ansi_1.truncate)(gitBranch, inner - 4)}`));
+        out.push(blank());
         const done = todos.filter((t) => t.status === "completed").length;
-        out.push(line(`${engine_1.theme.muted}TODOS${engine_1.reset} ${engine_1.theme.muted}${done}/${todos.length}${engine_1.reset}`));
+        out.push(line(`${engine_1.theme.muted}TODOS${engine_1.reset} ${engine_1.theme.muted}${done}/${todos.length}`));
         if (todos.length === 0) {
-            out.push(line(`${engine_1.theme.muted}(no tasks — ask xminal to plan one)${engine_1.reset}`));
+            out.push(line(`${engine_1.theme.muted}(no tasks)`));
         }
         else {
-            for (const todo of todos.slice(0, 8)) {
-                out.push(line(`${(0, engine_1.statusPill)(todo.status)}${engine_1.theme.text}${(0, ansi_1.truncate)(todo.text, inner - 4)}${engine_1.reset}`));
+            for (const todo of todos.slice(0, 9)) {
+                out.push(line(`${(0, engine_1.statusPill)(todo.status)}${engine_1.theme.text}${(0, ansi_1.truncate)(todo.text, inner - 4)}`));
             }
-            if (todos.length > 8)
-                out.push(line(`${engine_1.theme.muted}… +${todos.length - 8} more${engine_1.reset}`));
+            if (todos.length > 9)
+                out.push(line(`${engine_1.theme.muted}… +${todos.length - 9} more`));
         }
-        out.push(line(""));
-        const anyMcp = mcpSummary.length > 0;
-        out.push(line(`${engine_1.theme.muted}MCP SERVERS${engine_1.reset}`));
-        if (!anyMcp) {
-            out.push(line(`${engine_1.theme.muted}(none configured)${engine_1.reset}`));
+        out.push(blank());
+        out.push(line(`${engine_1.theme.muted}MCP`));
+        if (mcpSummary.length === 0) {
+            out.push(line(`${engine_1.theme.muted}(none)`));
         }
         else {
             for (const { server, tools } of mcpSummary) {
-                out.push(line(`${engine_1.theme.green}●${engine_1.reset} ${engine_1.theme.text}${(0, ansi_1.truncate)(server, inner - 8)}${engine_1.reset} ${engine_1.theme.muted}${tools}t${engine_1.reset}`));
+                out.push(line(`${engine_1.theme.green}●${engine_1.reset} ${engine_1.theme.text}${(0, ansi_1.truncate)(server, inner - 8)} ${engine_1.theme.muted}${tools}t`));
             }
         }
-        out.push(line(""));
-        out.push(line(`${engine_1.theme.muted}SKILLS${engine_1.reset} ${engine_1.theme.text}${runtime.skills.list().length}${engine_1.reset}`));
-        out.push(line(`${engine_1.theme.muted}TOOLS${engine_1.reset} ${engine_1.theme.text}${runtime.tools.names().length}${engine_1.reset}`));
-        out.push(engine_1.theme.border + "└" + "─".repeat(inner) + "┘" + engine_1.reset);
+        out.push(blank());
+        out.push(line(`${engine_1.theme.muted}SKILLS${engine_1.reset} ${engine_1.theme.text}${runtime.skills.list().length}`));
+        out.push(line(`${engine_1.theme.muted}TOOLS${engine_1.reset} ${engine_1.theme.text}${runtime.tools.names().length}`));
+        while (out.length < height)
+            out.push(blank());
         return out.slice(0, height);
     };
     const renderHeader = () => {
@@ -232,8 +240,8 @@ async function startTui(runtime) {
     };
     const renderFooter = () => {
         const w = cols();
-        const left = `${engine_1.theme.muted} / commands  ·  Tab mode  ·  Ctrl+B sidebar  ·  Ctrl+C ${busy ? "abort" : "quit"}  ·  Esc palette${engine_1.reset}`;
-        return [(0, ansi_1.pad)((0, ansi_1.truncate)(left, w), w)];
+        const left = ` ${engine_1.theme.muted}/${engine_1.reset} ${engine_1.theme.text}commands${engine_1.reset}   ${engine_1.theme.muted}Tab${engine_1.reset} ${engine_1.theme.text}mode${engine_1.reset}   ${engine_1.theme.muted}Ctrl+B${engine_1.reset} ${engine_1.theme.text}sidebar${engine_1.reset}   ${engine_1.theme.muted}Ctrl+C${engine_1.reset} ${engine_1.theme.text}${busy ? "abort" : "quit"}${engine_1.reset}   ${engine_1.theme.muted}Esc${engine_1.reset} ${engine_1.theme.text}back${engine_1.reset}`;
+        return [(0, engine_1.rule)(w), (0, ansi_1.pad)((0, ansi_1.truncate)(left, w), w)];
     };
     const render = () => {
         const w = cols();

@@ -3,7 +3,7 @@ import { resolveModel } from "../config/config";
 import path from "node:path";
 import { visibleLength, pad, truncate } from "../util/ansi";
 import { VERSION, TAGLINE } from "../version";
-import { theme, reset, rule, box, tag, statusPill, formatCost, modeColor } from "./engine";
+import { theme, reset, rule, box, tag, statusPill, formatCost, modeColor, bgFill } from "./engine";
 import { loadTodos, detectGitBranch, type TodoItem } from "./state";
 import { matchCommands, wrapText } from "./layout";
 import type { AgentCallbacks, AgentMode } from "../core/agent";
@@ -112,46 +112,54 @@ export async function startTui(runtime: Runtime): Promise<void> {
     return out;
   };
 
+  const fgClip = (line: string, width: number, bg: [number, number, number]): string => {
+    // Fill a line with the raised background and clip inner resets to foreground-only.
+    const safe = line.replace(/\x1b\[0m/g, "\x1b[39m");
+    const visible = visibleLength(safe);
+    const fill = Math.max(0, width - visible);
+    return `\x1b[48;2;${bg[0]};${bg[1]};${bg[2]}m${safe}${" ".repeat(fill)}${reset}`;
+  };
+
   const renderSidebar = (x: number, y: number, width: number, height: number): string[] => {
-    const inner = width - 2;
+    const inner = width;
+    const raised = theme.raisedRgb;
+    const line = (content: string) => fgClip(content, inner, raised);
+    const blank = () => bgFill(raised, inner);
     const out: string[] = [];
-    const line = (content: string) => theme.border + "│" + reset + pad(truncate(content, inner), inner) + theme.border + "│" + reset;
-    out.push(theme.border + "┌" + "─".repeat(width === 44 ? 1 : 0) + "─".repeat(Math.max(0, inner - 1)) + "┐" + reset);
     out.push(line(`${theme.accent}◆${reset} ${theme.text}${truncate(sessionTitle, inner - 4)}`));
-    out.push(line(`${theme.muted}${shortId}${reset}`));
+    out.push(line(`${theme.muted}${shortId}`));
 
-    out.push(line(""));
-    out.push(line(`${theme.muted}LOCATION${reset}`));
-    out.push(line(`${theme.text}${path.basename(cwd)}${reset}`));
-    if (gitBranch) out.push(line(`${theme.muted}⎇ ${theme.accent2}${truncate(gitBranch, inner - 4)}${reset}`));
+    out.push(blank());
+    out.push(line(`${theme.muted}LOCATION`));
+    out.push(line(`${theme.text}${path.basename(cwd)}`));
+    if (gitBranch) out.push(line(`${theme.muted}⎇ ${theme.accent2}${truncate(gitBranch, inner - 4)}`));
 
-    out.push(line(""));
+    out.push(blank());
     const done = todos.filter((t) => t.status === "completed").length;
-    out.push(line(`${theme.muted}TODOS${reset} ${theme.muted}${done}/${todos.length}${reset}`));
+    out.push(line(`${theme.muted}TODOS${reset} ${theme.muted}${done}/${todos.length}`));
     if (todos.length === 0) {
-      out.push(line(`${theme.muted}(no tasks — ask xminal to plan one)${reset}`));
+      out.push(line(`${theme.muted}(no tasks)`));
     } else {
-      for (const todo of todos.slice(0, 8)) {
-        out.push(line(`${statusPill(todo.status)}${theme.text}${truncate(todo.text, inner - 4)}${reset}`));
+      for (const todo of todos.slice(0, 9)) {
+        out.push(line(`${statusPill(todo.status)}${theme.text}${truncate(todo.text, inner - 4)}`));
       }
-      if (todos.length > 8) out.push(line(`${theme.muted}… +${todos.length - 8} more${reset}`));
+      if (todos.length > 9) out.push(line(`${theme.muted}… +${todos.length - 9} more`));
     }
 
-    out.push(line(""));
-    const anyMcp = mcpSummary.length > 0;
-    out.push(line(`${theme.muted}MCP SERVERS${reset}`));
-    if (!anyMcp) {
-      out.push(line(`${theme.muted}(none configured)${reset}`));
+    out.push(blank());
+    out.push(line(`${theme.muted}MCP`));
+    if (mcpSummary.length === 0) {
+      out.push(line(`${theme.muted}(none)`));
     } else {
       for (const { server, tools } of mcpSummary) {
-        out.push(line(`${theme.green}●${reset} ${theme.text}${truncate(server, inner - 8)}${reset} ${theme.muted}${tools}t${reset}`));
+        out.push(line(`${theme.green}●${reset} ${theme.text}${truncate(server, inner - 8)} ${theme.muted}${tools}t`));
       }
     }
 
-    out.push(line(""));
-    out.push(line(`${theme.muted}SKILLS${reset} ${theme.text}${runtime.skills.list().length}${reset}`));
-    out.push(line(`${theme.muted}TOOLS${reset} ${theme.text}${runtime.tools.names().length}${reset}`));
-    out.push(theme.border + "└" + "─".repeat(inner) + "┘" + reset);
+    out.push(blank());
+    out.push(line(`${theme.muted}SKILLS${reset} ${theme.text}${runtime.skills.list().length}`));
+    out.push(line(`${theme.muted}TOOLS${reset} ${theme.text}${runtime.tools.names().length}`));
+    while (out.length < height) out.push(blank());
     return out.slice(0, height);
   };
 
@@ -210,8 +218,8 @@ export async function startTui(runtime: Runtime): Promise<void> {
 
   const renderFooter = (): string[] => {
     const w = cols();
-    const left = `${theme.muted} / commands  ·  Tab mode  ·  Ctrl+B sidebar  ·  Ctrl+C ${busy ? "abort" : "quit"}  ·  Esc palette${reset}`;
-    return [pad(truncate(left, w), w)];
+    const left = ` ${theme.muted}/${reset} ${theme.text}commands${reset}   ${theme.muted}Tab${reset} ${theme.text}mode${reset}   ${theme.muted}Ctrl+B${reset} ${theme.text}sidebar${reset}   ${theme.muted}Ctrl+C${reset} ${theme.text}${busy ? "abort" : "quit"}${reset}   ${theme.muted}Esc${reset} ${theme.text}back${reset}`;
+    return [rule(w), pad(truncate(left, w), w)];
   };
 
   const render = () => {

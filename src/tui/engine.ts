@@ -4,35 +4,51 @@ import type { AgentMode } from "../core/agent";
 
 export interface Theme {
   bg: string;
+  bgRgb: [number, number, number];
   raised: string;
+  raisedRgb: [number, number, number];
   border: string;
+  borderRgb: [number, number, number];
   text: string;
+  textRgb: [number, number, number];
   muted: string;
+  mutedRgb: [number, number, number];
   accent: string;
+  accentRgb: [number, number, number];
   accent2: string;
+  accent2Rgb: [number, number, number];
   violet: string;
   green: string;
   yellow: string;
   red: string;
   cyan: string;
+  cyanRgb: [number, number, number];
 }
 
+const rgb = (r: number, g: number, b: number) => `\x1b[38;2;${r};${g};${b}m`;
+const rgbBg = (r: number, g: number, b: number) => `\x1b[48;2;${r};${g};${b}m`;
+
+// Tokyo Night — opencode's default dark theme (assets/tokyonight.json)
 export const theme: Theme = {
-  bg: "\x1b[48;5;234m",
-  raised: "\x1b[48;5;236m",
-  border: "\x1b[38;5;239m",
-  text: "\x1b[38;5;253m",
-  muted: "\x1b[38;5;245m",
-  accent: "\x1b[38;5;51m",
-  accent2: "\x1b[38;5;45m",
-  violet: "\x1b[38;5;141m",
-  green: "\x1b[38;5;120m",
-  yellow: "\x1b[38;5;221m",
-  red: "\x1b[38;5;203m",
-  cyan: "\x1b[38;5;45m",
+  bg: rgbBg(26, 27, 38), bgRgb: [26, 27, 38],
+  raised: rgbBg(30, 32, 48), raisedRgb: [30, 32, 48],
+  border: rgb(115, 122, 162), borderRgb: [115, 122, 162],
+  text: rgb(200, 211, 245), textRgb: [200, 211, 245],
+  muted: rgb(130, 139, 184), mutedRgb: [130, 139, 184],
+  accent: rgb(130, 170, 255), accentRgb: [130, 170, 255],
+  accent2: rgb(134, 225, 252), accent2Rgb: [134, 225, 252],
+  violet: rgb(192, 153, 255),
+  green: rgb(195, 232, 141),
+  yellow: rgb(255, 199, 119),
+  red: rgb(255, 117, 127),
+  cyan: rgb(130, 170, 255), cyanRgb: [130, 170, 255],
 };
 
 export const reset = "\x1b[0m";
+
+export function bgFill(rgbTriple: [number, number, number], width: number): string {
+  return rgbBg(...rgbTriple) + " ".repeat(width);
+}
 
 export function rule(width: number): string {
   return theme.border + "─".repeat(width) + reset;
