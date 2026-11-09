@@ -76,6 +76,16 @@ const COMMANDS = [
     { name: "/doctor", desc: "environment check" },
 ];
 async function startTui(runtime) {
+    try {
+        return await startTuiInner(runtime);
+    }
+    catch (error) {
+        console.error("xminal TUI error:", error instanceof Error ? error.message : String(error));
+        process.exitCode = 1;
+        throw error;
+    }
+}
+async function startTuiInner(runtime) {
     const o = await loadOpenTui();
     const { createCliRenderer, BoxRenderable, TextRenderable, ScrollBoxRenderable, InputRenderable, InputRenderableEvents, TextAttributes, } = o;
     const cwd = runtime.cwd;
@@ -262,12 +272,6 @@ async function startTui(runtime) {
         catch (error) {
             pushLine("err", error.message);
         }
-    });
-    // ---------- resize ----------
-    renderer.on("resize", (size) => {
-        renderer.resize(size.width, size.height);
-        root.width = size.width;
-        root.height = size.height;
     });
     // ---------- startup ----------
     const logo = [

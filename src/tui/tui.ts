@@ -49,6 +49,16 @@ const COMMANDS: Cmd[] = [
 ];
 
 export async function startTui(runtime: Runtime): Promise<void> {
+  try {
+    return await startTuiInner(runtime);
+  } catch (error) {
+    console.error("xminal TUI error:", error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+    throw error;
+  }
+}
+
+async function startTuiInner(runtime: Runtime): Promise<void> {
   const o = await loadOpenTui();
   const {
     createCliRenderer,
@@ -262,13 +272,6 @@ export async function startTui(runtime: Runtime): Promise<void> {
     } catch (error) {
       pushLine("err", (error as Error).message);
     }
-  });
-
-  // ---------- resize ----------
-  renderer.on("resize", (size: { width: number; height: number }) => {
-    renderer.resize(size.width, size.height);
-    root.width = size.width;
-    root.height = size.height;
   });
 
   // ---------- startup ----------

@@ -4,6 +4,15 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-11-09
+
+**Published on npm: `xminal@0.5.2`** (`npm install -g xminal`).
+
+### Fixed
+
+- **TUI crashed at startup on stock installs** — `renderer.on("resize", …)` called `renderer.resize()` internally, re-entering the resize path and corrupting the frame. Removed the handler; OpenTUI handles terminal resize natively.
+- Fatal TUI errors now surface as a clear message instead of dumping the native stack (falls back to classic REPL).
+
 ## [0.5.1] — 2026-11-09
 
 **Published on npm: `xminal@0.5.1`** (`npm install -g xminal`).
