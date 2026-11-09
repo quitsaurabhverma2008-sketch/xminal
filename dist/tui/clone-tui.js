@@ -94,7 +94,7 @@ const PROVIDERS = [
     { key: "opencode", label: "OpenCode (free)", kind: "free", env: "", baseUrl: "https://opencode.ai/inference/openai/v1", defaultModel: "inkling-2-small-free" },
     { key: "openrouter", label: "OpenRouter (free tier)", kind: "byok", env: "OPENROUTER_API_KEY", baseUrl: "https://openrouter.ai/api/v1", defaultModel: "openrouter/auto" },
     { key: "ollama", label: "Ollama (local)", kind: "local", env: "", baseUrl: "http://localhost:11434/v1", defaultModel: "llama3.2" },
-    { key: "lmstudio", label: "LM Studio (local)", kind: "local", env: "", baseUrl: "http://localhost:1234/v1", defaultModel: "local-model" },
+    { key: "lmstudio", label: "LM Studio (local)", kind: "local", env: "", baseUrl: "http://localhost:1234/v1", defaultModel: "openai/gpt-oss-20b" },
     { key: "vllm", label: "vLLM (local)", kind: "local", env: "", baseUrl: "http://localhost:8000/v1", defaultModel: "local-model" },
     { key: "llama_cpp", label: "llama.cpp (local)", kind: "local", env: "", baseUrl: "http://localhost:8080/v1", defaultModel: "local-model" },
     { key: "koboldcpp", label: "KoboldCpp (local)", kind: "local", env: "", baseUrl: "http://localhost:5001/v1", defaultModel: "koboldcpp" },
@@ -103,32 +103,32 @@ const PROVIDERS = [
     { key: "openwebui", label: "Open WebUI (local)", kind: "local", env: "", baseUrl: "http://localhost:3000/v1", defaultModel: "local-model" },
     { key: "openai", label: "OpenAI", kind: "byok", env: "OPENAI_API_KEY", baseUrl: "https://api.openai.com/v1", defaultModel: "gpt-4o-mini" },
     { key: "anthropic", label: "Anthropic (Claude)", kind: "byok", env: "ANTHROPIC_API_KEY", baseUrl: "https://api.anthropic.com", defaultModel: "claude-sonnet-4-5" },
-    { key: "gemini", label: "Google Gemini", kind: "byok", env: "GEMINI_API_KEY", baseUrl: "https://generativelanguage.googleapis.com", defaultModel: "gemini-2.5-flash" },
+    { key: "gemini", label: "Google Gemini", kind: "byok", env: "GEMINI_API_KEY", baseUrl: "https://generativelanguage.googleapis.com", defaultModel: "gemini-3.8-flash" },
     { key: "groq", label: "Groq", kind: "byok", env: "GROQ_API_KEY", baseUrl: "https://api.groq.com/openai/v1", defaultModel: "openai/gpt-oss-120b" },
-    { key: "deepseek", label: "DeepSeek", kind: "byok", env: "DEEPSEEK_API_KEY", baseUrl: "https://api.deepseek.com/v1", defaultModel: "deepseek-chat" },
+    { key: "deepseek", label: "DeepSeek", kind: "byok", env: "DEEPSEEK_API_KEY", baseUrl: "https://api.deepseek.com/v1", defaultModel: "deepseek-flash" },
     { key: "mistral", label: "Mistral", kind: "byok", env: "MISTRAL_API_KEY", baseUrl: "https://api.mistral.ai/v1", defaultModel: "mistral-large-latest" },
-    { key: "xai", label: "xAI (Grok)", kind: "byok", env: "XAI_API_KEY", baseUrl: "https://api.x.ai/v1", defaultModel: "grok-4" },
-    { key: "cerebras", label: "Cerebras", kind: "byok", env: "CEREBRAS_API_KEY", baseUrl: "https://api.cerebras.ai/v1", defaultModel: "llama3.3-70b" },
+    { key: "xai", label: "xAI (Grok)", kind: "byok", env: "XAI_API_KEY", baseUrl: "https://api.x.ai/v1", defaultModel: "grok-4.7" },
+    { key: "cerebras", label: "Cerebras", kind: "byok", env: "CEREBRAS_API_KEY", baseUrl: "https://api.cerebras.ai/v1", defaultModel: "qwen-3.8-27b" },
     { key: "cohere", label: "Cohere", kind: "byok", env: "COHERE_API_KEY", baseUrl: "https://api.cohere.com/compatibility/v1", defaultModel: "command-a-03-2025" },
     { key: "togetherai", label: "Together AI", kind: "byok", env: "TOGETHER_API_KEY", baseUrl: "https://api.together.xyz/v1", defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
-    { key: "fireworks", label: "Fireworks AI", kind: "byok", env: "FIREWORKS_API_KEY", baseUrl: "https://api.fireworks.ai/inference/v1", defaultModel: "accounts/fireworks/models/llama-v3p3-70b-instruct" },
+    { key: "fireworks", label: "Fireworks AI", kind: "byok", env: "FIREWORKS_API_KEY", baseUrl: "https://api.fireworks.ai/inference/v1", defaultModel: "accounts/fireworks/models/kimi-k3p1-pro" },
     { key: "perplexity", label: "Perplexity", kind: "byok", env: "PERPLEXITY_API_KEY", baseUrl: "https://api.perplexity.ai", defaultModel: "sonar-pro" },
-    { key: "moonshotai", label: "Moonshot AI (Kimi)", kind: "byok", env: "MOONSHOT_API_KEY", baseUrl: "https://api.moonshot.ai/v1", defaultModel: "moonshot-v1-auto" },
+    { key: "moonshotai", label: "Moonshot AI (Kimi)", kind: "byok", env: "MOONSHOT_API_KEY", baseUrl: "https://api.moonshot.ai/v1", defaultModel: "kimi-k3.1-pro" },
     { key: "huggingface", label: "Hugging Face", kind: "byok", env: "HF_TOKEN", baseUrl: "https://router.huggingface.co/v1", defaultModel: "deepseek-ai/DeepSeek-R1" },
     { key: "github", label: "GitHub Models", kind: "byok", env: "GITHUB_TOKEN", baseUrl: "https://models.github.ai/inference", defaultModel: "openai/gpt-4o-mini" },
     { key: "nvidia", label: "NVIDIA NIM", kind: "byok", env: "NVIDIA_API_KEY", baseUrl: "https://integrate.api.nvidia.com/v1", defaultModel: "nvidia/nemotron-3.5-super-vl-120b-a12b" },
-    { key: "deepinfra", label: "DeepInfra", kind: "byok", env: "DEEPINFRA_API_KEY", baseUrl: "https://api.deepinfra.com/v1/openai", defaultModel: "meta-llama/Meta-Llama-3.1-70B-Instruct" },
-    { key: "sambanova", label: "SambaNova", kind: "byok", env: "SAMBANOVA_API_KEY", baseUrl: "https://api.sambanova.ai/v1", defaultModel: "Meta-Llama-3.3-70B-Instruct" },
-    { key: "novita", label: "Novita AI", kind: "byok", env: "NOVITA_API_KEY", baseUrl: "https://api.novita.ai/openai", defaultModel: "deepseek/deepseek-r1" },
-    { key: "poe", label: "Poe", kind: "byok", env: "POE_API_KEY", baseUrl: "https://api.poe.com/v1", defaultModel: "GPT-4o-mini" },
-    { key: "zai", label: "Z.AI (GLM)", kind: "byok", env: "ZAI_API_KEY", baseUrl: "https://api.z.ai/api/paas/v4", defaultModel: "glm-4-plus" },
-    { key: "zhipuai", label: "Zhipu AI (GLM)", kind: "byok", env: "ZHIPU_API_KEY", baseUrl: "https://open.bigmodel.cn/api/paas/v4", defaultModel: "glm-4-plus" },
-    { key: "minimax", label: "MiniMax", kind: "byok", env: "MINIMAX_API_KEY", baseUrl: "https://api.minimax.chat/v1", defaultModel: "abab6.5s-chat" },
-    { key: "siliconflow", label: "SiliconFlow", kind: "byok", env: "SILICONFLOW_API_KEY", baseUrl: "https://api.siliconflow.cn/v1", defaultModel: "deepseek-ai/DeepSeek-V3" },
-    { key: "volcengine", label: "Volcengine (Doubao)", kind: "byok", env: "VOLCENGINE_API_KEY", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", defaultModel: "doubao-seed-1-6-250615" },
+    { key: "deepinfra", label: "DeepInfra", kind: "byok", env: "DEEPINFRA_API_KEY", baseUrl: "https://api.deepinfra.com/v1/openai", defaultModel: "deepseek-ai/DeepSeek-V4.1-Flash-1017" },
+    { key: "sambanova", label: "SambaNova", kind: "byok", env: "SAMBANOVA_API_KEY", baseUrl: "https://api.sambanova.ai/v1", defaultModel: "MiniMax-M3" },
+    { key: "novita", label: "Novita AI", kind: "byok", env: "NOVITA_API_KEY", baseUrl: "https://api.novita.ai/openai", defaultModel: "tencent/hy4" },
+    { key: "poe", label: "Poe", kind: "byok", env: "POE_API_KEY", baseUrl: "https://api.poe.com/v1", defaultModel: "google/gemini-3.8-flash" },
+    { key: "zai", label: "Z.AI (GLM)", kind: "byok", env: "ZAI_API_KEY", baseUrl: "https://api.z.ai/api/paas/v4", defaultModel: "glm-5.3-flashx" },
+    { key: "zhipuai", label: "Zhipu AI (GLM)", kind: "byok", env: "ZHIPU_API_KEY", baseUrl: "https://open.bigmodel.cn/api/paas/v4", defaultModel: "glm-5.3-flashx" },
+    { key: "minimax", label: "MiniMax", kind: "byok", env: "MINIMAX_API_KEY", baseUrl: "https://api.minimax.chat/v1", defaultModel: "MiniMax-M3.1-Flash" },
+    { key: "siliconflow", label: "SiliconFlow", kind: "byok", env: "SILICONFLOW_API_KEY", baseUrl: "https://api.siliconflow.cn/v1", defaultModel: "deepseek-ai/DeepSeek-V4-Flash-0731" },
+    { key: "volcengine", label: "Volcengine (Doubao)", kind: "byok", env: "VOLCENGINE_API_KEY", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", defaultModel: "deepseek-v4-flash-ga-260731" },
     { key: "302ai", label: "302.AI", kind: "byok", env: "AI_302AI_API_KEY", baseUrl: "https://api.302.ai/v1", defaultModel: "gpt-4o" },
-    { key: "venice", label: "Venice AI", kind: "byok", env: "VENICE_API_KEY", baseUrl: "https://api.venice.ai/api/v1", defaultModel: "llama-3.3-70b" },
-    { key: "vercel", label: "Vercel AI Gateway", kind: "byok", env: "VERCEL_AI_GATEWAY_API_KEY", baseUrl: "https://ai-gateway.vercel.sh/v1", defaultModel: "openai/gpt-4o-mini" },
+    { key: "venice", label: "Venice AI", kind: "byok", env: "VENICE_API_KEY", baseUrl: "https://api.venice.ai/api/v1", defaultModel: "deepseek-v4-1-flash-1017" },
+    { key: "vercel", label: "Vercel AI Gateway", kind: "byok", env: "VERCEL_AI_GATEWAY_API_KEY", baseUrl: "https://ai-gateway.vercel.sh/v1", defaultModel: "openai/gpt-6.1-terra" },
     { key: "alibaba", label: "Alibaba DashScope (Qwen)", kind: "byok", env: "DASHSCOPE_API_KEY", baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", defaultModel: "qwen-plus" },
 ];
 function providerKeyEnv(key) {
@@ -144,6 +144,58 @@ function kindLabel(kind) {
     return kind === "local" ? "LOCAL" : kind === "free" ? "FREE" : "BYOK";
 }
 async function validateKey(entry, key) {
+    if (entry.key === "gemini") {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${entry.defaultModel}:generateContent`;
+        const body = JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: "ping" }] }],
+            generationConfig: { maxOutputTokens: 1 },
+        });
+        try {
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { "content-type": "application/json", "x-goog-api-key": key },
+                body,
+                signal: AbortSignal.timeout(15_000),
+            });
+            if (res.ok)
+                return "ok";
+            const text = await res.text();
+            if (/insufficient|quota|credit|billing|resource_exhausted/i.test(text))
+                return "insufficient_funds";
+            if (res.status === 401 || res.status === 403)
+                return "invalid_key";
+            return `http_${res.status}`;
+        }
+        catch (error) {
+            return error.message ?? "network_error";
+        }
+    }
+    if (entry.key === "anthropic") {
+        const body = JSON.stringify({
+            model: entry.defaultModel,
+            max_tokens: 1,
+            messages: [{ role: "user", content: "ping" }],
+        });
+        try {
+            const res = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+                body,
+                signal: AbortSignal.timeout(15_000),
+            });
+            if (res.ok)
+                return "ok";
+            const text = await res.text();
+            if (/insufficient|quota|credit|billing/i.test(text))
+                return "insufficient_funds";
+            if (res.status === 401 || res.status === 403)
+                return "invalid_key";
+            return `http_${res.status}`;
+        }
+        catch (error) {
+            return error.message ?? "network_error";
+        }
+    }
     const url = entry.baseUrl.replace(/\/+$/, "") + "/chat/completions";
     const body = JSON.stringify({
         model: entry.defaultModel,
@@ -370,8 +422,9 @@ async function startOpenCodeClone(runtime) {
             const pBottom = ov.kind === "palette"
                 ? `${fgMuted("↑↓ select  ·  type to filter  ·  PgUp/PgDn scroll  ·  Enter run  ·  Esc close")}`
                 : `${fgMuted("↑↓ select  ·  PgUp/PgDn scroll  ·  Enter choose  ·  Esc close")}`;
+            const q = input.toLowerCase();
             const items = ov.kind === "palette"
-                ? COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase()) || (input.length > 1 && c.name.includes(input.toLowerCase())))
+                ? COMMANDS.filter((c) => c.name.startsWith(q) || (q.length > 1 && c.name.includes(q)))
                     .map((c) => ({ a: `${fgAmber(c.name.padEnd(14))}`, b: `${sectionLabel(c.group)}  ${c.desc}` }))
                 : ov.kind === "model"
                     ? (() => {
@@ -537,28 +590,38 @@ async function startOpenCodeClone(runtime) {
         }
         if (name === "/clear") {
             lines.length = 0;
+            input = "";
+            cursor = 0;
             render();
             return true;
         }
         if (name === "/help" || name === "/?") {
             overlay = { kind: "palette", index: 0 };
             paletteIndex = 0;
+            input = "";
+            cursor = 0;
             render();
             return true;
         }
         if (name === "/model") {
             overlay = { kind: "model", query: "", index: 0 };
             paletteIndex = 0;
+            input = "";
+            cursor = 0;
             render();
             return true;
         }
         if (name === "/provider" || name === "/connect" || name === "/set-key") {
             overlay = { kind: "provider", index: 0 };
+            input = "";
+            cursor = 0;
             render();
             return true;
         }
         if (name === "/variant" || name === "/effort" || name === "/reasoning") {
             overlay = { kind: "variant", index: 3 };
+            input = "";
+            cursor = 0;
             render();
             return true;
         }
@@ -670,9 +733,6 @@ async function startOpenCodeClone(runtime) {
         }
     };
     const selectOverlay = () => {
-        if (process.env.XMINAL_DEBUG_TUI) {
-            process.stderr.write(`[debug] selectOverlay kind=${overlay.kind} input=${JSON.stringify(input)} palIdx=${paletteIndex}\n`);
-        }
         if (overlay.kind === "palette" || overlay.kind === "model") {
             const filtered = overlay.kind === "palette"
                 ? COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase()))
@@ -768,9 +828,6 @@ async function startOpenCodeClone(runtime) {
     };
     const onData = (chunk) => {
         const s = chunk.toString("utf8");
-        if (process.env.XMINAL_DEBUG_TUI) {
-            process.stderr.write(`[chunk] ${[...chunk].map((b) => b.toString(16)).join(" ")}\n`);
-        }
         if (pendingPermission) {
             const ch = s.trim().toLowerCase()[0];
             const allow = ch === "y";
@@ -810,15 +867,6 @@ async function startOpenCodeClone(runtime) {
             cycleMode();
             return;
         }
-        if (s === "\r" || s === "\n") {
-            const handled = selectOverlay();
-            if (handled) {
-                render();
-                return;
-            }
-            submitInput();
-            return;
-        }
         if (s === "\x7f" || s === "\b") {
             if (cursor > 0) {
                 if (overlay.kind === "provider-key") {
@@ -855,41 +903,89 @@ async function startOpenCodeClone(runtime) {
             render();
             return;
         }
-        // printable path: dispatch to overlay-specific handler
-        if (overlay.kind === "provider-key") {
-            for (const ch of s)
-                if (ch >= " " && ch !== "\x7f")
-                    overlay.input += ch;
-            render();
-            return;
-        }
-        if (overlay.kind === "model") {
-            for (const ch of s)
-                if (ch >= " " && ch !== "\x7f") {
-                    overlay.query += ch;
-                    paletteIndex = 0;
+        // split embedded newlines and dispatch each segment
+        let rest = s;
+        for (;;) {
+            const idx2 = rest.search(/[\r\n]/);
+            if (idx2 === -1) {
+                if (rest) {
+                    if (overlay.kind === "provider-key") {
+                        for (const ch of rest)
+                            if (ch >= " " && ch !== "\x7f")
+                                overlay.input += ch;
+                        render();
+                        return;
+                    }
+                    if (overlay.kind === "model") {
+                        for (const ch of rest)
+                            if (ch >= " " && ch !== "\x7f") {
+                                overlay.query += ch;
+                                paletteIndex = 0;
+                            }
+                        render();
+                        return;
+                    }
+                    for (const ch of rest) {
+                        if (ch === "\x1b")
+                            continue;
+                        if (ch >= " " && ch !== "\x7f") {
+                            if (overlay.kind === "palette") {
+                                input += ch;
+                                paletteIndex = 0;
+                                continue;
+                            }
+                            input = input.slice(0, cursor) + ch + input.slice(cursor);
+                            cursor += 1;
+                        }
+                    }
+                    if (input.startsWith("/"))
+                        overlay = { kind: "palette", index: 0 };
+                    else if (overlay.kind === "palette")
+                        overlay = { kind: "none" };
+                    render();
                 }
-            render();
-            return;
-        }
-        for (const ch of s) {
-            if (ch === "\x1b")
-                continue;
-            if (ch >= " " && ch !== "\x7f") {
-                if (overlay.kind === "palette") {
-                    input += ch;
-                    paletteIndex = 0;
-                    continue;
-                }
-                input = input.slice(0, cursor) + ch + input.slice(cursor);
-                cursor += 1;
+                return;
             }
+            const head2 = rest.slice(0, idx2);
+            if (head2) {
+                if (overlay.kind === "provider-key") {
+                    for (const ch of head2)
+                        if (ch >= " " && ch !== "\x7f")
+                            overlay.input += ch;
+                }
+                else if (overlay.kind === "model") {
+                    for (const ch of head2)
+                        if (ch >= " " && ch !== "\x7f") {
+                            overlay.query += ch;
+                            paletteIndex = 0;
+                        }
+                }
+                else {
+                    for (const ch of head2) {
+                        if (ch === "\x1b")
+                            continue;
+                        if (ch >= " " && ch !== "\x7f") {
+                            if (overlay.kind === "palette") {
+                                input += ch;
+                                paletteIndex = 0;
+                                continue;
+                            }
+                            input = input.slice(0, cursor) + ch + input.slice(cursor);
+                            cursor += 1;
+                        }
+                    }
+                }
+            }
+            rest = rest.slice(idx2 + 1);
+            const handled = selectOverlay();
+            if (handled) {
+                render();
+                return;
+            }
+            submitInput();
+            if (closed)
+                return;
         }
-        if (input.startsWith("/"))
-            overlay = { kind: "palette", index: 0 };
-        else if (overlay.kind === "palette")
-            overlay = { kind: "none" };
-        render();
     };
     const cycleMode = () => {
         const MODES = ["build", "plan", "compose", "review", "yolo"];
@@ -904,7 +1000,6 @@ async function startOpenCodeClone(runtime) {
     process.stdin.on("data", onData);
     pushLine("system", `${fgText(BOLD + "◆ " + sessionTitle + RESET)}${branch ? fgMuted("  ⎇ " + branch) : ""}`);
     pushLine("system", fgAccent("You are XMINAL — Every coding agent. One terminal."));
-    pushLine("system", fgMuted("/ commands · ↑↓ select · Enter run · Esc back"));
     await new Promise((resolve) => {
         const check = () => (closed ? resolve() : setTimeout(check, 200));
         check();

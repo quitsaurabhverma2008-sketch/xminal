@@ -4,7 +4,25 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
-## [0.7.1] — 2026-11-09
+## [0.7.2] — 2026-11-09
+
+**Published on npm: `xminal@0.7.2`** (`npm install -g xminal`).
+
+### Fixed
+
+- **`/help` showed only `/help`** — the palette is opened by `/`-typing, which consumes the text as the filter query; after `/help<Enter>` the filter was cleared but the render order flushed the pre-clear state. All 70+ commands now render in `/help` / `/`-catalog with groups (Session · Agent · Providers · Tasks · Skills · MCP · Dev · Git · Usage · Setup · Audit · System).
+- **`/provider` and `/model` opened the filter-only palette instead of the wizard** — `Enter` on `/provider` selected the `/provider` row in the palette, leaving input as `/provider` and showing only one match. Wizards now launch on selection.
+- **`/` palette from typing** — all commands match `c.name.startsWith(query)`; typing `/` shows the full catalog (not a blank list).
+- **Model picker lost when `/model<Enter>`** — now opens the picker overlay directly instead of the filter palette.
+- **Footer hints** wrap with `↑↓` again (the `▶`/`▍` glyphs render on JetBrains Mono; arrows `↑↓←→` are in font).
+
+### Added
+
+- **Phone-width responsive rows** — 46-col layouts render correctly on Termux (hints collapse, sidebar hides, banner shrinks).
+- **`/help` lists every command** — 70+ entries across 12 groups.
+- **Provider list now 40+ entries** — including 302.AI, Venice, Vercel AI Gateway, Alibaba DashScope, MiniMax, SiliconFlow, Volcengine, Z.AI (GLM), ZhipuAI, Moonshot/Kimi, Fireworks, SambaNova, DeepInfra, NVIDIA NIM, GitHub Models — each with kind (LOCAL/FREE/BYOK), readiness dot (green + = ready), and the env var name needed for key.
+
+## [0.7.2] — 2026-11-09
 
 **Published on npm: `xminal@0.7.1`** (`npm install -g xminal`).
 
