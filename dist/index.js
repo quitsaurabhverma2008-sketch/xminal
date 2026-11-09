@@ -30,6 +30,25 @@ const tool_usage_1 = require("./core/tool-usage");
 const fs_1 = require("./util/fs");
 const ansi_1 = require("./util/ansi");
 const version_1 = require("./version");
+function reexecUnderBun() {
+    if (process.env.XMINAL_RUNTIME === "bun")
+        return true;
+    const bun = process.env.BUN ?? "bun";
+    try {
+        const check = (0, node_child_process_1.spawnSync)(bun, ["--version"], { stdio: "pipe" });
+        if (check.status !== 0)
+            return false;
+    }
+    catch {
+        return false;
+    }
+    const args = [process.argv[1] ?? "xminal", ...process.argv.slice(2)];
+    const result = (0, node_child_process_1.spawnSync)(bun, args, {
+        stdio: "inherit",
+        env: { ...process.env, XMINAL_RUNTIME: "bun" },
+    });
+    process.exit(result.status ?? 1);
+}
 async function main() {
     const args = (0, args_1.parseArgs)(process.argv.slice(2));
     if (args.flags["no-color"])
@@ -180,13 +199,19 @@ async function main() {
                 newSession: Boolean(args.flags.new) || !stringFlag(args.flags.session),
                 callbacks: (0, callbacks_1.rendererCallbacks)(renderer),
             });
-            if ((process.stdin.isTTY && !args.flags["no-tui"]) || process.env.XMINAL_TUI === "1") {
-                try {
-                    await (0, tui_1.startTui)(runtime);
-                    return;
+            const wantTui = (process.stdin.isTTY && !args.flags["no-tui"]) || process.env.XMINAL_TUI === "1";
+            if (wantTui) {
+                if (reexecUnderBun()) {
+                    try {
+                        await (0, tui_1.startTui)(runtime);
+                        return;
+                    }
+                    catch (error) {
+                        renderer.warn(`TUI failed (${error.message}); falling back to classic REPL.`);
+                    }
                 }
-                catch (error) {
-                    renderer.warn(`TUI failed (${error.message}); falling back to classic REPL.`);
+                else {
+                    renderer.warn("Bun not found for the TUI; starting classic REPL (install with: npm i -g bun).");
                 }
             }
             {

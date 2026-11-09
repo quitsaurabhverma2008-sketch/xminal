@@ -28,6 +28,23 @@ import { VERSION, TAGLINE } from "./version";
 import type { AgentCallbacks, AgentMode } from "./core/agent";
 import type { PermissionMode } from "./config/types";
 
+function reexecUnderBun(): boolean {
+  if (process.env.XMINAL_RUNTIME === "bun") return true;
+  const bun = process.env.BUN ?? "bun";
+  try {
+    const check = spawnSync(bun, ["--version"], { stdio: "pipe" });
+    if (check.status !== 0) return false;
+  } catch {
+    return false;
+  }
+  const args = [process.argv[1] ?? "xminal", ...process.argv.slice(2)];
+  const result = spawnSync(bun, args, {
+    stdio: "inherit",
+    env: { ...process.env, XMINAL_RUNTIME: "bun" },
+  });
+  process.exit(result.status ?? 1);
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   if (args.flags["no-color"]) process.env.NO_COLOR = "1";
@@ -190,12 +207,17 @@ async function main(): Promise<void> {
         newSession: Boolean(args.flags.new) || !stringFlag(args.flags.session),
         callbacks: rendererCallbacks(renderer),
       });
-      if ((process.stdin.isTTY && !args.flags["no-tui"]) || process.env.XMINAL_TUI === "1") {
-        try {
-          await startTui(runtime);
-          return;
-        } catch (error) {
-          renderer.warn(`TUI failed (${(error as Error).message}); falling back to classic REPL.`);
+      const wantTui = (process.stdin.isTTY && !args.flags["no-tui"]) || process.env.XMINAL_TUI === "1";
+      if (wantTui) {
+        if (reexecUnderBun()) {
+          try {
+            await startTui(runtime);
+            return;
+          } catch (error) {
+            renderer.warn(`TUI failed (${(error as Error).message}); falling back to classic REPL.`);
+          }
+        } else {
+          renderer.warn("Bun not found for the TUI; starting classic REPL (install with: npm i -g bun).");
         }
       }
       {

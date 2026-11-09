@@ -26,7 +26,7 @@ XMINAL is a provider-agnostic terminal coding agent and orchestration platform. 
 ## Requirements
 
 - **Bun ≥ 1.4** for the fullscreen TUI (same choice as opencode: Zig-native OpenTUI engine). Install with `npm i -g bun`.
-- Node ≥ 18 for classic REPL (`xminal --no-tui`).
+- Node ≥ 18 for classic REPL; on interactive TTY `xminal` re-execs under Bun automatically (`npm i -g bun` required for the TUI). Headless `xminal run` works without Bun.
 
 ## Features
 

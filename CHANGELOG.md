@@ -4,6 +4,15 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-11-09
+
+**Published on npm: `xminal@0.5.1`** (`npm install -g xminal`).
+
+### Fixed
+
+- **`xminal` silently fell back to classic REPL on machines where Node is the bin runtime** — `#!/usr/bin/env node` + OpenTUI's Bun-only FFI meant stock Node never reached the TUI. Now `xminal` (interactive TTY) re-execs itself under `bun` when available; if Bun is missing it prints a clear warning and starts classic REPL. Headless `xminal run` stays on Node.
+- `BUN` env var overrides the bun binary lookup.
+
 ## [0.5.0] — 2026-11-08
 
 **Published on npm: `xminal@0.5.0`** (`npm install -g xminal`).
