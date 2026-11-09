@@ -272,8 +272,17 @@ export async function startTui(runtime: Runtime): Promise<void> {
   });
 
   // ---------- startup ----------
-  pushLine("system", `xminal v${VERSION} — ${TAGLINE}`);
+  const logo = [
+    "███╗   ███╗██╗███╗   ██╗ █████╗ ██╗",
+    "╚██╗██╔╝███╗ ████║██║██╔██╗ ██║██╔══██╗██║",
+    " ╚███╔╝ ██╔████╔██║██║██╔██╗ ██║███████║██║",
+    " ██╔██╗ ██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║",
+    "██╔╝ ██╗██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗",
+    "╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝",
+  ].join("\n");
+  pushLine("system", logo + "\n" + `xminal v${VERSION} — ${TAGLINE}`);
   pushLine("system", `session ${shortId} · model ${runtime.agent.modelSpec} · ${path.basename(cwd)}`);
+  pushLine("system", "Tab switches plan/build/compose/review/yolo · Ctrl+B toggles sidebar · Ctrl+C quits · / commands");
   try {
     resolveModel(runtime.config, runtime.agent.modelSpec);
   } catch {

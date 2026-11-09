@@ -30,6 +30,7 @@ XMINAL is a provider-agnostic terminal coding agent and orchestration platform. 
 
 ## Features
 
+- **Native fullscreen TUI** — built on **OpenTUI** (Zig-native render engine, same as opencode): header bar, streaming chat, sidebar (session + todos + MCP + skills), boxed prompt, `/`-palette, mode cycling.
 - **Every provider** — OpenAI, Anthropic, Gemini, OpenRouter, Groq, DeepSeek, Mistral, xAI, Cerebras, Cohere, Together, Fireworks, Moonshot, Hugging Face, GitHub Models, Ollama, LM Studio, llama.cpp, vLLM and more (**47 built-in providers, 258 models** with real pricing/context). Default is **OpenCode's free models** (no key required).
 - **Every workflow** — Plan → Build → Compose → Review → YOLO modes, plus Ralph loops that keep iterating until your verification command passes.
 - **Every scale** — one agent, background subagents, parallel git worktrees, cost-aware routing.

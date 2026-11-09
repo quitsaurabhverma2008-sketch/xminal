@@ -270,8 +270,17 @@ async function startTui(runtime) {
         root.height = size.height;
     });
     // ---------- startup ----------
-    pushLine("system", `xminal v${version_1.VERSION} — ${version_1.TAGLINE}`);
+    const logo = [
+        "███╗   ███╗██╗███╗   ██╗ █████╗ ██╗",
+        "╚██╗██╔╝███╗ ████║██║██╔██╗ ██║██╔══██╗██║",
+        " ╚███╔╝ ██╔████╔██║██║██╔██╗ ██║███████║██║",
+        " ██╔██╗ ██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║",
+        "██╔╝ ██╗██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗",
+        "╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝",
+    ].join("\n");
+    pushLine("system", logo + "\n" + `xminal v${version_1.VERSION} — ${version_1.TAGLINE}`);
     pushLine("system", `session ${shortId} · model ${runtime.agent.modelSpec} · ${node_path_1.default.basename(cwd)}`);
+    pushLine("system", "Tab switches plan/build/compose/review/yolo · Ctrl+B toggles sidebar · Ctrl+C quits · / commands");
     try {
         (0, config_1.resolveModel)(runtime.config, runtime.agent.modelSpec);
     }
