@@ -41,7 +41,21 @@ export async function* sseJson(response: Response): AsyncGenerator<Record<string
 export async function readError(response: Response): Promise<string> {
   try {
     const text = await response.text();
-    return text.slice(0, 2000) || `${response.status} ${response.statusText}`;
+    const trimmed = text.trim();
+    if (trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed) as {
+          error?: { message?: string; type?: string };
+          message?: string;
+        };
+        const message = parsed?.error?.message ?? parsed?.message;
+        const type = parsed?.error?.type;
+        if (typeof message === "string" && message.length > 0) {
+          return type ? `${message} (${type})` : message;
+        }
+      } catch { /* not JSON after all */ }
+    }
+    return trimmed.slice(0, 400) || `${response.status} ${response.statusText}`;
   } catch {
     return `${response.status} ${response.statusText}`;
   }

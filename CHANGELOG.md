@@ -4,6 +4,28 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.7.5] — 2026-11-09
+
+**Published on npm: `xminal@0.7.5`** (`npm install -g xminal`).
+
+### Changed
+
+- **Default models are now free where a free one exists** (verified against models.dev 2026-11-08). Updated: OpenRouter → `nvidia/nemotron-3.5-super-vl:free` · Mistral → `labs-leanstral-1-5-1` · Vercel → `reflection/beam-free` · Z.AI/ZhipuAI → `glm-4.7-flash` · Cohere → `north-mini-code-1-0` · Hugging Face → `zai-org/GLM-4.7-Flash` · LM Studio → `qwen/qwen3-coder-30b`. OpenCode (`inkling-2-small-free`) unchanged. NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`) unchanged. Providers with no public free model (Anthropic, OpenAI, DeepSeek, xAI, MiniMax, …) keep sane low-cost defaults.
+
+### Added
+
+- **Readable rate-limit errors** — `readError()` now parses OpenAI/Groq-style JSON error envelopes and returns the message + type (`…Limit 8000, Requested 18216 (rate_limit_exceeded)`) instead of a 2000-char JSON dump. Session shows a concrete recovery hint (`/new`, `/compact`, switch provider) on TPM/429.
+- **Unit tests** for `readError` (OpenAI envelope, bare message, non-JSON fallback). 33/33 pass.
+
+### Docs
+
+- README: **zero built-in API keys** (all keys live in `~/.xminal/config.json`, chmod 600), **free default model table**, **rate-limit guidance**, `/report` command documented, stale Bun/OpenTUI mentions removed (fullscreen TUI is pure Node since 0.6.0).
+- README.example config now uses a free OpenRouter model.
+
+### Fixed
+
+- **TUI and catalog default models now agree** with `PROVIDER_DEFAULT_MODELS` for all free-tier providers (previously drifted, e.g. `openrouter/auto`, `command-a-03-2025`).
+
 ## [0.7.4] — 2026-11-09
 
 **Published on npm: `xminal@0.7.4`** (`npm install -g xminal`).

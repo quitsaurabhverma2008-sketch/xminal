@@ -8,7 +8,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.7.4` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.7.5` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
@@ -76,6 +76,29 @@ XMINAL speaks **OpenAI Chat**, **Anthropic Messages**, **Gemini native**, and **
 
 `/provider` in the TUI: pick → paste key (masked) → **live validation** → save. `/model`: pick from 258 aliases with context window + $/Mtok pricing (models.dev snapshot 2026-11-08). All keys stored only in `~/.xminal/config.json` (chmod 600), never logged.
 
+**Zero built-in API keys.** No key ships with XMINAL — every provider call uses *your* key, stored only on your device in `~/.xminal/config.json` (chmod 600) or your shell env. Nothing is proxied or exfiltrated.
+
+**Default models are free where a free one exists** (verified against models.dev 2026-11-08; everything else keeps a sane low-cost default):
+
+| Provider | Default model | Cost |
+|---|---|---|
+| OpenCode | `inkling-2-small-free` | free (anonymous, rate-limited) |
+| OpenRouter | `nvidia/nemotron-3.5-super-vl:free` | free (`:free` tier) |
+| Cohere | `north-mini-code-1-0` | free |
+| NVIDIA NIM | `nvidia/nemotron-3.5-super-vl-120b-a12b` | free |
+| Z.AI / ZhipuAI | `glm-4.7-flash` | free |
+| Hugging Face | `zai-org/GLM-4.7-Flash` | free |
+| Mistral | `labs-leanstral-1-5-1` | free |
+| LM Studio (local) | `qwen/qwen3-coder-30b` | free |
+| Vercel AI Gateway | `reflection/beam-free` | free |
+| Groq | `openai/gpt-oss-120b` | free tier (8000 TPM on free accounts) |
+| Cerebras | `qwen-3.8-27b` | free tier (rate-limited) |
+
+Providers without a public free model (Anthropic, OpenAI, DeepSeek, xAI, MiniMax, Suno-style gateways…) keep a low-cost default and require your own key/credits.
+
+**Rate limits.** Free tiers are real but small. If a provider answers `429 … TPM …` XMINAL shows a readable message plus concrete recovery steps (`/new` a fresh session, `/compact`, switch provider with `/model`) — and, because 429 is retryable, automatically fails over to other ready providers before surfacing the error.
+
+
 ### Safety & audit
 - **Permission modes**: `ask` (approve every risky action) · `auto` (approve known-safe, ask for risky) · `full` (approve all)
 - **Protected paths**: `.env`, `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config/gh` — never writable, even in `full` mode
@@ -84,7 +107,7 @@ XMINAL speaks **OpenAI Chat**, **Anthropic Messages**, **Gemini native**, and **
 - **Network allowlist** — web_fetch/web_search are separate tools with explicit opt-in
 
 ### Interfaces
-- **Fullscreen TUI** (Bun-native OpenTUI renderer — same engine opencode uses). Responsive: 46-col phone → 100+-col desktop, sidebar auto-hides under 100 cols
+- **Fullscreen TUI** in the opencode style (Tokyo Night, alternate-screen, sidebar). Responsive: phone-width (~44 cols) → 100+-col desktop, sidebar auto-hides under ~100 cols
 - **Classic REPL** — automatic fallback (or `xminal --no-tui`)
 - **`xminal run`** — non-interactive headless mode for CI (`--json`, `--quiet`, `--max-turns`, `--permission`)
 - **`xminal serve`** — OpenAI-compatible HTTP server (`POST /v1/chat/completions` with SSE streaming) + `GET /health`
@@ -101,10 +124,10 @@ XMINAL speaks **OpenAI Chat**, **Anthropic Messages**, **Gemini native**, and **
 ## Install
 
 ```bash
-npm install -g xminal          # or: npm install -g bun && npm install -g xminal
+npm install -g xminal
 ```
 
-Requires Node ≥ 18 (Node path) or Bun ≥ 1.4 (TUI path). `npm install -g bun` gives you the fullscreen TUI.
+Requires Node ≥ 18. No build tools, no native deps — the fullscreen TUI is pure Node.
 
 ## Quickstart
 
@@ -138,7 +161,7 @@ Providers — `/provider` · `/connect` · `/set-key` · `/clear-key`
 Tasks — `/tasks` · `/todo` · `/memory <list|add|search|forget>` · `/skills` · `/skill <name>` · `/mcp` · `/audit`
 Git — `/diff [args]` · `/git [args]` · `/worktree <list|create|remove|merge>`
 Verify — `/verify [cmd]` · `/ralph <task> --verify <cmd> [--iterations N]` · `/diagnostics`
-System — `/doctor` · `/init` · `/config` · `/status` · `/cost` · `/tools` · `/features` · `/brain` · `/plan` · `/verify` · `/help` · `/clear` · `/exit`
+System — `/doctor` · `/init` · `/config` · `/status` · `/cost` · `/tools` · `/features` · `/brain` · `/plan` · `/verify` · `/help` · `/clear` · `/exit` · `/report` (opens GitHub issue tracker)
 Wild — `/ralph` · `/worktree` · `/brain` · `/features` · `/plan`
 
 ## Configuration
@@ -188,13 +211,13 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.7.4** — live on npm, 30/30 tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.7.5** — live on npm, 33/33 tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 
 ```bash
 npm run build     # tsc → dist/
-npm test          # 30 tests (node:test, offline)
+npm test          # 33 tests (node:test, offline)
 npm run verify    # build + test (required before push)
 ```
 

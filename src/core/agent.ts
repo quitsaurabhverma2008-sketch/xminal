@@ -187,7 +187,11 @@ export class Agent {
             this.cost.add(event.usage, actualModel);
             this.callbacks.onUsage?.(event.usage, actualModel);
           } else if (event.type === "error") {
-            this.callbacks.onStatus?.(`Provider error: ${event.message}`);
+            let message = event.message;
+            if (/rate limit|rate_limit|429|TPM|tokens per minute|Too Many Requests/i.test(message)) {
+              message += "\n→ free-tier limit hit. Try: `/new` a fresh session, `/compact`, or switch provider with `/model` (opencode free, openrouter `:free` models, zai/zhipuai `glm-4.7-flash`).";
+            }
+            this.callbacks.onStatus?.(`Provider error: ${message}`);
             this.history.push({ role: "assistant", content: `Provider error: ${event.message}` });
             if (!this.ephemeral) this.options.session.note(`Provider error: ${event.message}`);
             return {
