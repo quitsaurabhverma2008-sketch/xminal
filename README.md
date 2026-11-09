@@ -5,12 +5,12 @@
 [![ci](https://github.com/quitsaurabhverma2008-sketch/xminal/actions/workflows/ci.yml/badge.svg)](https://github.com/quitsaurabhverma2008-sketch/xminal/actions/workflows/ci.yml)
 
 ```
-██╗  ██╗███╗   ███╗██╗███╗   ██╗ █████╗ ██╗
+██╗   ██╗███╗   ███╗██╗███╗   ██╗ █████╗ ██╗
 ╚██╗██╔╝████╗ ████║██║████╗  ██║██╔══██╗██║
  ╚███╔╝ ██╔████╔██║██║██╔██╗ ██║███████║██║
  ██╔██╗ ██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║
 ██╔╝ ██╗██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗
-╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝
+╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝╚══════╝
 ```
 
 **XMINAL** — Every coding agent. One terminal.
