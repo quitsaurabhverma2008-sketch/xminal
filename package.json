@@ -1,6 +1,6 @@
 {
   "name": "xminal",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "description": "XMINAL \u2014 Every coding agent. One terminal. Provider-agnostic fullscreen TUI powered by OpenTUI (Zig core), agent runtime, 47 providers, sessions, MCP, memory, worktrees, Ralph loops.",
   "license": "MIT",
   "author": "XMINAL contributors",
@@ -57,8 +57,5 @@
     "url": "https://github.com/quitsaurabhverma2008-sketch/xminal.git"
   },
   "homepage": "https://github.com/quitsaurabhverma2008-sketch/xminal",
-  "bugs": "https://github.com/quitsaurabhverma2008-sketch/xminal/issues",
-  "dependencies": {
-    "@opentui/core": "^0.8.3"
-  }
+  "bugs": "https://github.com/quitsaurabhverma2008-sketch/xminal/issues"
 }

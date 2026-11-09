@@ -4,6 +4,19 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-11-09
+
+**Published on npm: `xminal@0.6.0`** (`npm install -g xminal`).
+
+### Added
+
+- **Opencode-clone TUI (built-in default)** — a pure-Node fullscreen TUI matching opencode's design language: near-black background, dark input panels with blue accent bar, amber "max" badge, title bar with session + `+`, divider, streaming chat with `▍` accent markers, right sidebar (≥100 cols) with Greeting/Context/TODOS/SKILLS/MCP, status bar with `esc interrupt` / `ctrl+p commands`, `/` palette with prefix match + ↑↓, Tab cycles modes, Ctrl+P toggles palette.
+- `XMINAL_TUI_ENGINE=opentui` opts into the experimental OpenTUI build (Bun required).
+
+### Changed
+
+- Default UI is now the built-in clone TUI on **all platforms** (no Bun required, works on Termux/Android).
+
 ## [0.5.4] — 2026-11-09
 
 **Published on npm: `xminal@0.5.4`** (`npm install -g xminal`).

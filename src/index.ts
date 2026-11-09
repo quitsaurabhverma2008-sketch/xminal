@@ -7,6 +7,7 @@ import { Renderer } from "./cli/render";
 import { rendererCallbacks } from "./cli/callbacks";
 import { startRepl } from "./cli/repl";
 import { startTui } from "./tui/tui";
+import { startOpenCodeClone } from "./tui/clone-tui";
 import { Runtime } from "./runtime";
 import { loadConfig, defaultConfig, saveGlobalConfig, initProject, providerReady, listModelAliases } from "./config/config";
 import { globalConfigPath, projectConfigPath, globalXminalDir } from "./config/paths";
@@ -209,15 +210,20 @@ async function main(): Promise<void> {
       });
       const wantTui = (process.stdin.isTTY && !args.flags["no-tui"]) || process.env.XMINAL_TUI === "1";
       if (wantTui) {
-        if (reexecUnderBun()) {
+        const useOpenTui = process.env.XMINAL_TUI_ENGINE === "opentui";
+        if (useOpenTui && reexecUnderBun()) {
           try {
             await startTui(runtime);
             return;
           } catch (error) {
-            renderer.warn(`TUI failed (${(error as Error).message}); falling back to classic REPL.`);
+            renderer.warn(`OpenTUI failed (${(error as Error).message}); using built-in TUI.`);
           }
-        } else {
-          renderer.warn("Bun not found for the TUI; starting classic REPL (install with: npm i -g bun).");
+        }
+        try {
+          await startOpenCodeClone(runtime);
+          return;
+        } catch (error) {
+          renderer.warn(`TUI failed (${(error as Error).message}); falling back to classic REPL.`);
         }
       }
       {
