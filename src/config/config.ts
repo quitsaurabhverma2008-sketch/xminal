@@ -3,6 +3,7 @@ import { exists, readJson, writeJson, ensureDir } from "../util/fs";
 import { globalConfigPath, projectConfigPath } from "./paths";
 import { DEFAULT_MODELS } from "./default-models";
 import { PROVIDER_DEFAULT_MODELS } from "./provider-defaults";
+import { effectiveModelMap, isFreeModel, lookupModelAlias } from "./models-catalog";
 import type { ProviderConfig, ResolvedModel, XminalConfig } from "./types";
 
 export function defaultConfig(): XminalConfig {
@@ -175,7 +176,11 @@ function providerHasCredentials(provider: ProviderConfig): boolean {
 }
 
 export function listModelAliases(config: XminalConfig): string[] {
-  return Object.keys(config.models).sort();
+  return Object.entries(effectiveModelMap(config.models).models)
+    .sort(([a, ma], [b, mb]) =>
+      (Number(isFreeModel(mb)) - Number(isFreeModel(ma))) || a.localeCompare(b),
+    )
+    .map(([alias]) => alias);
 }
 
 export function resolveModel(config: XminalConfig, spec?: string): ResolvedModel {
@@ -192,8 +197,9 @@ export function resolveModel(config: XminalConfig, spec?: string): ResolvedModel
     return buildResolved(name, providerConfig, config, defaultModelName(name));
   }
 
-  if (config.models[requested]) {
-    const modelConfig = config.models[requested];
+  const effModels = effectiveModelMap(config.models).models;
+  if (effModels[requested]) {
+    const modelConfig = effModels[requested];
     const providerConfig = config.providers[modelConfig.provider];
     if (!providerConfig) {
       throw new Error(`Model alias "${requested}" points to unknown provider "${modelConfig.provider}".`);
@@ -221,6 +227,20 @@ export function resolveModel(config: XminalConfig, spec?: string): ResolvedModel
         `Unknown provider "${providerName}". Known providers: ${Object.keys(config.providers).join(", ")}`,
       );
     }
+    const meta = lookupModelAlias(config.models, requested);
+    if (meta) {
+      return {
+        alias: requested,
+        provider: providerName,
+        providerConfig,
+        model: meta.model,
+        contextWindow: meta.contextWindow ?? 128000,
+        maxOutput: meta.maxOutput ?? 8192,
+        inputPricePerMTok: meta.inputPricePerMTok ?? 0,
+        outputPricePerMTok: meta.outputPricePerMTok ?? 0,
+        capabilities: meta.capabilities ?? ["tools", "streaming"],
+      };
+    }
     return buildResolved(providerName, providerConfig, config, modelName);
   }
 
@@ -238,7 +258,7 @@ function buildResolved(
   config: XminalConfig,
   model: string,
 ): ResolvedModel {
-  const alias = Object.entries(config.models).find(
+  const alias = Object.entries(effectiveModelMap(config.models).models).find(
     ([, value]) => value.provider === providerName && value.model === model,
   )?.[0];
   return {

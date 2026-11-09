@@ -18,6 +18,7 @@ const fs_1 = require("../util/fs");
 const paths_1 = require("./paths");
 const default_models_1 = require("./default-models");
 const provider_defaults_1 = require("./provider-defaults");
+const models_catalog_1 = require("./models-catalog");
 function defaultConfig() {
     const providers = {
         opencode: {
@@ -175,7 +176,9 @@ function providerHasCredentials(provider) {
     return providerReady(provider);
 }
 function listModelAliases(config) {
-    return Object.keys(config.models).sort();
+    return Object.entries((0, models_catalog_1.effectiveModelMap)(config.models).models)
+        .sort(([a, ma], [b, mb]) => (Number((0, models_catalog_1.isFreeModel)(mb)) - Number((0, models_catalog_1.isFreeModel)(ma))) || a.localeCompare(b))
+        .map(([alias]) => alias);
 }
 function resolveModel(config, spec) {
     const requested = (spec || config.defaultModel || "auto").trim();
@@ -187,8 +190,9 @@ function resolveModel(config, spec) {
         const [name, providerConfig] = candidates[0];
         return buildResolved(name, providerConfig, config, defaultModelName(name));
     }
-    if (config.models[requested]) {
-        const modelConfig = config.models[requested];
+    const effModels = (0, models_catalog_1.effectiveModelMap)(config.models).models;
+    if (effModels[requested]) {
+        const modelConfig = effModels[requested];
         const providerConfig = config.providers[modelConfig.provider];
         if (!providerConfig) {
             throw new Error(`Model alias "${requested}" points to unknown provider "${modelConfig.provider}".`);
@@ -213,6 +217,20 @@ function resolveModel(config, spec) {
         if (!providerConfig) {
             throw new Error(`Unknown provider "${providerName}". Known providers: ${Object.keys(config.providers).join(", ")}`);
         }
+        const meta = (0, models_catalog_1.lookupModelAlias)(config.models, requested);
+        if (meta) {
+            return {
+                alias: requested,
+                provider: providerName,
+                providerConfig,
+                model: meta.model,
+                contextWindow: meta.contextWindow ?? 128000,
+                maxOutput: meta.maxOutput ?? 8192,
+                inputPricePerMTok: meta.inputPricePerMTok ?? 0,
+                outputPricePerMTok: meta.outputPricePerMTok ?? 0,
+                capabilities: meta.capabilities ?? ["tools", "streaming"],
+            };
+        }
         return buildResolved(providerName, providerConfig, config, modelName);
     }
     const providerConfig = config.providers[requested];
@@ -222,7 +240,7 @@ function resolveModel(config, spec) {
     throw new Error(`Unknown model "${requested}". Use provider/model, a configured alias, or "auto".`);
 }
 function buildResolved(providerName, providerConfig, config, model) {
-    const alias = Object.entries(config.models).find(([, value]) => value.provider === providerName && value.model === model)?.[0];
+    const alias = Object.entries((0, models_catalog_1.effectiveModelMap)(config.models).models).find(([, value]) => value.provider === providerName && value.model === model)?.[0];
     return {
         alias: alias ?? `${providerName}/${model}`,
         provider: providerName,

@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startOpenCodeClone = startOpenCodeClone;
 const config_1 = require("../config/config");
+const models_catalog_1 = require("../config/models-catalog");
 const render_1 = require("../cli/render");
 const commands_1 = require("../cli/commands");
 const node_child_process_1 = require("node:child_process");
@@ -248,15 +249,27 @@ async function validateKey(entry, key) {
     }
 }
 const EFFORTS = ["low", "medium", "high", "max"];
-const MODEL_ALIASES = (() => {
+const modelAliases = () => {
     try {
         const { config } = (0, config_1.loadConfig)(process.cwd());
-        return Object.entries(config.models).map(([alias, m]) => ({ alias, provider: m.provider, model: m.model }));
+        return (0, models_catalog_1.listEffectiveAliases)(config.models);
     }
     catch {
         return [];
     }
-})();
+};
+let modelScope = null;
+const modelScopeOfSpec = (spec) => {
+    const slash = spec.indexOf("/");
+    return slash > 0 ? spec.slice(0, slash) : null;
+};
+const filteredModels = (query = "") => {
+    const aliases = modelAliases();
+    const scoped = modelScope ? aliases.filter((m) => m.provider === modelScope) : aliases;
+    const q = query.toLowerCase();
+    const list = q ? scoped.filter((m) => m.alias.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || m.model.toLowerCase().includes(q)) : scoped;
+    return [...list].sort((a, b) => (Number(b.free) - Number(a.free)) || a.provider.localeCompare(b.provider) || a.model.localeCompare(b.model));
+};
 // ─── utility ────────────────────────────────────────────────────────
 const sanitizeKey = (raw) => raw.replace(/[^\x21-\x7E]/g, "").trim();
 const keyCharsetOk = (key) => key.length > 0 && /^[\x21-\x7E]+$/.test(key);
@@ -461,10 +474,12 @@ async function startOpenCodeClone(runtime) {
             frame[y] = `${rgb(C.border)}│${RESET}${bgRgb(C.panel)}${" ".repeat(innerW)}${RESET}${rgb(C.border)}│${RESET}`;
         };
         if (ov.kind === "palette" || ov.kind === "model" || ov.kind === "provider") {
-            const title = ov.kind === "palette" ? "Commands" : ov.kind === "model" ? "Models" : "Providers";
+            const title = ov.kind === "palette" ? "Commands" : ov.kind === "model" ? `Models${modelScope ? ` — ${modelScope}` : " — all providers"}` : "Providers";
             const pBottom = ov.kind === "palette"
                 ? `${fgMuted("↑↓ select  ·  type to filter  ·  PgUp/PgDn scroll  ·  Enter run  ·  Esc close")}`
-                : `${fgMuted("↑↓ select  ·  PgUp/PgDn scroll  ·  Enter choose  ·  Esc close")}`;
+                : ov.kind === "model"
+                    ? `${fgMuted("↑↓ select  ·  type to filter  ·  PgUp/PgDn scroll  ·  Enter choose  ·  Ctrl+S toggle scope  ·  Esc close")}`
+                    : `${fgMuted("↑↓ select  ·  PgUp/PgDn scroll  ·  Enter choose  ·  Esc close")}`;
             const q = input.toLowerCase();
             const items = ov.kind === "palette"
                 ? COMMANDS.filter((c) => c.name.startsWith(q) || (q.length > 1 && c.name.includes(q)))
@@ -472,7 +487,10 @@ async function startOpenCodeClone(runtime) {
                 : ov.kind === "model"
                     ? (() => {
                         const q = (ov.query ?? "").toLowerCase();
-                        return MODEL_ALIASES.filter((m) => !q || m.alias.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || m.model.toLowerCase().includes(q)).map((m) => ({ a: `${fgAccent(m.alias.slice(0, 26).padEnd(26))}`, b: fgMuted(`${m.provider}/${m.model}`.slice(0, 44)) }));
+                        return filteredModels(q).map((m) => ({
+                            a: `${fgAccent(m.alias.slice(0, 26).padEnd(26))}${m.free ? fgGreen(" FREE") : ""}`,
+                            b: fgMuted(`${m.provider}/${m.model}`.slice(0, 44)),
+                        }));
                     })()
                     : PROVIDERS.map((p) => {
                         const ready = providerIsReady(p.key, runtime.config.providers);
@@ -653,6 +671,7 @@ async function startOpenCodeClone(runtime) {
             return true;
         }
         if (name === "/model") {
+            modelScope = modelScopeOfSpec(runtime.agent.modelSpec);
             overlay = { kind: "model", query: "", index: 0 };
             paletteIndex = 0;
             input = "";
@@ -768,10 +787,7 @@ async function startOpenCodeClone(runtime) {
         if (overlay.kind === "palette" || overlay.kind === "model") {
             const count = overlay.kind === "palette"
                 ? COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase())).length
-                : MODEL_ALIASES.filter((m) => {
-                    const q = overlay.kind === "model" ? overlay.query.toLowerCase() : "";
-                    return !q || m.alias.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || m.model.toLowerCase().includes(q);
-                }).length;
+                : filteredModels(overlay.kind === "model" ? overlay.query.toLowerCase() : "").length;
             paletteIndex = Math.min(Math.max(0, count - 1), paletteIndex + 1);
         }
         else if (overlay.kind === "provider") {
@@ -785,10 +801,7 @@ async function startOpenCodeClone(runtime) {
         if (overlay.kind === "palette" || overlay.kind === "model") {
             const filtered = overlay.kind === "palette"
                 ? COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase()))
-                : MODEL_ALIASES.filter((m) => {
-                    const q = overlay.kind === "model" ? overlay.query.toLowerCase() : "";
-                    return !q || m.alias.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || m.model.toLowerCase().includes(q);
-                });
+                : filteredModels(overlay.kind === "model" ? overlay.query.toLowerCase() : "");
             const item = filtered[Math.min(paletteIndex, Math.max(0, filtered.length - 1))];
             if (!item) {
                 overlay = { kind: "none" };
@@ -917,6 +930,14 @@ async function startOpenCodeClone(runtime) {
         }
         if (s === "\t") {
             cycleMode();
+            return;
+        }
+        if (s === "\x13" && overlay.kind === "model") { // Ctrl+S: toggle provider scope / all providers
+            modelScope = modelScope
+                ? null
+                : (modelScopeOfSpec(runtime.agent.modelSpec) ?? modelScopeOfSpec(runtime.config.defaultModel));
+            paletteIndex = 0;
+            render();
             return;
         }
         if (s === "\x7f" || s === "\b") {
@@ -1050,6 +1071,22 @@ async function startOpenCodeClone(runtime) {
     process.stdin.setRawMode?.(true);
     process.stdin.resume();
     process.stdin.on("data", onData);
+    if (!process.env.XMINAL_MODELS_OFFLINE) { // refresh catalog from models.dev in the background when stale
+        void (async () => {
+            try {
+                const result = await (0, models_catalog_1.refreshModelsCatalog)({ force: false });
+                if (result.source === "fresh" && !closed) {
+                    pushLine("system", fgMuted(`model catalog refreshed · ${result.modelCount} models · ${result.freeCount} free`));
+                    render();
+                }
+                else if (!result.ok && !closed) {
+                    pushLine("system", fgMuted(`model catalog refresh failed (${result.error ?? "unknown"}) — using bundled/cached catalog`));
+                    render();
+                }
+            }
+            catch { /* best effort */ }
+        })();
+    }
     pushLine("system", `${fgText(BOLD + "◆ " + sessionTitle + RESET)}${branch ? fgMuted("  ⎇ " + branch) : ""}`);
     pushLine("system", fgAccent("You are XMINAL — Every coding agent. One terminal."));
     await new Promise((resolve) => {

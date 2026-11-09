@@ -125,7 +125,8 @@ Usage:
   xminal resume [session-id]      resume a session (default: latest)
   xminal init                     initialize .xminal in this project
   xminal doctor                   diagnose providers, sandbox, skills, MCP
-  xminal models                   list providers, credentials, aliases
+  xminal models                   list providers, credentials, aliases, catalog status
+  xminal models refresh            fetch latest model catalog from models.dev
   xminal sessions                 list sessions
   xminal ralph <task> --verify <cmd> [--iterations N]
   xminal worktree <list|create|remove|merge> [options]

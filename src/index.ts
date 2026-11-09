@@ -26,6 +26,7 @@ import { loadToolUsage } from "./core/tool-usage";
 import { exists, truncateText } from "./util/fs";
 import { ansi } from "./util/ansi";
 import { VERSION, TAGLINE } from "./version";
+import { refreshModelsCatalog, catalogMeta, MODEL_DEV_URL } from "./config/models-catalog";
 import type { AgentCallbacks, AgentMode } from "./core/agent";
 import type { PermissionMode } from "./config/types";
 
@@ -71,9 +72,22 @@ async function main(): Promise<void> {
       commandDoctor(cwd);
       return;
 
-    case "models":
+    case "models": {
+      const sub = args.positionals[0]?.toLowerCase();
+      if (sub === "refresh") {
+        const result = await refreshModelsCatalog({ force: true });
+        if (result.ok) {
+          console.log(`catalog refreshed · ${result.modelCount} models (${result.freeCount} free) from models.dev · new: ${result.newModels}`);
+          console.log(`source: ${MODEL_DEV_URL} · cache: ${result.cachePath}`);
+        } else {
+          console.error(`catalog refresh failed: ${result.error}`);
+          process.exitCode = 1;
+        }
+        return;
+      }
       commandModels(cwd, renderer);
       return;
+    }
 
     case "sessions":
       commandSessions(cwd, renderer);
@@ -277,7 +291,12 @@ function commandModels(cwd: string, renderer: Renderer): void {
   renderer.info(
     `default: ${config.defaultModel}\naliases: ${aliases.length} configured (showing 12): ${aliases.slice(0, 12).join(", ")}${aliases.length > 12 ? " …" : ""}`,
   );
-  renderer.info(`full catalog: src/config/default-models.ts (grep for any provider/model to use it)`);
+  const meta = catalogMeta(config.models);
+  renderer.info(
+    `model catalog: ${meta.source} · ${meta.modelCount} models · ${meta.freeCount} free` +
+      (meta.fetchedAt ? ` · fetched ${meta.fetchedAt}` : "") +
+      `\nsource: ${MODEL_DEV_URL}\ncache: ${meta.cachePath}\nrun \`xminal models refresh\` to refresh from models.dev (auto every 24h)`,
+  );
   renderer.info(`config: ${globalConfigPath()} · ${projectConfigPath(cwd)}`);
 }
 

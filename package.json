@@ -1,6 +1,6 @@
 {
   "name": "xminal",
-  "version": "0.7.5",
+  "version": "0.8.0",
   "description": "XMINAL \u2014 Every coding agent. One terminal. Provider-agnostic fullscreen TUI powered by OpenTUI (Zig core), agent runtime, 47 providers, sessions, MCP, memory, worktrees, Ralph loops.",
   "license": "MIT",
   "author": "XMINAL contributors",

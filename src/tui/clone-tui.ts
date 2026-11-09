@@ -1,5 +1,6 @@
 import { Runtime } from "../runtime";
 import { loadConfig, resolveModel, defaultConfig } from "../config/config";
+import { listEffectiveAliases, refreshModelsCatalog } from "../config/models-catalog";
 import type { ProviderConfig } from "../config/types";
 import { VERSION, TAGLINE } from "../version";
 import { Renderer } from "../cli/render";
@@ -282,14 +283,27 @@ type Overlay =
   | { kind: "variant"; index: number };
 
 const EFFORTS = ["low", "medium", "high", "max"];
-const MODEL_ALIASES = ((): Array<{ alias: string; provider: string; model: string }> => {
+const modelAliases = (): Array<{ alias: string; provider: string; model: string; free: boolean }> => {
   try {
     const { config } = loadConfig(process.cwd());
-    return Object.entries(config.models).map(([alias, m]) => ({ alias, provider: m.provider, model: m.model }));
+    return listEffectiveAliases(config.models);
   } catch {
     return [];
   }
-})();
+};
+type ModelAliasItem = ReturnType<typeof modelAliases>[number];
+let modelScope: string | null = null;
+const modelScopeOfSpec = (spec: string): string | null => {
+  const slash = spec.indexOf("/");
+  return slash > 0 ? spec.slice(0, slash) : null;
+};
+const filteredModels = (query = ""): ModelAliasItem[] => {
+  const aliases = modelAliases();
+  const scoped = modelScope ? aliases.filter((m) => m.provider === modelScope) : aliases;
+  const q = query.toLowerCase();
+  const list = q ? scoped.filter((m) => m.alias.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || m.model.toLowerCase().includes(q)) : scoped;
+  return [...list].sort((a, b) => (Number(b.free) - Number(a.free)) || a.provider.localeCompare(b.provider) || a.model.localeCompare(b.model));
+};
 
 // ─── utility ────────────────────────────────────────────────────────
 const sanitizeKey = (raw: string): string => raw.replace(/[^\x21-\x7E]/g, "").trim();
@@ -499,21 +513,24 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     };
 
     if (ov.kind === "palette" || ov.kind === "model" || ov.kind === "provider") {
-      const title = ov.kind === "palette" ? "Commands" : ov.kind === "model" ? "Models" : "Providers";
+      const title = ov.kind === "palette" ? "Commands" : ov.kind === "model" ? `Models${modelScope ? ` — ${modelScope}` : " — all providers"}` : "Providers";
       const pBottom = ov.kind === "palette"
         ? `${fgMuted("↑↓ select  ·  type to filter  ·  PgUp/PgDn scroll  ·  Enter run  ·  Esc close")}`
-        : `${fgMuted("↑↓ select  ·  PgUp/PgDn scroll  ·  Enter choose  ·  Esc close")}`;
+        : ov.kind === "model"
+          ? `${fgMuted("↑↓ select  ·  type to filter  ·  PgUp/PgDn scroll  ·  Enter choose  ·  Ctrl+S toggle scope  ·  Esc close")}`
+          : `${fgMuted("↑↓ select  ·  PgUp/PgDn scroll  ·  Enter choose  ·  Esc close")}`;
       const q = input.toLowerCase();
       const items: Array<{ a: string; b: string }> =
         ov.kind === "palette"
           ? COMMANDS.filter((c) => c.name.startsWith(q) || (q.length > 1 && c.name.includes(q)))
               .map((c) => ({ a: `${fgAmber(c.name.padEnd(14))}`, b: `${sectionLabel(c.group)}  ${c.desc}` }))
-          : ov.kind === "model"
+            : ov.kind === "model"
             ? (() => {
                 const q = (ov.query ?? "").toLowerCase();
-                return MODEL_ALIASES.filter((m) =>
-                  !q || m.alias.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || m.model.toLowerCase().includes(q),
-                ).map((m) => ({ a: `${fgAccent(m.alias.slice(0, 26).padEnd(26))}`, b: fgMuted(`${m.provider}/${m.model}`.slice(0, 44)) }));
+                return filteredModels(q).map((m) => ({
+                  a: `${fgAccent(m.alias.slice(0, 26).padEnd(26))}${m.free ? fgGreen(" FREE") : ""}`,
+                  b: fgMuted(`${m.provider}/${m.model}`.slice(0, 44)),
+                }));
               })()
             : PROVIDERS.map((p) => {
                 const ready = providerIsReady(p.key, runtime.config.providers);
@@ -685,7 +702,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     }
     if (name === "/clear") { lines.length = 0; input = ""; cursor = 0; render(); return true; }
     if (name === "/help" || name === "/?") { overlay = { kind: "palette", index: 0 }; paletteIndex = 0; input = ""; cursor = 0; render(); return true; }
-    if (name === "/model") { overlay = { kind: "model", query: "", index: 0 }; paletteIndex = 0; input = ""; cursor = 0; render(); return true; }
+    if (name === "/model") { modelScope = modelScopeOfSpec(runtime.agent.modelSpec); overlay = { kind: "model", query: "", index: 0 }; paletteIndex = 0; input = ""; cursor = 0; render(); return true; }
     if (name === "/provider" || name === "/connect" || name === "/set-key") { overlay = { kind: "provider", index: 0 }; input = ""; cursor = 0; render(); return true; }
     if (name === "/variant" || name === "/effort" || name === "/reasoning") { overlay = { kind: "variant", index: 3 }; input = ""; cursor = 0; render(); return true; }
     return false;
@@ -772,10 +789,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     if (overlay.kind === "palette" || overlay.kind === "model") {
       const count = overlay.kind === "palette"
         ? COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase())).length
-        : MODEL_ALIASES.filter((m) => {
-            const q = overlay.kind === "model" ? overlay.query.toLowerCase() : "";
-            return !q || m.alias.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || m.model.toLowerCase().includes(q);
-          }).length;
+        : filteredModels(overlay.kind === "model" ? overlay.query.toLowerCase() : "").length;
       paletteIndex = Math.min(Math.max(0, count - 1), paletteIndex + 1);
     } else if (overlay.kind === "provider") {
       overlay.index = Math.min(PROVIDERS.length - 1, overlay.index + 1);
@@ -788,10 +802,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     if (overlay.kind === "palette" || overlay.kind === "model") {
       const filtered = overlay.kind === "palette"
         ? COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase()))
-        : MODEL_ALIASES.filter((m) => {
-            const q = overlay.kind === "model" ? overlay.query.toLowerCase() : "";
-            return !q || m.alias.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || m.model.toLowerCase().includes(q);
-          });
+        : filteredModels(overlay.kind === "model" ? overlay.query.toLowerCase() : "");
       const item = filtered[Math.min(paletteIndex, Math.max(0, filtered.length - 1))];
       if (!item) { overlay = { kind: "none" }; render(); return true; }
       if (overlay.kind === "palette") {
@@ -801,7 +812,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
         return true;
       }
       // model picked — apply it as the new default model for this session
-      const picked = item as (typeof MODEL_ALIASES)[number];
+      const picked = item as ModelAliasItem;
       runtime.agent.setModel(`${picked.provider}/${picked.model}`);
       pushLine("ok", `model → ${picked.provider}/${picked.model}`);
       overlay = { kind: "none" };
@@ -887,6 +898,14 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
       return;
     }
     if (s === "\t") { cycleMode(); return; }
+    if (s === "\x13" && overlay.kind === "model") { // Ctrl+S: toggle provider scope / all providers
+      modelScope = modelScope
+        ? null
+        : (modelScopeOfSpec(runtime.agent.modelSpec) ?? modelScopeOfSpec(runtime.config.defaultModel));
+      paletteIndex = 0;
+      render();
+      return;
+    }
     if (s === "\x7f" || s === "\b") {
       if (cursor > 0) {
         if (overlay.kind === "provider-key") { overlay.input = overlay.input.slice(0, overlay.input.length - 1); render(); return; }
@@ -969,6 +988,21 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
   process.stdin.setRawMode?.(true);
   process.stdin.resume();
   process.stdin.on("data", onData);
+
+  if (!process.env.XMINAL_MODELS_OFFLINE) { // refresh catalog from models.dev in the background when stale
+    void (async () => {
+      try {
+        const result = await refreshModelsCatalog({ force: false });
+        if (result.source === "fresh" && !closed) {
+          pushLine("system", fgMuted(`model catalog refreshed · ${result.modelCount} models · ${result.freeCount} free`));
+          render();
+        } else if (!result.ok && !closed) {
+          pushLine("system", fgMuted(`model catalog refresh failed (${result.error ?? "unknown"}) — using bundled/cached catalog`));
+          render();
+        }
+      } catch { /* best effort */ }
+    })();
+  }
 
   pushLine("system", `${fgText(BOLD + "◆ " + sessionTitle + RESET)}${branch ? fgMuted("  ⎇ " + branch) : ""}`);
   pushLine("system", fgAccent("You are XMINAL — Every coding agent. One terminal."));

@@ -36,7 +36,7 @@ const HELP = `Commands
   /mode <plan|build|compose|review|yolo>
   /plan /build /review /yolo mode shortcuts
   /model [spec]              show or switch model (provider/model or alias)
-  /models                    list aliases and provider credential status
+  /models                    list aliases and provider credential status (Ctrl+S: scope, free models on top)
   /permissions [ask|auto|full]
   /status                    session, model, mode, cost
   /cost                      token usage and spend

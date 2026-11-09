@@ -4,6 +4,25 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-11-09
+
+**Published on npm: `xminal@0.8.0`** (`npm install -g xminal`).
+
+### Added
+
+- **Live model catalog from models.dev** — refreshes automatically on interactive TUI boot (24h TTL). New models — including newly-free ones — appear automatically without a release. `xminal models` shows catalog source (bundled · cache · fresh), count and free count; `xminal models refresh` forces an immediate fetch (writes `~/.xminal/cache/models.json`, chmod 600; 1940 models with 314 free as of fetch). `XMINAL_MODELS_OFFLINE=1` disables, `XMINAL_MODELS_TTL_HOURS` tunes the TTL. Catalog misses fall back to the cached catalog; everything works offline with bundled/cached data and `~/.xminal/config.json` is never rewritten with fetched models.
+- **`/model` is provider-scoped** — with an OpenRouter model active, `/model` shows only OpenRouter models. **Ctrl+S** toggles between *this provider* and *all providers*; the title always displays the current scope.
+- **FREE badge** next to every zero-cost model in the picker.
+- **Free-first ordering everywhere** — in the picker, in `xminal models`, in the alias list: free models always sort before paid ones.
+
+### Added (tests)
+
+- Unit tests for the catalog: snapshot→alias conversion, providers without text/tool models are skipped, user aliases win, free-first sort, resolveModel falls back to the cached catalog. 37/37 pass.
+
+### Docs
+
+- README: new "Live model catalog (models.dev)" section, scoped-`/model` screenshots (provider scope + all-providers with free-first), config is never rewritten with fetched models, release cadence note, version/tests bumped.
+
 ## [0.7.5] — 2026-11-09
 
 **Published on npm: `xminal@0.7.5`** (`npm install -g xminal`).

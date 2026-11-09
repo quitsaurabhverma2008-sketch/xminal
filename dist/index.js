@@ -31,6 +31,7 @@ const tool_usage_1 = require("./core/tool-usage");
 const fs_1 = require("./util/fs");
 const ansi_1 = require("./util/ansi");
 const version_1 = require("./version");
+const models_catalog_1 = require("./config/models-catalog");
 function reexecUnderBun() {
     if (process.env.XMINAL_RUNTIME === "bun")
         return true;
@@ -73,9 +74,23 @@ async function main() {
         case "doctor":
             commandDoctor(cwd);
             return;
-        case "models":
+        case "models": {
+            const sub = args.positionals[0]?.toLowerCase();
+            if (sub === "refresh") {
+                const result = await (0, models_catalog_1.refreshModelsCatalog)({ force: true });
+                if (result.ok) {
+                    console.log(`catalog refreshed · ${result.modelCount} models (${result.freeCount} free) from models.dev · new: ${result.newModels}`);
+                    console.log(`source: ${models_catalog_1.MODEL_DEV_URL} · cache: ${result.cachePath}`);
+                }
+                else {
+                    console.error(`catalog refresh failed: ${result.error}`);
+                    process.exitCode = 1;
+                }
+                return;
+            }
             commandModels(cwd, renderer);
             return;
+        }
         case "sessions":
             commandSessions(cwd, renderer);
             return;
@@ -265,7 +280,10 @@ function commandModels(cwd, renderer) {
     renderer.info(`providers:\n${lines.join("\n")}`);
     const aliases = (0, config_1.listModelAliases)(config);
     renderer.info(`default: ${config.defaultModel}\naliases: ${aliases.length} configured (showing 12): ${aliases.slice(0, 12).join(", ")}${aliases.length > 12 ? " …" : ""}`);
-    renderer.info(`full catalog: src/config/default-models.ts (grep for any provider/model to use it)`);
+    const meta = (0, models_catalog_1.catalogMeta)(config.models);
+    renderer.info(`model catalog: ${meta.source} · ${meta.modelCount} models · ${meta.freeCount} free` +
+        (meta.fetchedAt ? ` · fetched ${meta.fetchedAt}` : "") +
+        `\nsource: ${models_catalog_1.MODEL_DEV_URL}\ncache: ${meta.cachePath}\nrun \`xminal models refresh\` to refresh from models.dev (auto every 24h)`);
     renderer.info(`config: ${(0, paths_1.globalConfigPath)()} · ${(0, paths_1.projectConfigPath)(cwd)}`);
 }
 function commandSessions(cwd, renderer) {

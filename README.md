@@ -8,7 +8,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.7.5` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.8.0` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
@@ -47,6 +47,14 @@ XMINAL is a **provider-agnostic terminal coding agent** and orchestration platfo
 
 <img src="assets/screenshot-model-picker.png" width="720" alt="XMINAL /model with 258 aliases"/>
 
+**Scoped to your provider** — with OpenRouter active, `/model` shows only OpenRouter models (all FREE-first):
+
+<img src="assets/screenshot-model-provider-scope.png" width="720" alt="XMINAL /model scoped to openrouter"/>
+
+**Ctrl+S toggles back to the full free-first catalog:**
+
+<img src="assets/screenshot-model-all-providers.png" width="720" alt="XMINAL /model all providers, free first"/>
+
 ## Features
 
 ### Agent runtime
@@ -74,7 +82,20 @@ XMINAL speaks **OpenAI Chat**, **Anthropic Messages**, **Gemini native**, and **
 |---|---|
 | OpenCode (free) · OpenRouter (free tier) · OpenAI · Anthropic · Google Gemini · xAI · Groq · DeepSeek · Mistral · Cohere · Together AI · Fireworks · Perplexity · Moonshot/Kimi · Cerebras · SambaNova · DeepInfra · Novita · Friendli · Nebius · Poe · Z.AI · ZhipuAI · MiniMax · SiliconFlow · Volcengine · 302.AI · Venice · Vercel AI Gateway · Alibaba DashScope · Moonshot (CN) · Hugging Face · NVIDIA NIM · GitHub Models | Ollama · LM Studio · vLLM · llama.cpp · KoboldCpp · text-generation-webui · GPT4All · Open WebUI |
 
-`/provider` in the TUI: pick → paste key (masked) → **live validation** → save. `/model`: pick from 258 aliases with context window + $/Mtok pricing (models.dev snapshot 2026-11-08). All keys stored only in `~/.xminal/config.json` (chmod 600), never logged.
+`/provider` in the TUI: pick → paste key (masked) → **live validation** → save. Keys are stored only in `~/.xminal/config.json` (chmod 600), never logged.
+
+### Live model catalog (models.dev)
+
+XMINAL ships a bundled model catalog and refreshes it **automatically from models.dev** in the background on an interactive `xminal` boot (24h TTL; non-TTY mode stays network-free). New models — including freshly-added free ones — appear automatically; the list is **free-first** everywhere (`/model`, `xminal models`, aliases). Manual refresh: `xminal models refresh`.
+
+- `xminal models` — aliases + catalog source/freshness (bundled · cache · fresh)
+- `xminal models refresh` — fetch now (16xx models, `~/.xminal/cache/models.json`, chmod 600)
+- Scoping: `/model` shows **only the active provider** by default; **Ctrl+S** toggles between *this provider* ↔ *all providers*; title always shows the scope. Free models always sort to the top, in both views.
+- **FREE** badge next to every zero-cost model in the picker.
+- Catalog misses never break resolution: unknown aliases fall back to the cached models.dev catalog.
+- Offline? Everything works offline with the cache (or bundled defaults). Set `XMINAL_MODELS_OFFLINE=1` to disable background refresh, `XMINAL_MODELS_TTL_HOURS=<n>` to change the TTL (0 forces refresh every launch).
+
+The catalog is used at read-time only — `~/.xminal/config.json` is never rewritten with fetched models.
 
 **Zero built-in API keys.** No key ships with XMINAL — every provider call uses *your* key, stored only on your device in `~/.xminal/config.json` (chmod 600) or your shell env. Nothing is proxied or exfiltrated.
 
@@ -211,13 +232,13 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.7.5** — live on npm, 33/33 tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.8.0** — live on npm, 37/37 tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 
 ```bash
 npm run build     # tsc → dist/
-npm test          # 33 tests (node:test, offline)
+npm test          # 37 tests (node:test, offline)
 npm run verify    # build + test (required before push)
 ```
 
