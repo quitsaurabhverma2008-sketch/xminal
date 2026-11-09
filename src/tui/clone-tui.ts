@@ -46,7 +46,19 @@ const bold = (t: string) => `${BOLD}${t}${RESET}`;
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07/g, "");
 const visible = (s: string) => stripAnsi(s).length;
 const padRight = (s: string, w: number) => (visible(s) >= w ? s : s + " ".repeat(w - visible(s)));
-const clip = (s: string, w: number) => (visible(s) <= w ? s : s.slice(0, w));
+const clip = (s: string, w: number): string => {
+  if (visible(s) <= w) return s;
+  let out = "";
+  let cols = 0;
+  let i = 0;
+  while (i < s.length) {
+    const esc = /^(\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07)/.exec(s.slice(i));
+    if (esc) { out += esc[0]; i += esc[0].length; continue; }
+    if (cols >= w) break;
+    out += s[i]; cols += 1; i += 1;
+  }
+  return out + RESET;
+};
 
 type LineKind = "user" | "assistant" | "tool" | "ok" | "err" | "system";
 interface Line {
@@ -360,6 +372,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
   const todos = loadTodos(cwd);
   const branch = detectGitBranch(cwd);
 
+  const mouseMode = !/^(0|off|false)$/i.test(process.env.XMINAL_MOUSE ?? "");
   let busy = false;
   let closed = false;
   let input = "";
@@ -414,6 +427,9 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     return out;
   };
 
+  const clampScroll = (target: number) =>
+    Math.min(Math.max(0, target), Math.max(0, renderChatLines().length - (rows() - 7)));
+
   const renderChatLines = (): string[] => {
     const out: string[] = [];
     for (const line of lines) out.push(...styledLine(line));
@@ -437,9 +453,16 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
         const text = ` ${fgAmber("?")} allow ${p.tool}${p.reason ? fgMuted(" · " + p.reason) : ""} ${fgAccent("[y/N]")}`;
         return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(text, w - 1)}${RESET}`;
       }
-      const placeholder = input === "" ? fgMuted('Ask anything…  "fix the failing test"') : fgText(input);
-      const caret = fgAccent("▌");
-      return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(" " + placeholder + (input === "" ? caret : ""), w - 1)}${RESET}`;
+      const placeholder = input === "" ? fgMuted('Ask anything…  "fix the failing test"') : undefined;
+      if (placeholder !== undefined) {
+        return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(" " + placeholder + fgAccent("▌"), w - 1)}${RESET}`;
+      }
+      const budget = w - 3; // "▍" + leading space + caret
+      let start = 0;
+      while (start < input.length && visible(input.slice(start)) > budget) start++;
+      const shown = input.slice(start);
+      const row = " " + fgText(shown) + fgAccent("▌");
+      return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(row, w - 1)}${RESET}`;
     }
     if (row === inputTop + 2) {
       const model = runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec;
@@ -449,7 +472,11 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     }
     if (row === rows() - 1) {
       const cost = runtime.agent.getCost();
-      const left = busy ? `${fgAmber("esc")}${fgMuted(" interrupt")}` : `${fgMuted("~")}`;
+      const left = busy
+        ? `${fgAmber("esc")}${fgMuted(" interrupt")}`
+        : scroll > 0
+          ? `${fgAmber("▲ scrolled " + scroll)}${fgMuted(" · PgDn tail · wheel works too")}`
+          : `${fgMuted("~")}`;
       const right = `${fgMuted((cost.inputTokens / 1000).toFixed(1) + "K")} ${fgMuted("·")} ${fgMuted("ctrl+p commands")}`;
       return `${bgRgb(C.bg)}${padRight(left + " ".repeat(Math.max(1, w - visible(left) - visible(right))) + right, w)}${RESET}`;
     }
@@ -501,6 +528,22 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     for (let i = 0; i < frame.length; i++) {
       process.stdout.write(clip(frame[i], w) + "\x1b[K\r\n");
     }
+  };
+
+  // coalesce a burst of streaming tokens into a single frame — avoids repaint storms on slow terminals
+  let renderTimer: ReturnType<typeof setTimeout> | null = null;
+  let renderPending = false;
+  const requestRender = () => {
+    if (renderTimer) { renderPending = true; return; }
+    renderTimer = setTimeout(() => {
+      renderTimer = null;
+      renderPending = false;
+      render();
+    }, 30);
+  };
+  const flushRender = () => {
+    if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
+    if (renderPending) { renderPending = false; render(); }
   };
 
   // ─── overlay rendering ────────────────────────────────────────────
@@ -575,7 +618,8 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
       const lines: string[] = [];
       lines.push(panelBorder(`Connect ${entry.label}`, width - 2));
       lines.push(panelSide(sectionLabel("API key"), innerW, C.panel));
-      lines.push(panelSide(`${fgAccent("│")} ${padRight(fgText(maskKey(ov.input)), innerW - 4)}${RESET}`, innerW, C.panel));
+      const visibleKey = ov.input.length > (innerW - 6) ? maskKey(ov.input).slice(-(innerW - 6)) : maskKey(ov.input);
+      lines.push(panelSide(`${fgAccent("│")} ${padRight(fgText(visibleKey), innerW - 4)}${RESET}`, innerW, C.panel));
       lines.push(panelSide("", innerW, C.panel));
       lines.push(panelSide(`${fgMuted("Get your key:")} ${fgAccent(entry.baseUrl)}`, innerW, C.panel));
       lines.push(panelSide("", innerW, C.panel));
@@ -646,7 +690,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     const last = lines[lines.length - 1];
     if (last && last.kind === "assistant") {
       last.text += text;
-      render();
+      requestRender();
     } else {
       pushLine("assistant", text);
     }
@@ -657,14 +701,14 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     onToolCall: (call) => pushLine("tool", `${call.name}(${call.arguments.slice(0, 80)})`),
     onToolResult: (_n, r) => pushLine(r.isError ? "err" : "ok", (r.content.split("\n")[0] ?? "").slice(0, 160)),
     onStatus: (m) => pushLine("system", `· ${m}`),
-    onUsage: () => render(),
+    onUsage: () => requestRender(),
   };
   runtime.agent.setCallbacks?.(callbacks);
 
   const close = () => {
     if (closed) return;
     closed = true;
-    process.stdout.write("\x1b[?1049l\x1b[?25h\x1b[0m\n");
+    process.stdout.write((mouseMode ? "\x1b[?1000l\x1b[?1006l" : "") + "\x1b[?1049l\x1b[?25h\x1b[0m\n");
     runtime.close();
     process.exit(0);
   };
@@ -734,6 +778,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
         pushLine("err", (error as Error).message);
       } finally {
         busy = false;
+        flushRender();
         render();
       }
     })();
@@ -891,8 +936,21 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     }
     if (s === "\x03") { close(); return; }
     if (s === "\x0c") { render(); return; }
-    if (s === "\x1b[5~") { scroll = Math.min(scroll + 8, Math.max(0, renderChatLines().length - (rows() - 7))); render(); return; }
-    if (s === "\x1b[6~") { scroll = Math.max(0, scroll - 8); render(); return; }
+    if (s === "\x1b[5~") { scroll = clampScroll(scroll + 8); render(); return; }
+    if (s === "\x1b[6~") { scroll = clampScroll(scroll - 8); render(); return; }
+    const wheel = /^(?:\x1b\[<(\d+);\d+;\d+[Mm])$/.exec(s);
+    if (wheel) {
+      const button = Number(wheel[1]);
+      if (button === 64 || button === 65) {
+        if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "provider" || overlay.kind === "variant") {
+          for (let i = 0; i < 4; i++) { if (button === 64) overlayUp(); else overlayDown(); }
+        } else {
+          scroll = clampScroll(scroll + (button === 64 ? 4 : -4));
+        }
+        render();
+        return;
+      }
+    }
     if (s === "\x1b") { // Esc
       if (overlay.kind !== "none") { overlay = { kind: "none" }; render(); return; }
       return;
@@ -983,7 +1041,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     pushLine("system", `mode → ${MODES[(idx + 1) % MODES.length]}`);
   };
 
-  process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l\x1b[48;2;16;17;20m\x1b[38;2;230;232;236m");
+  process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l\x1b[48;2;16;17;20m\x1b[38;2;230;232;236m" + (mouseMode ? "\x1b[?1000h\x1b[?1006h" : ""));
   process.stdout.on("resize", render);
   process.stdin.setRawMode?.(true);
   process.stdin.resume();

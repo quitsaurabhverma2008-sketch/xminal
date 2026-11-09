@@ -8,7 +8,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.8.0` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.8.1` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
@@ -141,6 +141,7 @@ Providers without a public free model (Anthropic, OpenAI, DeepSeek, xAI, MiniMax
 - **Budget caps** — `$maxCostPerSession`, `maxTurns`, `maxTokensPerTurn`
 - **Compaction** — long conversations auto-summarize (tool-pair safe)
 - **Resume** — `xminal resume` picks up exactly where you left off
+- **Mouse wheel scroll** (4 lines per notch) + **PgUp/PgDn** page scroll; when scrolled up, the bottom-left status shows `▲ scrolled N · PgDn tail`. Wheel over an open palette/picker moves its selection instead of the chat. Set `XMINAL_MOUSE=0` to disable mouse capture entirely (restores your terminal's text selection).
 
 ## Install
 
@@ -232,7 +233,7 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.8.0** — live on npm, 37/37 tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.8.1** — live on npm, 37/37 tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 

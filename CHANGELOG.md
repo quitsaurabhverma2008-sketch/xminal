@@ -4,6 +4,23 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-11-09
+
+**Published on npm: `xminal@0.8.1`** (`npm install -g xminal`).
+
+### Fixed
+
+- **Input box showed nothing while typing long messages** — text now keeps the caret visible by sliding left (horizontal viewport window), like every sane terminal. Caret is always in view; your input no longer disappears off the right edge.
+- **ANSI-unsafe frame clip** — the clipper sliced raw bytes mid-escape-sequence, mangling long colored lines. It now walks the string, preserves escape sequences, and clips at exactly w visible columns.
+- **Output scroll back** — SGR mouse mode (wheel up/down scrolls 4 lines) is enabled while the TUI is active; over an open palette/picker, the wheel moves that picker's selection instead of the chat. PgUp/PgDn/wheel bounds are now clamped to available scrollback. When scrolled up, the bottom-left status shows `▲ scrolled N · PgDn tail`.
+- **`XMINAL_MOUSE=0`** — disables mouse capture entirely (restores terminal text selection); enablement is restored on exit (`?1000l ?1006l`). Follows the tui-design skill's rule: mouse capture must always have an opt-out for text selection.
+- **Repaint storm while streaming** — token bursts re-rendered the whole frame every token. Renders are now coalesced to ~33 fps (`requestRender()`) with a final `flushRender()` on completion. Slow phones stay smooth on long outputs.
+- **Overlong API key entry in the provider wizard** — masked input now keeps only the trailing visible characters within the panel width.
+
+### Tooling
+
+- `skills` project skill **tui-design** installed (`npx skills add https://github.com/hyperb1iss/hyperskills --skill tui-design`; security panel: Safe / 0 alerts / Low Risk). `skills-lock.json` pins the skill by hash and is committed; downloaded files under `.agents/` are gitignored.
+
 ## [0.8.0] — 2026-11-09
 
 **Published on npm: `xminal@0.8.0`** (`npm install -g xminal`).
