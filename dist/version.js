@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TAGLINE = exports.DISPLAY_NAME = exports.NAME = exports.VERSION = void 0;
-exports.VERSION = "0.7.0";
+exports.VERSION = "0.7.1";
 exports.NAME = "xminal";
 exports.DISPLAY_NAME = "XMINAL";
 exports.TAGLINE = "EVERY CODING AGENT. ONE TERMINAL.";

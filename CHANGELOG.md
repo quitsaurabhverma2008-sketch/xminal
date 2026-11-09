@@ -4,7 +4,19 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
-## [0.7.0] — 2026-11-09
+## [0.7.1] — 2026-11-09
+
+**Published on npm: `xminal@0.7.1`** (`npm install -g xminal`).
+
+### Fixed
+
+- **Stale default model IDs** in the provider wizard: Groq default was `llama-3.3-70b-versatile` (removed from catalog; now `openai/gpt-oss-120b`), NVIDIA default was `nvidia/llama-3.1-nemotron-70b-instruct` (404; now `nvidia/nemotron-3.5-super-vl-120b-a12b`). These were rejecting otherwise-valid keys as `invalid_key`.
+
+### Verified
+
+- Live end-to-end against Groq (`openai/gpt-oss-120b`) and NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`) — agent loop + streaming + tool call all work with user-supplied keys.
+
+## [0.7.1] — 2026-11-09
 
 **Published on npm: `xminal@0.7.0`** (`npm install -g xminal`).
 

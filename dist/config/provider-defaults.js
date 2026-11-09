@@ -25,7 +25,7 @@ exports.PROVIDER_DEFAULT_MODELS = {
     "moonshotai_cn": "moonshot-v1-auto",
     "nebius": "MiniMaxAI/MiniMax-M3.1-Flash",
     "novita": "tencent/hy4",
-    "nvidia": "minimaxai/minimax-m3.1-flash",
+    "nvidia": "nvidia/nemotron-3.5-super-vl-120b-a12b",
     "ollama": "llama3.2",
     "ollama_cloud": "kimi-k3.1-pro",
     "ollama_cn": "llama3.2",
