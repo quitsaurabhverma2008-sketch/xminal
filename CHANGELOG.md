@@ -4,6 +4,22 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-08
+
+**Published on npm: `xminal@0.5.0`** (`npm install -g xminal`).
+
+### Changed
+
+- **TUI rewritten on OpenTUI** — the same Zig-native render engine opencode uses. Imperative tree of `BoxRenderable`/`TextRenderable`/`ScrollBoxRenderable`/`InputRenderable` over Yoga flexbox layout: header bar (model · mode · cost), streaming chat with sticky scroll, sidebar (session title, cwd + git branch, TODOS synced from state, MCP servers, skills/tools counts), boxed `›` prompt with `/`-commands, and footer keybinding hints.
+- Requires **Bun ≥ 1.4** for the TUI (same model as opencode). Node fallback remains classic REPL via `--no-tui` or automatic detection.
+- Sidebar is full-height raised background; vertical scrollbar hidden when content fits.
+- Agent streaming re-renders in place via `TextRenderable.content +=`.
+
+### Added
+
+- `XMINAL_TUI=1` forces TUI even on non-TTY (for testing/integration harnesses).
+
+
 ## [0.4.1] — 2026-11-08
 
 **Published on npm: `xminal@0.4.1`** (`npm install -g xminal`).

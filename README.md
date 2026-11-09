@@ -15,13 +15,18 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.4.1` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.5.0` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
 ---
 
 XMINAL is a provider-agnostic terminal coding agent and orchestration platform. It fuses the best ideas from 125 MIT-licensed terminal-agent projects into one hackable TypeScript core — streaming agent loop, tool calling, modes, sessions, memory, subagents, MCP, permissions — and exposes it through one `xminal` command.
+
+## Requirements
+
+- **Bun ≥ 1.4** for the fullscreen TUI (same choice as opencode: Zig-native OpenTUI engine). Install with `npm i -g bun`.
+- Node ≥ 18 for classic REPL (`xminal --no-tui`).
 
 ## Features
 

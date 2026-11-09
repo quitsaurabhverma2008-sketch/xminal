@@ -37,554 +37,296 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startTui = startTui;
-const config_1 = require("../config/config");
+const dynamicImport = new Function("specifier", "return import(specifier)");
+async function loadOpenTui() {
+    // @opentui/core is ESM-only and Bun-only for the native renderer.
+    return dynamicImport("@opentui/core");
+}
 const node_path_1 = __importDefault(require("node:path"));
-const ansi_1 = require("../util/ansi");
+const config_1 = require("../config/config");
 const version_1 = require("../version");
-const engine_1 = require("./engine");
 const state_1 = require("./state");
-const layout_1 = require("./layout");
 const render_1 = require("../cli/render");
-const LOGO = [
-    "███╗   ███╗██╗███╗   ██╗ █████╗ ██╗     ",
-    "████╗ ████║██║████╗  ██║██╔══██╗██║     ",
-    "██╔████╔██║██║██╔██╗ ██║███████║██║     ",
-    "██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║     ",
-    "██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗",
-    "╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝",
-];
+const T = {
+    bg: "#1a1b26",
+    surface: "#1e2030",
+    panel: "#222436",
+    element: "#292e42",
+    border: "#3b4261",
+    borderSubtle: "#3b4261",
+    text: "#c8d3f5",
+    muted: "#828bb8",
+    accent: "#82aaff",
+    accent2: "#86e1fc",
+    violet: "#c099ff",
+    green: "#c3e88d",
+    yellow: "#ffc777",
+    red: "#ff757f",
+};
 const COMMANDS = [
-    { name: "/help", desc: "show all commands" },
-    { name: "/model", desc: "show or switch model (provider/model)" },
-    { name: "/models", desc: "list providers and aliases" },
+    { name: "/help", desc: "show commands" },
+    { name: "/model", desc: "switch model" },
     { name: "/mode", desc: "switch plan/build/compose/review/yolo" },
-    { name: "/permissions", desc: "show or set ask/auto/full" },
-    { name: "/status", desc: "session and agent status" },
-    { name: "/cost", desc: "token usage and spend" },
-    { name: "/tools", desc: "per-tool token usage" },
+    { name: "/undo", desc: "undo last edit" },
     { name: "/sessions", desc: "list sessions" },
-    { name: "/new", desc: "start a new session" },
-    { name: "/resume", desc: "resume a session (latest)" },
-    { name: "/undo", desc: "undo last checkpoint" },
-    { name: "/rewind", desc: "restore a checkpoint" },
-    { name: "/checkpoints", desc: "list checkpoints" },
-    { name: "/compact", desc: "compact conversation" },
-    { name: "/memory", desc: "memory list/add/search/forget" },
-    { name: "/skills", desc: "list skills; --lock/--verify to trust" },
-    { name: "/mcp", desc: "list MCP servers + per-tool usage" },
-    { name: "/audit", desc: "verify hash-chained audit log" },
-    { name: "/doctor", desc: "environment diagnostics" },
-    { name: "/verify", desc: "run project verification" },
-    { name: "/ralph", desc: "iterate until verify passes" },
-    { name: "/tasks", desc: "show the task list" },
-    { name: "/diff", desc: "git diff" },
-    { name: "/git", desc: "run a git command" },
-    { name: "/init", desc: "initialize .xminal in this project" },
-    { name: "/brain", desc: "show BRAIN.md" },
-    { name: "/features", desc: "show the feature matrix" },
-    { name: "/clear", desc: "clear this screen" },
-    { name: "/exit", desc: "quit XMINAL" },
+    { name: "/cost", desc: "token usage" },
+    { name: "/tools", desc: "tool usage" },
+    { name: "/mcp", desc: "MCP servers" },
+    { name: "/skills", desc: "list skills" },
+    { name: "/doctor", desc: "environment check" },
 ];
 async function startTui(runtime) {
+    const o = await loadOpenTui();
+    const { createCliRenderer, BoxRenderable, TextRenderable, ScrollBoxRenderable, InputRenderable, InputRenderableEvents, TextAttributes, } = o;
     const cwd = runtime.cwd;
-    let closed = false;
-    let busy = false;
-    let scroll = 0;
-    let statusHint = "";
-    let panelMode = "chat";
-    let sidebarVisible = (process.stdout.columns ?? 80) >= 100;
-    let paletteOpen = false;
-    let paletteIndex = 0;
-    let todos = (0, state_1.loadTodos)(cwd);
+    const todos = (0, state_1.loadTodos)(cwd);
     const gitBranch = (0, state_1.detectGitBranch)(cwd);
-    let mcpSummary = runtime.mcp
-        .listServerNames()
-        .map((server) => ({ server, tools: "?" }));
-    const lines = [];
-    let input = "";
-    let cursor = 0;
-    let pendingPermission = null;
-    const cols = () => Math.max(40, process.stdout.columns ?? 80);
-    const rows = () => Math.max(16, process.stdout.rows ?? 24);
-    const sidebarWidth = () => (sidebarVisible ? 44 : 0);
-    const chatWidth = () => Math.max(20, cols() - sidebarWidth());
-    const sbHeight = () => Math.max(4, rows() - 8);
-    const sessionTitle = runtime.session.meta.title === "untitled" ? "new session" : runtime.session.meta.title;
+    const mcpCount = runtime.mcp.listServerNames().length;
     const shortId = runtime.session.id.slice(0, 8);
-    // ---------- rendering helpers ----------
-    const wrapKindPrefix = (kind) => {
-        const w = chatWidth();
-        switch (kind) {
-            case "user": return { prefix: engine_1.theme.cyan + "you ▸ " + engine_1.reset, body: w - 6 };
-            case "assistant": return { prefix: engine_1.theme.accent + "xminal ▸ " + engine_1.reset, body: w - 9 };
-            case "tool": return { prefix: engine_1.theme.yellow + " ● " + engine_1.reset, body: w - 3 };
-            case "ok": return { prefix: engine_1.theme.green + " ✓ " + engine_1.reset, body: w - 3 };
-            case "err": return { prefix: engine_1.theme.red + " ✗ " + engine_1.reset, body: w - 3 };
-            default: return { prefix: engine_1.theme.muted + " · " + engine_1.reset, body: w - 3 };
-        }
+    const sessionTitle = runtime.session.meta.title === "untitled" ? "new session" : runtime.session.meta.title;
+    const renderer = await createCliRenderer({
+        exitOnCtrlC: true,
+        backgroundColor: T.bg,
+    });
+    // ---------- root layout ----------
+    const width = renderer.terminalWidth;
+    const height = renderer.terminalHeight;
+    const sidebarWidth = 42;
+    const root = new BoxRenderable(renderer, {
+        flexDirection: "column",
+        width,
+        height,
+        backgroundColor: T.bg,
+    });
+    const topRow = new BoxRenderable(renderer, {
+        flexDirection: "row",
+        flexGrow: 1,
+        backgroundColor: T.bg,
+    });
+    const chatCol = new BoxRenderable(renderer, {
+        flexDirection: "column",
+        flexGrow: 1,
+        backgroundColor: T.bg,
+    });
+    const header = new TextRenderable(renderer, {
+        content: ` ${runtime.agent.modelSpec}  ·  mode ${runtime.agent.mode}  ·  $${runtime.agent.getCost().costUsd.toFixed(4)}`,
+        fg: T.muted,
+        height: 1,
+    });
+    chatCol.add(header);
+    const scrollbox = new ScrollBoxRenderable(renderer, {
+        flexGrow: 1,
+        backgroundColor: T.bg,
+        verticalScrollbarOptions: { visible: false },
+        horizontalScrollbarOptions: { visible: false },
+    });
+    chatCol.add(scrollbox);
+    const input = new InputRenderable(renderer, {
+        id: "prompt",
+        placeholder: "ask xminal…  (/ commands)",
+        width: "100%",
+        backgroundColor: T.surface,
+        focusedBackgroundColor: T.panel,
+        textColor: T.text,
+        cursorColor: T.accent,
+    });
+    const promptBox = new BoxRenderable(renderer, {
+        border: true,
+        borderStyle: "rounded",
+        borderColor: T.border,
+        backgroundColor: T.surface,
+        height: 3,
+    });
+    promptBox.add(input);
+    chatCol.add(promptBox);
+    // ---------- sidebar ----------
+    const sidebar = new BoxRenderable(renderer, {
+        width: sidebarWidth,
+        height: "100%",
+        flexDirection: "column",
+        backgroundColor: T.surface,
+        padding: 1,
+        gap: 1,
+    });
+    const sessionNode = new TextRenderable(renderer, {
+        content: `◆ ${sessionTitle}`,
+        fg: T.text,
+        attributes: TextAttributes.BOLD,
+    });
+    sidebar.add(sessionNode);
+    const idNode = new TextRenderable(renderer, { content: shortId, fg: T.muted });
+    sidebar.add(idNode);
+    const locationNode = new TextRenderable(renderer, {
+        content: `${node_path_1.default.basename(cwd)}${gitBranch ? `  ⎇ ${gitBranch}` : ""}`,
+        fg: T.muted,
+    });
+    sidebar.add(locationNode);
+    const todosNode = new TextRenderable(renderer, {
+        content: renderTodos(todos),
+        fg: T.text,
+    });
+    sidebar.add(todosNode);
+    const mcpNode = new TextRenderable(renderer, {
+        content: `MCP  ${mcpCount === 0 ? "(none)" : runtime.mcp.listServerNames().join(", ")}`,
+        fg: T.muted,
+    });
+    sidebar.add(mcpNode);
+    const countsNode = new TextRenderable(renderer, {
+        content: `SKILLS  ${runtime.skills.list().length}   TOOLS  ${runtime.tools.names().length}`,
+        fg: T.muted,
+    });
+    sidebar.add(countsNode);
+    topRow.add(chatCol);
+    topRow.add(sidebar);
+    root.add(topRow);
+    const footer = new TextRenderable(renderer, {
+        content: " / commands · Tab mode · Ctrl+B sidebar · Ctrl+C quit",
+        fg: T.muted,
+        height: 1,
+    });
+    root.add(footer);
+    renderer.root.add(root);
+    // ---------- agent wiring ----------
+    const pushLine = (kind, text) => {
+        const fg = kind === "user" ? T.accent2
+            : kind === "tool" ? T.yellow
+                : kind === "ok" ? T.green
+                    : kind === "err" ? T.red
+                        : kind === "system" ? T.muted
+                            : T.text;
+        scrollbox.add(new TextRenderable(renderer, { content: text, fg }));
+        input.focus();
     };
-    let _wrappedCache = null;
-    let _wrappedKey = -1;
-    let _wrappedChars = -1;
-    const contentKey = () => lines.reduce((n, line) => n + line.text.length, 0);
-    const renderLines = () => {
-        const chars = contentKey();
-        if (_wrappedCache && _wrappedKey === lines.length && _wrappedChars === chars)
-            return _wrappedCache;
-        _wrappedCache = null;
-        _wrappedKey = lines.length;
-        _wrappedChars = chars;
-        {
-            const out = [];
-            for (const line of lines) {
-                const { prefix, body } = wrapKindPrefix(line.kind);
-                const parts = (0, layout_1.wrapText)(line.text, Math.max(4, body));
-                for (let i = 0; i < parts.length; i++) {
-                    out.push((i === 0 ? prefix : " ".repeat(2)) + parts[i]);
-                }
-            }
-            _wrappedCache = out;
-            return out;
-        }
-    };
-    const fgClip = (line, width, bg) => {
-        // Fill a line with the raised background and clip inner resets to foreground-only.
-        const safe = line.replace(/\x1b\[0m/g, "\x1b[39m");
-        const visible = (0, ansi_1.visibleLength)(safe);
-        const fill = Math.max(0, width - visible);
-        return `\x1b[48;2;${bg[0]};${bg[1]};${bg[2]}m${safe}${" ".repeat(fill)}${engine_1.reset}`;
-    };
-    const renderSidebar = (x, y, width, height) => {
-        const inner = width;
-        const raised = engine_1.theme.raisedRgb;
-        const line = (content) => fgClip(content, inner, raised);
-        const blank = () => (0, engine_1.bgFill)(raised, inner);
-        const out = [];
-        out.push(line(`${engine_1.theme.accent}◆${engine_1.reset} ${engine_1.theme.text}${(0, ansi_1.truncate)(sessionTitle, inner - 4)}`));
-        out.push(line(`${engine_1.theme.muted}${shortId}`));
-        out.push(blank());
-        out.push(line(`${engine_1.theme.muted}LOCATION`));
-        out.push(line(`${engine_1.theme.text}${node_path_1.default.basename(cwd)}`));
-        if (gitBranch)
-            out.push(line(`${engine_1.theme.muted}⎇ ${engine_1.theme.accent2}${(0, ansi_1.truncate)(gitBranch, inner - 4)}`));
-        out.push(blank());
-        const done = todos.filter((t) => t.status === "completed").length;
-        out.push(line(`${engine_1.theme.muted}TODOS${engine_1.reset} ${engine_1.theme.muted}${done}/${todos.length}`));
-        if (todos.length === 0) {
-            out.push(line(`${engine_1.theme.muted}(no tasks)`));
-        }
-        else {
-            for (const todo of todos.slice(0, 9)) {
-                out.push(line(`${(0, engine_1.statusPill)(todo.status)}${engine_1.theme.text}${(0, ansi_1.truncate)(todo.text, inner - 4)}`));
-            }
-            if (todos.length > 9)
-                out.push(line(`${engine_1.theme.muted}… +${todos.length - 9} more`));
-        }
-        out.push(blank());
-        out.push(line(`${engine_1.theme.muted}MCP`));
-        if (mcpSummary.length === 0) {
-            out.push(line(`${engine_1.theme.muted}(none)`));
-        }
-        else {
-            for (const { server, tools } of mcpSummary) {
-                out.push(line(`${engine_1.theme.green}●${engine_1.reset} ${engine_1.theme.text}${(0, ansi_1.truncate)(server, inner - 8)} ${engine_1.theme.muted}${tools}t`));
-            }
-        }
-        out.push(blank());
-        out.push(line(`${engine_1.theme.muted}SKILLS${engine_1.reset} ${engine_1.theme.text}${runtime.skills.list().length}`));
-        out.push(line(`${engine_1.theme.muted}TOOLS${engine_1.reset} ${engine_1.theme.text}${runtime.tools.names().length}`));
-        while (out.length < height)
-            out.push(blank());
-        return out.slice(0, height);
-    };
-    const renderHeader = () => {
-        const w = cols();
-        const cost = runtime.agent.getCost();
-        const logo = engine_1.theme.accent + LOGO[0] + engine_1.reset;
-        const titleRight = engine_1.theme.muted + (sessionTitle === "new session" ? "new session" : sessionTitle) + engine_1.reset;
-        const line0 = engine_1.theme.accent + logo + " " + engine_1.reset + titleRight;
-        const metaLeft = `${engine_1.theme.accent}${runtime.agent.modelSpec}${engine_1.reset} ${engine_1.theme.muted}·${engine_1.reset} ${(0, engine_1.modeColor)(runtime.agent.mode)}${runtime.agent.mode}${engine_1.reset} ${engine_1.theme.muted}·${engine_1.reset} ${engine_1.theme.yellow}${runtime.permissions.mode}${engine_1.reset}`;
-        const metaRight = `${engine_1.theme.muted}${(0, engine_1.formatCost)(cost.costUsd)} · ${cost.turns} turns${engine_1.reset}`;
-        const line1 = (0, ansi_1.truncate)(metaLeft, Math.max(10, w - (0, ansi_1.visibleLength)(metaRight) - 2)) +
-            " ".repeat(Math.max(1, w - (0, ansi_1.visibleLength)(metaLeft) - (0, ansi_1.visibleLength)(metaRight) - 1)) + metaRight;
-        return [(0, ansi_1.pad)((0, ansi_1.truncate)(line0, w), w), (0, ansi_1.pad)((0, ansi_1.truncate)(line1, w), w), (0, engine_1.rule)(w)];
-    };
-    const renderInput = () => {
-        const w = chatWidth();
-        const out = [];
-        const border = engine_1.theme.border;
-        const line = `${border}│${engine_1.reset} `;
-        out.push(border + "┌" + "─".repeat(Math.max(0, w - 2)) + "┐" + engine_1.reset);
-        if (pendingPermission) {
-            const ask = pendingPermission;
-            const prompt = `${engine_1.theme.yellow}? allow ${ask.tool}${engine_1.reset} ${engine_1.theme.muted}(${(0, ansi_1.truncate)(ask.reason, w - 20)})${engine_1.reset} ${engine_1.theme.cyan}[y/N]${engine_1.reset}`;
-            out.push(line + (0, ansi_1.pad)((0, ansi_1.truncate)(prompt, w - 3), w - 3) + border + "│" + engine_1.reset);
-        }
-        else {
-            const placeholder = input === "" ? `${engine_1.theme.muted}ask anything…  ( / for commands )${engine_1.reset}` : "";
-            out.push(line + (0, ansi_1.pad)((0, ansi_1.truncate)(engine_1.theme.accent + "› " + engine_1.reset + input + placeholder, w - 3), w - 3) + border + "│" + engine_1.reset);
-        }
-        out.push(border + "└" + "─".repeat(Math.max(0, w - 2)) + "┘" + engine_1.reset);
-        return out;
-    };
-    const renderPalette = () => {
-        if (!paletteOpen)
-            return [];
-        const w = Math.min(64, cols() - 8);
-        const q = input.toLowerCase();
-        const items = COMMANDS.filter((c) => c.name.startsWith(q));
-        const shown = items.slice(0, 8);
-        const out = [];
-        out.push(engine_1.theme.border + "┌─ " + engine_1.theme.accent + "COMMANDS" + engine_1.theme.muted + `  ${items.length} match${items.length === 1 ? "" : "es"}` + engine_1.theme.border + " " + "─".repeat(Math.max(0, w - 22)) + "┐" + engine_1.reset);
-        if (shown.length === 0) {
-            out.push(engine_1.theme.border + "│ " + engine_1.theme.muted + "no matches" + engine_1.reset + (0, ansi_1.pad)("", w - 13) + engine_1.theme.border + "│" + engine_1.reset);
-        }
-        else {
-            const clampedIndex = Math.min(paletteIndex, Math.max(0, shown.length - 1));
-            shown.forEach((item, i) => {
-                const selected = i === clampedIndex;
-                const marker = selected ? engine_1.theme.accent + "› " + engine_1.reset : "  ";
-                const text = `${marker}${engine_1.theme.text}${item.name}${engine_1.reset} ${engine_1.theme.muted}— ${item.desc}${engine_1.reset}`;
-                out.push(engine_1.theme.border + "│ " + engine_1.reset + (0, ansi_1.pad)((0, ansi_1.truncate)(text, w - 3), w - 3) + engine_1.theme.border + "│" + engine_1.reset);
-            });
-        }
-        out.push(engine_1.theme.border + "└" + "─".repeat(Math.max(0, w - 2)) + "┘" + engine_1.reset);
-        return out;
-    };
-    const renderFooter = () => {
-        const w = cols();
-        const left = ` ${engine_1.theme.muted}/${engine_1.reset} ${engine_1.theme.text}commands${engine_1.reset}   ${engine_1.theme.muted}Tab${engine_1.reset} ${engine_1.theme.text}mode${engine_1.reset}   ${engine_1.theme.muted}Ctrl+B${engine_1.reset} ${engine_1.theme.text}sidebar${engine_1.reset}   ${engine_1.theme.muted}Ctrl+C${engine_1.reset} ${engine_1.theme.text}${busy ? "abort" : "quit"}${engine_1.reset}   ${engine_1.theme.muted}Esc${engine_1.reset} ${engine_1.theme.text}back${engine_1.reset}`;
-        return [(0, engine_1.rule)(w), (0, ansi_1.pad)((0, ansi_1.truncate)(left, w), w)];
-    };
-    const render = () => {
-        const w = cols();
-        const messageLines = renderLines();
-        const end = Math.max(0, messageLines.length - scroll);
-        const view = messageLines.slice(Math.max(0, end - sbHeight()), end);
-        const out = [];
-        out.push(...renderHeader());
-        const palette = paletteOpen ? renderPalette() : [];
-        const effSb = Math.max(2, sbHeight() - palette.length);
-        for (let row = 0; row < effSb; row++) {
-            const line = view[row] ?? "";
-            const chatCol = (0, ansi_1.pad)((0, ansi_1.truncate)(line, chatWidth()), chatWidth());
-            if (sidebarVisible) {
-                const sidebar = renderSidebar(0, row, sidebarWidth(), effSb);
-                const sideCol = sidebar[row] ?? " ".repeat(sidebarWidth());
-                out.push(chatCol + sideCol);
+    let streamingNode = null;
+    const callbacks = {
+        onText: (text) => {
+            if (!streamingNode) {
+                streamingNode = new TextRenderable(renderer, { content: "", fg: T.text });
+                scrollbox.add(streamingNode);
             }
             else {
-                out.push(chatCol);
+                streamingNode.content += text;
             }
-        }
-        if (palette.length) {
-            for (const p of palette)
-                out.push((0, ansi_1.pad)((0, ansi_1.truncate)(p, w), w));
-        }
-        out.push((0, engine_1.rule)(w));
-        out.push(...renderInput());
-        out.push(...renderFooter());
-        process.stdout.write("\x1b[H" + out.map((l) => l + "\x1b[K").join("\n"));
-    };
-    // ---------- runtime plumbing ----------
-    const push = (kind, text) => {
-        lines.push({ kind, text });
-        scroll = 0;
-        render();
-    };
-    const appendAssistant = (text) => {
-        const last = lines[lines.length - 1];
-        if (last && last.kind === "assistant") {
-            last.text += text;
-            scroll = 0;
-            render();
-        }
-        else {
-            push("assistant", text);
-        }
-    };
-    const callbacks = {
-        onText: (t) => appendAssistant(t),
-        onToolCall: (call) => push("tool", `${call.name}(${(0, ansi_1.truncate)(call.arguments, 100)})`),
-        onToolResult: (_name, result) => push(result.isError ? "err" : "ok", (result.content.split("\n")[0] ?? "").slice(0, 200)),
-        onStatus: (m) => push("system", m),
-        onUsage: () => render(),
+        },
+        onToolCall: (call) => pushLine("tool", `● ${call.name}(${call.arguments.slice(0, 60)})`),
+        onToolResult: (_n, r) => pushLine(r.isError ? "err" : "ok", `${r.isError ? "✗" : "✓"} ${(r.content.split("\n")[0] ?? "").slice(0, 100)}`),
+        onStatus: (m) => pushLine("system", `· ${m}`),
+        onUsage: () => {
+            const cost = runtime.agent.getCost();
+            header.content = ` ${runtime.agent.modelSpec}  ·  mode ${runtime.agent.mode}  ·  $${cost.costUsd.toFixed(4)}`;
+        },
     };
     runtime.agent.setCallbacks?.(callbacks);
-    const askPermission = (tool, reason) => new Promise((resolve) => {
-        pendingPermission = { tool, reason: reason ?? "needs approval", resolve };
-        render();
+    // ---------- keyboard handling ----------
+    const MODES = ["build", "plan", "compose", "review", "yolo"];
+    renderer.keyInput.on("keypress", async (key) => {
+        const k = key;
+        if (k.name === "tab") {
+            const idx = MODES.indexOf(runtime.agent.mode);
+            const next = MODES[(idx + 1) % MODES.length];
+            runtime.setMode(next);
+            pushLine("system", `mode → ${next}`);
+            header.content = ` ${runtime.agent.modelSpec}  ·  mode ${runtime.agent.mode}  ·  $${runtime.agent.getCost().costUsd.toFixed(4)}`;
+            return;
+        }
+        if (k.ctrl && k.name === "b") {
+            sidebar.destroy();
+            return;
+        }
+        if (k.name === "pageup") {
+            scrollbox.scrollBy(-Math.max(1, Math.floor(scrollbox.height / 2)));
+            return;
+        }
+        if (k.name === "pagedown") {
+            scrollbox.scrollBy(Math.max(1, Math.floor(scrollbox.height / 2)));
+            return;
+        }
     });
-    runtime.setAskHandler(askPermission);
-    const runAgent = async (text) => {
-        busy = true;
-        statusHint = "working…";
-        push("user", text);
+    input.on(InputRenderableEvents.ENTER, async (value) => {
+        const text = value.trim();
+        input.value = "";
+        if (!text)
+            return;
+        if (text.startsWith("/")) {
+            await handleSlash(text, runtime, renderer, pushLine);
+            return;
+        }
+        pushLine("user", `you ▸ ${text}`);
+        streamingNode = null;
         try {
             const result = await runtime.agent.run(text);
+            streamingNode = null;
             if (result.stoppedReason !== "done")
-                push("err", `stopped: ${result.stoppedReason}`);
+                pushLine("err", `stopped: ${result.stoppedReason}`);
         }
         catch (error) {
-            push("err", error.message);
+            pushLine("err", error.message);
         }
-        finally {
-            busy = false;
-            statusHint = "";
-            render();
-        }
-    };
-    const refreshTodos = () => {
-        todos = (0, state_1.loadTodos)(cwd);
-        render();
-    };
-    const close = () => {
-        if (closed)
-            return;
-        closed = true;
-        process.stdout.write("\x1b[?1049l\x1b[?25h\x1b[0m\n");
-        runtime.close();
-        process.exit(0);
-    };
-    // MCP summary (async, best effort)
-    void (async () => {
-        try {
-            const tools = await Promise.race([
-                runtime.mcp.listAllTools(),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 15_000)),
-            ]);
-            const counts = new Map();
-            for (const { server } of tools)
-                counts.set(server, (counts.get(server) ?? 0) + 1);
-            mcpSummary = runtime.mcp.listServerNames().map((server) => ({ server, tools: counts.get(server) ?? 0 }));
-        }
-        catch {
-            mcpSummary = runtime.mcp.listServerNames().map((server) => ({ server, tools: 0 }));
-        }
-        render();
-    })();
-    // ---------- raw key handling ----------
-    const submitInput = () => {
-        const text = input.trim();
-        input = "";
-        cursor = 0;
-        paletteOpen = false;
-        if (!text) {
-            render();
-            return;
-        }
-        if (text.startsWith("/")) {
-            const cmd = text;
-            if (cmd === "/exit" || cmd === "/quit") {
-                if (busy)
-                    runtime.agent.abort();
-                close();
-                return;
-            }
-            if (cmd === "/clear") {
-                lines.length = 0;
-                render();
-                return;
-            }
-            return classicCommand(cmd);
-        }
-        scroll = 0;
-        render();
-        void runAgent(text);
-    };
-    const classicCommand = async (cmdLine) => {
-        process.stdout.write("\x1b[?1049l\x1b[?25h\n");
+    });
+    // ---------- resize ----------
+    renderer.on("resize", (size) => {
+        renderer.resize(size.width, size.height);
+        root.width = size.width;
+        root.height = size.height;
+    });
+    // ---------- startup ----------
+    pushLine("system", `xminal v${version_1.VERSION} — ${version_1.TAGLINE}`);
+    pushLine("system", `session ${shortId} · model ${runtime.agent.modelSpec} · ${node_path_1.default.basename(cwd)}`);
+    try {
+        (0, config_1.resolveModel)(runtime.config, runtime.agent.modelSpec);
+    }
+    catch {
+        pushLine("err", "no working provider — set OPENROUTER_API_KEY or run /doctor");
+    }
+    input.focus();
+    await new Promise((resolve) => {
+        renderer.on("destroy", () => resolve());
+    });
+    runtime.close();
+}
+function renderTodos(todos) {
+    if (todos.length === 0)
+        return "TODOS  (none)";
+    const done = todos.filter((t) => t.status === "completed").length;
+    const lines = todos.slice(0, 8).map((t) => {
+        const box = t.status === "completed" ? "✓" : t.status === "in_progress" ? "▸" : "○";
+        return `${box} ${t.text.slice(0, 34)}`;
+    });
+    return `TODOS  ${done}/${todos.length}\n${lines.join("\n")}`;
+}
+async function handleSlash(input, runtime, renderer, pushLine) {
+    const cmd = input.trim();
+    if (cmd === "/exit" || cmd === "/quit") {
+        renderer.destroy();
+        return;
+    }
+    if (cmd === "/doctor" || cmd === "/help" || cmd === "/model" || cmd === "/mcp" || cmd === "/skills" || cmd === "/cost" || cmd === "/tools" || cmd === "/sessions") {
         const { handleCommand } = await Promise.resolve().then(() => __importStar(require("../cli/commands")));
         const cliRenderer = new render_1.Renderer();
+        // leave alternate screen temporarily
+        process.stdout.write("\x1b[?1049l\x1b[?25h\n");
         const ctx = {
             runtime,
             renderer: cliRenderer,
-            cwd,
-            exit: () => { closed = true; },
+            cwd: runtime.cwd,
+            exit: () => process.exit(0),
             restart: () => undefined,
             ask: async () => null,
         };
         try {
-            await handleCommand(cmdLine, ctx);
+            await handleCommand(cmd, ctx);
         }
         catch (error) {
             cliRenderer.error(error.message);
         }
-        refreshTodos();
-        process.stdout.write("\npress any key to return…\n");
+        process.stdout.write("\npress Enter to return to XMINAL…\n");
         await new Promise((resolve) => {
             const onData = () => { process.stdin.removeListener("data", onData); resolve(); };
             process.stdin.once("data", onData);
         });
         process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l");
-        render();
-    };
-    const cycleMode = () => {
-        const modes = ["build", "plan", "compose", "review", "yolo"];
-        const index = modes.indexOf(runtime.agent.mode);
-        const next = modes[(index + 1) % modes.length];
-        runtime.setMode(next);
-        push("system", `mode → ${next}`);
-    };
-    const submitLine = () => submitInput();
-    const onData = (chunk) => {
-        const s = chunk.toString("utf8");
-        if (pendingPermission) {
-            const ch = s.trim().toLowerCase()[0];
-            const allow = ch === "y";
-            const prompt = pendingPermission;
-            pendingPermission = null;
-            push(allow ? "ok" : "err", allow ? `allowed ${prompt.tool}` : `denied ${prompt.tool}`);
-            prompt.resolve(allow);
-            return;
-        }
-        if (s === "\x03") {
-            if (busy) {
-                runtime.agent.abort();
-                push("err", "aborted current turn");
-            }
-            else {
-                close();
-            }
-            return;
-        }
-        if (s === "\x0c") {
-            render();
-            return;
-        } // Ctrl+L
-        if (s === "\x1b[5~") {
-            scroll = Math.min(scroll + Math.floor(sbHeight() / 2), Math.max(0, renderLines().length - sbHeight()));
-            render();
-            return;
-        } // PgUp
-        if (s === "\x1b[6~") {
-            scroll = Math.max(0, scroll - Math.floor(sbHeight() / 2));
-            render();
-            return;
-        } // PgDn
-        if (s === "\x1b[H" || s === "\x1b[1~") {
-            scroll = Math.max(0, renderLines().length - sbHeight());
-            render();
-            return;
-        } // Home
-        if (s === "\x1b[F" || s === "\x1b[4~") {
-            scroll = 0;
-            render();
-            return;
-        } // End
-        if (s === "\x1b") {
-            paletteOpen = false;
-            render();
-            return;
-        } // Esc
-        if (s === "\t") {
-            if (paletteOpen) {
-                const items = COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase()));
-                if (items.length > 0) {
-                    input = items[paletteIndex % items.length].name + " ";
-                    cursor = input.length;
-                    paletteOpen = false;
-                    render();
-                }
-                return;
-            }
-            cycleMode();
-            return;
-        }
-        if (s === "\x1b[B" || s === "\x1b[A") { // down/up in palette
-            if (paletteOpen) {
-                const items = COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase()));
-                paletteIndex = Math.max(0, Math.min(items.length - 1, paletteIndex + (s === "\x1b[B" ? 1 : -1)));
-                render();
-                return;
-            }
-        }
-        if (s === "\x02") {
-            sidebarVisible = !sidebarVisible;
-            render();
-            return;
-        } // Ctrl+B sidebar
-        if (s === "\r" || s === "\n") {
-            submitInput();
-            return;
-        }
-        if (s === "\x7f" || s === "\b") {
-            if (cursor > 0) {
-                input = input.slice(0, cursor - 1) + input.slice(cursor);
-                cursor -= 1;
-                if (!input.startsWith("/"))
-                    paletteOpen = false;
-                render();
-            }
-            return;
-        }
-        if (s === "\x1b[D") {
-            cursor = Math.max(0, cursor - 1);
-            render();
-            return;
-        }
-        if (s === "\x1b[C") {
-            cursor = Math.min(input.length, cursor + 1);
-            render();
-            return;
-        }
-        // split embedded newlines: text before each newline is submitted
-        let rest = s;
-        for (;;) {
-            const idx = rest.search(/[\r\n]/);
-            if (idx === -1) {
-                if (rest) {
-                    for (const ch of rest) {
-                        if (ch === "\x1b")
-                            continue;
-                        if (ch >= " " && ch !== "\x7f") {
-                            input = input.slice(0, cursor) + ch + input.slice(cursor);
-                            cursor += 1;
-                        }
-                    }
-                    if (input.startsWith("/")) {
-                        paletteOpen = true;
-                        paletteIndex = 0;
-                    }
-                    else if (paletteOpen && !input.startsWith("/")) {
-                        paletteOpen = false;
-                    }
-                }
-                break;
-            }
-            const head = rest.slice(0, idx);
-            for (const ch of head) {
-                if (ch === "\x1b")
-                    continue;
-                if (ch >= " " && ch !== "\x7f") {
-                    input = input.slice(0, cursor) + ch + input.slice(cursor);
-                    cursor += 1;
-                }
-            }
-            submitLine();
-            rest = rest.slice(idx + 1);
-            if (closed)
-                return;
-        }
-        render();
-    };
-    // ---------- enter alternate screen ----------
-    process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l");
-    process.stdout.on("resize", render);
-    process.stdin.setRawMode?.(true);
-    process.stdin.resume();
-    process.stdin.on("data", onData);
-    push("system", `xminal v${version_1.VERSION} — ${version_1.TAGLINE}`);
-    push("system", `session ${shortId} · model ${runtime.agent.modelSpec} · folder ${node_path_1.default.basename(cwd)}`);
-    try {
-        (0, config_1.resolveModel)(runtime.config, runtime.agent.modelSpec);
+        return;
     }
-    catch {
-        push("err", "no working provider yet — run /doctor or set OPENROUTER_API_KEY / ANTHROPIC_API_KEY");
-    }
-    await new Promise((resolve) => {
-        const check = () => (closed ? resolve() : setTimeout(check, 200));
-        check();
-    });
+    pushLine("system", `unknown command: ${cmd}`);
 }
 //# sourceMappingURL=tui.js.map
