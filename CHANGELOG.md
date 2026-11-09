@@ -4,6 +4,17 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-11-09
+
+**Published on npm: `xminal@0.6.1`** (`npm install -g xminal`).
+
+### Fixed
+
+- CRLF line endings — `LF` alone left the cursor mid-row and shifted the alternate screen sideways (corrupt render in strict terminals).
+- Command palette now actually renders (state machine existed, renderer missing): `/` prefix filter + `↑↓` navigation + `Enter` to run + `Tab` complete + `Ctrl+P` toggle.
+- `COLUMNS`/`LINES` env vars respected when `stdout.columns/rows` is unset (phones/Termux).
+- Palette selected row spans full width with amber background + near-black text.
+
 ## [0.6.0] — 2026-11-09
 
 **Published on npm: `xminal@0.6.0`** (`npm install -g xminal`).

@@ -82,8 +82,8 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
   const lines: Line[] = [];
 
   const renderer = new Renderer();
-  const cols = () => Math.max(40, process.stdout.columns ?? 80);
-  const rows = () => Math.max(16, process.stdout.rows ?? 24);
+  const cols = () => Math.max(40, process.stdout.columns ?? Number(process.env.COLUMNS) ?? 80);
+  const rows = () => Math.max(16, process.stdout.rows ?? Number(process.env.LINES) ?? 24);
   const sidebarWidth = () => (cols() >= 100 ? 30 : 0);
   const contentWidth = () => cols() - sidebarWidth();
 
@@ -181,6 +181,27 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
       const right = `${fgMuted(`${(cost.inputTokens / 1000).toFixed(1)}K`)} ${fgMuted("·")} ${fgMuted("ctrl+p commands")}`;
       return `${bgRgb(C.bg)}${padRight(left + " ".repeat(Math.max(1, w - visible(left) - visible(right))) + right, w)}${RESET}`;
     }
+    // command palette overlay (above the input area)
+    if (paletteOpen) {
+      const inputTopRow = rows() - 5;
+      const list = COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase())).slice(0, 8);
+      const overlayStart = inputTopRow - list.length;
+      if (row >= overlayStart && row < inputTopRow) {
+        const itemIndex = list.length - (inputTopRow - row);
+        const item = list[itemIndex];
+        if (item) {
+          const selected = itemIndex === paletteIndex;
+          const name = ("  " + item.name).padEnd(14);
+          const desc = item.desc.slice(0, Math.max(0, w - 17));
+          if (selected) {
+            const text = `${BOLD}${name}${desc}`;
+            return `${bgRgb(C.amber)}${rgb(C.bg)}${padRight(text, w - 1)}${RESET}`;
+          }
+          const text = `${fgAmber(name)}${fgMuted(desc)}`;
+          return `${bgRgb(C.panel)}${padRight(text, w - 1)}${RESET}`;
+        }
+      }
+    }
     // chat area
     const chatLines = renderChatLines();
     const end = Math.max(0, chatLines.length - scroll);
@@ -222,7 +243,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
   const render = () => {
     process.stdout.write("\x1b[H");
     for (let r = 0; r < rows(); r++) {
-      process.stdout.write(clip(renderRow(r), cols()) + "\x1b[K\n");
+      process.stdout.write(clip(renderRow(r), cols()) + "\x1b[K\r\n");
     }
   };
 
