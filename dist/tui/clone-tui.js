@@ -154,11 +154,11 @@ const PROVIDERS = [
 function providerKeyEnv(key) {
     return PROVIDERS.find((p) => p.key === key)?.env ?? "";
 }
-function providerIsReady(key) {
+function providerIsReady(key, saved) {
     const env = providerKeyEnv(key);
     if (!env)
         return true; // keyless (local / free)
-    return Boolean(process.env[env]);
+    return Boolean(process.env[env]) || Boolean(saved?.[key]?.apiKey);
 }
 function kindLabel(kind) {
     return kind === "local" ? "LOCAL" : kind === "free" ? "FREE" : "BYOK";
@@ -475,7 +475,7 @@ async function startOpenCodeClone(runtime) {
                         return MODEL_ALIASES.filter((m) => !q || m.alias.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || m.model.toLowerCase().includes(q)).map((m) => ({ a: `${fgAccent(m.alias.slice(0, 26).padEnd(26))}`, b: fgMuted(`${m.provider}/${m.model}`.slice(0, 44)) }));
                     })()
                     : PROVIDERS.map((p) => {
-                        const ready = providerIsReady(p.key);
+                        const ready = providerIsReady(p.key, runtime.config.providers);
                         const dot = ready ? fgGreen("+") : fgMuted("-");
                         const tag = `${kindLabel(p.kind).padEnd(5)}`;
                         return { a: `${dot} ${fgText(p.label.padEnd(28))}`, b: `${fgMuted(tag)}  ${ready ? fgGreen("ready") : p.env ? fgMuted(p.env) : fgGreen("no key needed")}` };
@@ -815,7 +815,7 @@ async function startOpenCodeClone(runtime) {
         }
         if (overlay.kind === "provider") {
             const entry = PROVIDERS[Math.min(overlay.index, PROVIDERS.length - 1)];
-            if (!providerIsReady(entry.key) && entry.env) {
+            if (!providerIsReady(entry.key, runtime.config.providers) && entry.env) {
                 overlay = { kind: "provider-key", entry, input: "" };
             }
             else {
@@ -845,9 +845,7 @@ async function startOpenCodeClone(runtime) {
                 const result = await validateKey(entry, cleaned);
                 if (result === "ok") {
                     try {
-                        const loaded = (0, config_1.loadConfig)(process.cwd());
-                        const next = { ...loaded.config, providers: { ...loaded.config.providers, [entry.key]: { ...loaded.config.providers[entry.key], apiKey: cleaned } } };
-                        (0, config_1.saveGlobalConfig)(next);
+                        runtime.setProviderKey(entry.key, cleaned);
                     }
                     catch { /* best effort */ }
                     overlay = { kind: "provider-test", entry, status: "ok", message: "saved" };

@@ -1,4 +1,6 @@
-import { loadConfig, type LoadedConfig } from "./config/config";
+import { loadConfig, saveGlobalConfig, type LoadedConfig } from "./config/config";
+import { globalConfigPath } from "./config/paths";
+import { exists, readJson, writeJson } from "./util/fs";
 import { Session, type SessionMeta } from "./core/session";
 import { PermissionManager, type AskHandler } from "./core/permissions";
 import { Agent, type AgentCallbacks, type AgentMode } from "./core/agent";
@@ -66,6 +68,21 @@ export class Runtime {
 
   setAskHandler(handler: AskHandler | undefined): void {
     this.permissions.setAskHandler(handler);
+  }
+
+  setProviderKey(provider: string, apiKey: string): void {
+    const current = this.config.providers[provider];
+    if (!current) return;
+    this.config.providers = { ...this.config.providers, [provider]: { ...current, apiKey } };
+    try {
+      const raw = exists(globalConfigPath())
+        ? readJson<Partial<XminalConfig>>(globalConfigPath(), {})
+        : {};
+      const providers = { ...(raw.providers ?? {}), [provider]: { ...(raw.providers?.[provider] ?? current), apiKey } };
+      writeJson(globalConfigPath(), { ...raw, providers });
+    } catch {
+      try { saveGlobalConfig(this.config); } catch { /* best effort */ }
+    }
   }
 
   setMode(mode: AgentMode): void {

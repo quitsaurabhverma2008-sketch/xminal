@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Runtime = void 0;
 const config_1 = require("./config/config");
+const paths_1 = require("./config/paths");
+const fs_1 = require("./util/fs");
 const session_1 = require("./core/session");
 const permissions_1 = require("./core/permissions");
 const agent_1 = require("./core/agent");
@@ -54,6 +56,25 @@ class Runtime {
     }
     setAskHandler(handler) {
         this.permissions.setAskHandler(handler);
+    }
+    setProviderKey(provider, apiKey) {
+        const current = this.config.providers[provider];
+        if (!current)
+            return;
+        this.config.providers = { ...this.config.providers, [provider]: { ...current, apiKey } };
+        try {
+            const raw = (0, fs_1.exists)((0, paths_1.globalConfigPath)())
+                ? (0, fs_1.readJson)((0, paths_1.globalConfigPath)(), {})
+                : {};
+            const providers = { ...(raw.providers ?? {}), [provider]: { ...(raw.providers?.[provider] ?? current), apiKey } };
+            (0, fs_1.writeJson)((0, paths_1.globalConfigPath)(), { ...raw, providers });
+        }
+        catch {
+            try {
+                (0, config_1.saveGlobalConfig)(this.config);
+            }
+            catch { /* best effort */ }
+        }
     }
     setMode(mode) {
         this.agent.setMode(mode);

@@ -4,6 +4,16 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.7.4] — 2026-11-09
+
+**Published on npm: `xminal@0.7.4`** (`npm install -g xminal`).
+
+### Fixed
+
+- **"Missing API key" after saving a key in `/provider`** — the interactive TUI wrote the key to `~/.xminal/config.json` correctly, but the running session kept a boot-time snapshot of the config; the router never saw it. `Runtime.setProviderKey()` now updates the in-memory config **and** persists only the `providers` section to the global config file (`providers` merged, other sections untouched). A `/provider` save now takes effect immediately — no restart needed — and fresh sessions resolve the key straight from `~/.xminal/config.json` (verified end-to-end: `setProviderKey` → `loadConfig` → `resolveModel`/`getApiKey` all return the saved key).
+- **Provider wizard ready-dot was env-only** — saved keys under `config.providers[*].apiKey` now render the `+`/green indicator in `/provider`, not just env vars.
+- **Wizard no longer wipes unrelated global settings by accident** — only the `providers` block is merged when saving keys, instead of re-serializing the whole boot-time config.
+
 ## [0.7.3] — 2026-11-09
 
 **Published on npm: `xminal@0.7.3`** (`npm install -g xminal`).

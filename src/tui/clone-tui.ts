@@ -1,5 +1,5 @@
 import { Runtime } from "../runtime";
-import { loadConfig, saveGlobalConfig, resolveModel, defaultConfig } from "../config/config";
+import { loadConfig, resolveModel, defaultConfig } from "../config/config";
 import type { ProviderConfig } from "../config/types";
 import { VERSION, TAGLINE } from "../version";
 import { Renderer } from "../cli/render";
@@ -191,10 +191,10 @@ const PROVIDERS: ProviderEntry[] = [
 function providerKeyEnv(key: string): string {
   return PROVIDERS.find((p) => p.key === key)?.env ?? "";
 }
-function providerIsReady(key: string): boolean {
+function providerIsReady(key: string, saved?: Record<string, { apiKey?: string } | undefined>): boolean {
   const env = providerKeyEnv(key);
   if (!env) return true; // keyless (local / free)
-  return Boolean(process.env[env]);
+  return Boolean(process.env[env]) || Boolean(saved?.[key]?.apiKey);
 }
 function kindLabel(kind: ProviderEntry["kind"]): string {
   return kind === "local" ? "LOCAL" : kind === "free" ? "FREE" : "BYOK";
@@ -516,7 +516,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
                 ).map((m) => ({ a: `${fgAccent(m.alias.slice(0, 26).padEnd(26))}`, b: fgMuted(`${m.provider}/${m.model}`.slice(0, 44)) }));
               })()
             : PROVIDERS.map((p) => {
-                const ready = providerIsReady(p.key);
+                const ready = providerIsReady(p.key, runtime.config.providers);
                 const dot = ready ? fgGreen("+") : fgMuted("-");
                 const tag = `${kindLabel(p.kind).padEnd(5)}`;
                 return { a: `${dot} ${fgText(p.label.padEnd(28))}`, b: `${fgMuted(tag)}  ${ready ? fgGreen("ready") : p.env ? fgMuted(p.env) : fgGreen("no key needed")}` };
@@ -810,7 +810,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     }
     if (overlay.kind === "provider") {
       const entry = PROVIDERS[Math.min(overlay.index, PROVIDERS.length - 1)];
-      if (!providerIsReady(entry.key) && entry.env) {
+      if (!providerIsReady(entry.key, runtime.config.providers) && entry.env) {
         overlay = { kind: "provider-key", entry, input: "" };
       } else {
         runtime.agent.setModel(`${entry.key}/${entry.defaultModel}`);
@@ -835,9 +835,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
         const result = await validateKey(entry, cleaned);
         if (result === "ok") {
           try {
-            const loaded = loadConfig(process.cwd());
-            const next = { ...loaded.config, providers: { ...loaded.config.providers, [entry.key]: { ...loaded.config.providers[entry.key], apiKey: cleaned } } };
-            saveGlobalConfig(next);
+            runtime.setProviderKey(entry.key, cleaned);
           } catch { /* best effort */ }
           overlay = { kind: "provider-test", entry, status: "ok", message: "saved" };
         } else {
