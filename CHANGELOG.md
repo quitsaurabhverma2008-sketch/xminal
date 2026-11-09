@@ -4,6 +4,14 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.5.4] — 2026-11-09
+
+**Published on npm: `xminal@0.5.4`** (`npm install -g xminal`).
+
+### Fixed
+
+- **Phone-width (≈44–60 cols) terminal rendered garbled UI** — sidebar (42 cols) no longer shows below 100 cols, ASCII logo replaced by a compact one-line banner under 70 cols, header trimmed to model + cost under 60 cols. The fullscreen TUI now works on narrow terminals.
+
 ## [0.5.3] — 2026-11-09
 
 **Published on npm: `xminal@0.5.3`** (`npm install -g xminal`).

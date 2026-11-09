@@ -115,6 +115,9 @@ async function startTuiInner(runtime) {
     const width = renderer.terminalWidth;
     const height = renderer.terminalHeight;
     const sidebarWidth = 42;
+    const sidebarVisible = width >= 100;
+    const compact = width < 70;
+    const tiny = width < 60;
     const root = new BoxRenderable(renderer, {
         flexDirection: "column",
         width,
@@ -131,8 +134,13 @@ async function startTuiInner(runtime) {
         flexGrow: 1,
         backgroundColor: T.bg,
     });
+    const headerText = () => tiny
+        ? ` ${(runtime.agent.modelSpec.split("/").pop() ?? "model").slice(0, 10)} $${runtime.agent.getCost().costUsd.toFixed(4)}`
+        : compact
+            ? ` ${runtime.agent.modelSpec.split("/").pop()?.slice(0, 14) ?? "model"} · ${runtime.agent.mode.slice(0, 4)} · $${runtime.agent.getCost().costUsd.toFixed(4)}`
+            : ` ${runtime.agent.modelSpec}  ·  mode ${runtime.agent.mode}  ·  $${runtime.agent.getCost().costUsd.toFixed(4)}`;
     const header = new TextRenderable(renderer, {
-        content: ` ${runtime.agent.modelSpec}  ·  mode ${runtime.agent.mode}  ·  $${runtime.agent.getCost().costUsd.toFixed(4)}`,
+        content: headerText(),
         fg: T.muted,
         height: 1,
     });
@@ -200,7 +208,8 @@ async function startTuiInner(runtime) {
     });
     sidebar.add(countsNode);
     topRow.add(chatCol);
-    topRow.add(sidebar);
+    if (sidebarVisible)
+        topRow.add(sidebar);
     root.add(topRow);
     const footer = new TextRenderable(renderer, {
         content: " / commands · Tab mode · Ctrl+B sidebar · Ctrl+C quit",
@@ -242,7 +251,7 @@ async function startTuiInner(runtime) {
             if (closed)
                 return;
             const cost = runtime.agent.getCost();
-            header.content = ` ${runtime.agent.modelSpec}  ·  mode ${runtime.agent.mode}  ·  $${cost.costUsd.toFixed(4)}`;
+            header.content = headerText();
         },
     };
     runtime.agent.setCallbacks?.(callbacks);
@@ -255,11 +264,11 @@ async function startTuiInner(runtime) {
             const next = MODES[(idx + 1) % MODES.length];
             runtime.setMode(next);
             pushLine("system", `mode → ${next}`);
-            header.content = ` ${runtime.agent.modelSpec}  ·  mode ${runtime.agent.mode}  ·  $${runtime.agent.getCost().costUsd.toFixed(4)}`;
+            header.content = headerText();
             return;
         }
         if (k.ctrl && k.name === "b") {
-            sidebar.destroy();
+            pushLine("system", "sidebar needs ≥100 cols to show");
             return;
         }
         if (k.ctrl && k.name === "c") {
@@ -297,17 +306,26 @@ async function startTuiInner(runtime) {
         }
     });
     // ---------- startup ----------
-    const logo = [
-        "███╗   ███╗██╗███╗   ██╗ █████╗ ██╗",
-        "╚██╗██╔╝███╗ ████║██║██╔██╗ ██║██╔══██╗██║",
-        " ╚███╔╝ ██╔████╔██║██║██╔██╗ ██║███████║██║",
-        " ██╔██╗ ██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║",
-        "██╔╝ ██╗██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗",
-        "╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝",
-    ].join("\n");
-    pushLine("system", logo + "\n" + `xminal v${version_1.VERSION} — ${version_1.TAGLINE}`);
-    pushLine("system", `session ${shortId} · model ${runtime.agent.modelSpec} · ${node_path_1.default.basename(cwd)}`);
-    pushLine("system", "Tab switches plan/build/compose/review/yolo · Ctrl+B toggles sidebar · Ctrl+C quits · / commands");
+    if (tiny) {
+        pushLine("system", `xminal v${version_1.VERSION} · model ${runtime.agent.modelSpec.split("/").pop()} · Tab mode · / commands`);
+    }
+    else if (compact) {
+        pushLine("system", `◉ XMINAL v${version_1.VERSION}`);
+        pushLine("system", `session ${shortId} · ${runtime.agent.modelSpec.split("/").pop()} · ${node_path_1.default.basename(cwd)}`);
+    }
+    else {
+        const logo = [
+            "███╗   ███╗██╗███╗   ██╗ █████╗ ██╗",
+            "╚██╗██╔╝███╗ ████║██║██╔██╗ ██║██╔══██╗██║",
+            " ╚███╔╝ ██╔████╔██║██║██╔██╗ ██║███████║██║",
+            " ██╔██╗ ██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║",
+            "██╔╝ ██╗██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗",
+            "╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝",
+        ].join("\n");
+        pushLine("system", logo + "\n" + `xminal v${version_1.VERSION} — ${version_1.TAGLINE}`);
+        pushLine("system", `session ${shortId} · model ${runtime.agent.modelSpec} · ${node_path_1.default.basename(cwd)}`);
+        pushLine("system", "Tab switches plan/build/compose/review/yolo · Ctrl+B toggles sidebar · Ctrl+C quits · / commands");
+    }
     try {
         (0, config_1.resolveModel)(runtime.config, runtime.agent.modelSpec);
     }
