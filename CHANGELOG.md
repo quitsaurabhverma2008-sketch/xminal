@@ -16,7 +16,7 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 - Live end-to-end against Groq (`openai/gpt-oss-120b`) and NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`) — agent loop + streaming + tool call all work with user-supplied keys.
 
-## [0.7.1] — 2026-11-09
+## [0.7.0] — 2026-11-09
 
 **Published on npm: `xminal@0.7.0`** (`npm install -g xminal`).
 
