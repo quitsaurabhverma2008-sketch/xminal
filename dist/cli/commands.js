@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleCommand = handleCommand;
+const node_child_process_1 = require("node:child_process");
 const node_fs_1 = __importDefault(require("node:fs"));
 const node_path_1 = __importDefault(require("node:path"));
 const config_1 = require("../config/config");
@@ -49,6 +50,7 @@ Work
   /tasks                     show the task list
   /init                      create .xminal/config.json for this project
   /doctor                    environment diagnostics
+  /report (or /issue)        open the GitHub issue tracker
 
 Context
   /memory [list|add <text>|search <q>|forget <id>]
@@ -449,6 +451,13 @@ async function handleCommand(input, ctx) {
             renderer.info(node_fs_1.default.existsSync(file) ? `feature matrix: ${file}` : "(no FEATURE_MATRIX.md in this project)");
             return true;
         }
+        case "report":
+        case "issue": {
+            const url = "https://github.com/quitsaurabhverma2008-sketch/xminal/issues/new";
+            const opened = openExternal(url);
+            renderer.info(opened ? `opened: ${url}` : `Report bugs here: ${url}`);
+            return true;
+        }
         default:
             renderer.warn(`Unknown command: /${command}. Type /help.`);
             return true;
@@ -522,6 +531,29 @@ function parseRalphArgs(input) {
         task = task.replace(iterationsMatch[0], " ");
     }
     return { task: task.replace(/\s+/g, " ").trim(), verify, iterations };
+}
+function openExternal(url) {
+    const platform = process.platform;
+    const candidates = platform === "darwin"
+        ? [["open", [url]]]
+        : platform === "win32"
+            ? [["cmd", ["/c", "start", "", url]]]
+            : [
+                ["termux-open-url", [url]],
+                ["xdg-open", [url]],
+                ["gio", ["open", url]],
+            ];
+    for (const [bin, args] of candidates) {
+        try {
+            const result = (0, node_child_process_1.spawnSync)(bin, args, { stdio: "ignore" });
+            if (result.status === 0)
+                return true;
+        }
+        catch {
+            // try next candidate
+        }
+    }
+    return false;
 }
 function ensureGitignore(cwd) {
     const file = node_path_1.default.join(cwd, ".gitignore");

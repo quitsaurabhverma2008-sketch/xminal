@@ -4,6 +4,26 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-11-09
+
+**Published on npm: `xminal@0.7.3`** (`npm install -g xminal`).
+
+### Added
+
+- **`/report` (alias `/issue`)** — opens the GitHub issue tracker directly from within the TUI (`open`/`xdg-open`/`termux-open-url`/`gio`).
+- **Key sanitizer** — strips non-ASCII/non-printable bytes from API keys before any network call; rejects with "key contains invalid characters" instead of throwing `Cannot convert argument to a ByteString`.
+- **Friendlier validation errors** — `invalid_key`, `insufficient funds`, `HTTP timeouts`, `network errors`, `bad_chars` all mapped to plain human sentences.
+
+### Fixed
+
+- **`/help` showed only `/help`** — palette filter was never cleared after Enter; now Enter on `/help` clears the filter and shows the full catalog.
+- **`/provider` and `/model` opened the filter palette instead of their wizards** — selected commands now short-circuit to their dedicated overlay.
+- **`/` spectrum** — typing `/` with nothing after shows all 70+ commands (not a blank list).
+
+### Verified
+
+- Groq (`openai/gpt-oss-120b`) + NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`) confirmed live end-to-end with user-supplied keys.
+
 ## [0.7.2] — 2026-11-09
 
 **Published on npm: `xminal@0.7.2`** (`npm install -g xminal`).

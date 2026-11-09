@@ -4,6 +4,24 @@ import type { ProviderConfig } from "../config/types";
 import { VERSION, TAGLINE } from "../version";
 import { Renderer } from "../cli/render";
 import { handleCommand } from "../cli/commands";
+import { spawnSync } from "node:child_process";
+
+function openExternal(url: string): boolean {
+  const platform = process.platform;
+  const candidates: Array<[string, string[]]> =
+    platform === "darwin"
+      ? [["open", [url]]]
+      : platform === "win32"
+        ? [["cmd", ["/c", "start", "", url]]]
+        : [["termux-open-url", [url]], ["xdg-open", [url]], ["gio", ["open", url]]];
+  for (const [bin, args] of candidates) {
+    try {
+      const r = spawnSync(bin, args, { stdio: "ignore" });
+      if (r.status === 0) return true;
+    } catch { /* try next */ }
+  }
+  return false;
+}
 import { loadTodos, detectGitBranch } from "./state";
 import type { AgentCallbacks, AgentMode } from "../core/agent";
 
@@ -114,6 +132,8 @@ const COMMANDS: Cmd[] = [
   { name: "/help", desc: "this command list", group: "System" },
   { name: "/clear", desc: "clear the screen", group: "System" },
   { name: "/theme", desc: "toggle dark/light (light = coming)", group: "System" },
+  { name: "/report", desc: "report a bug on GitHub", group: "System" },
+  { name: "/issue", desc: "alias for /report", group: "System" },
   { name: "/exit", desc: "quit XMINAL", group: "System" },
 ];
 
@@ -180,6 +200,9 @@ function kindLabel(kind: ProviderEntry["kind"]): string {
   return kind === "local" ? "LOCAL" : kind === "free" ? "FREE" : "BYOK";
 }
 async function validateKey(entry: ProviderEntry, key: string): Promise<string> {
+  const cleaned = sanitizeKey(key);
+  if (!keyCharsetOk(cleaned)) return "bad_chars";
+  key = cleaned;
   if (entry.key === "gemini") {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${entry.defaultModel}:generateContent`;
     const body = JSON.stringify({
@@ -199,7 +222,7 @@ async function validateKey(entry: ProviderEntry, key: string): Promise<string> {
       if (res.status === 401 || res.status === 403) return "invalid_key";
       return `http_${res.status}`;
     } catch (error) {
-      return (error as Error).message ?? "network_error";
+      return (error as Error).message?.includes("Timeout") ? "timeout" : "network_error";
     }
   }
   if (entry.key === "anthropic") {
@@ -221,7 +244,7 @@ async function validateKey(entry: ProviderEntry, key: string): Promise<string> {
       if (res.status === 401 || res.status === 403) return "invalid_key";
       return `http_${res.status}`;
     } catch (error) {
-      return (error as Error).message ?? "network_error";
+      return (error as Error).message?.includes("Timeout") ? "timeout" : "network_error";
     }
   }
   const url = entry.baseUrl.replace(/\/+$/, "") + "/chat/completions";
@@ -244,7 +267,7 @@ async function validateKey(entry: ProviderEntry, key: string): Promise<string> {
     if (res.status === 401 || res.status === 403) return "invalid_key";
     return `http_${res.status}`;
   } catch (error) {
-    return (error as Error).message ?? "network_error";
+    return (error as Error).message?.includes("Timeout") ? "timeout" : "network_error";
   }
 }
 
@@ -269,6 +292,23 @@ const MODEL_ALIASES = ((): Array<{ alias: string; provider: string; model: strin
 })();
 
 // ─── utility ────────────────────────────────────────────────────────
+const sanitizeKey = (raw: string): string => raw.replace(/[^\x21-\x7E]/g, "").trim();
+const keyCharsetOk = (key: string): boolean => key.length > 0 && /^[\x21-\x7E]+$/.test(key);
+const friendlyValidateError = (code: string): string => {
+  switch (code) {
+    case "bad_chars": return "key contains invalid characters — copy it exactly (no smart quotes, no stray symbols)";
+    case "invalid_key": return "invalid API key (401/403 from provider)";
+    case "insufficient_funds": return "insufficient funds / quota exhausted";
+    case "timeout": return "request timed out — check network / base URL";
+    case "network_error": return "network error — check connection";
+    default:
+      if (code.startsWith("http_404")) return "model not found on provider — wrong catalog entry";
+      if (code.startsWith("http_429")) return "rate limit reached";
+      if (code.startsWith("http_")) return `provider rejected request (${code})`;
+      return code;
+  }
+};
+
 const maskKey = (key: string) => {
   if (key.length <= 4) return "•".repeat(key.length);
   return "•".repeat(key.length - 4) + key.slice(-4);
@@ -537,7 +577,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
       const statusLine =
         ov.status === "working" ? `${warn("* validating...")} ${fgMuted("(pinging " + ov.entry.baseUrl + ")")}`
         : ov.status === "ok" ? `${ok("✓ key saved")} ${fgMuted("· default model " + ov.entry.defaultModel)}`
-        : `${err("✗ " + ov.message)}`;
+        : `${err("✗ " + friendlyValidateError(ov.message))}`;
       const lines = [
         panelBorder(`Connect ${ov.entry.label}`, width - 2),
         panelSide("", innerW, C.panel),
@@ -637,6 +677,12 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     const parts = cmdLine.trim().split(/\s+/);
     const name = parts[0].toLowerCase();
     if (name === "/exit" || name === "/quit") { close(); return true; }
+    if (name === "/report" || name === "/issue") {
+      const url = "https://github.com/quitsaurabhverma2008-sketch/xminal/issues/new";
+      pushLine("system", `report bugs: ${url}`);
+      openExternal(url);
+      return true;
+    }
     if (name === "/clear") { lines.length = 0; input = ""; cursor = 0; render(); return true; }
     if (name === "/help" || name === "/?") { overlay = { kind: "palette", index: 0 }; paletteIndex = 0; input = ""; cursor = 0; render(); return true; }
     if (name === "/model") { overlay = { kind: "model", query: "", index: 0 }; paletteIndex = 0; input = ""; cursor = 0; render(); return true; }
@@ -776,16 +822,21 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     }
     if (overlay.kind === "provider-key") {
       const { entry, input: key } = overlay;
-      if (!key.trim()) { pushLine("err", "API key cannot be empty"); render(); return true; }
-      overlay = { kind: "provider-test", entry, status: "working", message: "" };
+      const cleaned = sanitizeKey(key);
+      if (cleaned.length === 0) { pushLine("err", "API key cannot be empty"); render(); return true; }
+      if (!keyCharsetOk(cleaned)) {
+        overlay = { kind: "provider-test", entry, status: "fail", message: "bad_chars" };
+        render();
+        return true;
+      }
       overlay = { kind: "provider-test", entry, status: "working", message: "" };
       render();
       void (async () => {
-        const result = await validateKey(entry, key.trim());
+        const result = await validateKey(entry, cleaned);
         if (result === "ok") {
           try {
             const loaded = loadConfig(process.cwd());
-            const next = { ...loaded.config, providers: { ...loaded.config.providers, [entry.key]: { ...loaded.config.providers[entry.key], apiKey: key.trim() } } };
+            const next = { ...loaded.config, providers: { ...loaded.config.providers, [entry.key]: { ...loaded.config.providers[entry.key], apiKey: cleaned } } };
             saveGlobalConfig(next);
           } catch { /* best effort */ }
           overlay = { kind: "provider-test", entry, status: "ok", message: "saved" };
@@ -801,7 +852,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
         runtime.agent.setModel(`${overlay.entry.key}/${overlay.entry.defaultModel}`);
         pushLine("ok", `${overlay.entry.label} connected — default model ${overlay.entry.defaultModel}`);
       } else {
-        pushLine("err", `could not validate ${overlay.entry.label}: ${overlay.message}`);
+        pushLine("err", `could not validate ${overlay.entry.label}: ${friendlyValidateError(overlay.message)}`);
       }
       overlay = { kind: "none" };
       render();

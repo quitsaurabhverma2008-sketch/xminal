@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { initProject, listModelAliases, providerReady, resolveModel } from "../config/config";
@@ -58,6 +59,7 @@ Work
   /tasks                     show the task list
   /init                      create .xminal/config.json for this project
   /doctor                    environment diagnostics
+  /report (or /issue)        open the GitHub issue tracker
 
 Context
   /memory [list|add <text>|search <q>|forget <id>]
@@ -501,6 +503,14 @@ export async function handleCommand(input: string, ctx: CommandContext): Promise
       return true;
     }
 
+    case "report":
+    case "issue": {
+      const url = "https://github.com/quitsaurabhverma2008-sketch/xminal/issues/new";
+      const opened = openExternal(url);
+      renderer.info(opened ? `opened: ${url}` : `Report bugs here: ${url}`);
+      return true;
+    }
+
     default:
       renderer.warn(`Unknown command: /${command}. Type /help.`);
       return true;
@@ -581,6 +591,29 @@ function parseRalphArgs(input: string): { task: string; verify?: string; iterati
     task = task.replace(iterationsMatch[0], " ");
   }
   return { task: task.replace(/\s+/g, " ").trim(), verify, iterations };
+}
+
+function openExternal(url: string): boolean {
+  const platform = process.platform;
+  const candidates: Array<[string, string[]]> =
+    platform === "darwin"
+      ? [["open", [url]]]
+      : platform === "win32"
+        ? [["cmd", ["/c", "start", "", url]]]
+        : [
+            ["termux-open-url", [url]],
+            ["xdg-open", [url]],
+            ["gio", ["open", url]],
+          ];
+  for (const [bin, args] of candidates) {
+    try {
+      const result = spawnSync(bin, args, { stdio: "ignore" });
+      if (result.status === 0) return true;
+    } catch {
+      // try next candidate
+    }
+  }
+  return false;
 }
 
 function ensureGitignore(cwd: string): void {
