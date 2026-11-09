@@ -3,94 +3,151 @@
 <img src="assets/logo.svg" width="720" alt="XMINAL — Every coding agent. One terminal." />
 
 [![ci](https://github.com/quitsaurabhverma2008-sketch/xminal/actions/workflows/ci.yml/badge.svg)](https://github.com/quitsaurabhverma2008-sketch/xminal/actions/workflows/ci.yml)
-
-```
-██╗   ██╗███╗   ███╗██╗███╗   ██╗ █████╗ ██╗
-╚██╗██╔╝████╗ ████║██║████╗  ██║██╔══██╗██║
- ╚███╔╝ ██╔████╔██║██║██╔██╗ ██║███████║██║
- ██╔██╗ ██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║
-██╔╝ ██╗██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗
-╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝╚══════╝
-```
+[![npm](https://img.shields.io/npm/v/xminal.svg)](https://www.npmjs.com/package/xminal)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.5.0` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.7.3` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
 ---
 
-XMINAL is a provider-agnostic terminal coding agent and orchestration platform. It fuses the best ideas from 125 MIT-licensed terminal-agent projects into one hackable TypeScript core — streaming agent loop, tool calling, modes, sessions, memory, subagents, MCP, permissions — and exposes it through one `xminal` command.
+XMINAL is a **provider-agnostic terminal coding agent** and orchestration platform — 125 MIT-licensed terminal-agent projects fused into one hackable TypeScript core. Streaming agent loop, tool calling, plan/build/compose/review/yolo modes, persistent sessions, memory, subagents, MCP, hash-chained audit, checkpoints — all behind one `xminal` command.
 
-## Requirements
+## Screenshots
 
-- **Bun ≥ 1.4** for the fullscreen TUI (same choice as opencode: Zig-native OpenTUI engine). Install with `npm i -g bun`.
-- Node ≥ 18 for classic REPL; on interactive TTY `xminal` re-execs under Bun automatically (`npm i -g bun` required for the TUI). Headless `xminal run` works without Bun.
+<div align="center">
+<table>
+<tr>
+  <td><img src="assets/screenshot-boot.png" width="420" alt="XMINAL desktop home"/></td>
+  <td><img src="assets/screenshot-phone.png" width="200" alt="XMINAL on a phone (46 cols)"/></td>
+</tr>
+<tr>
+  <td align="center"><b>Desktop</b> — sidebar, session title, tokens, TODOS, MCP, skills</td>
+  <td align="center"><b>Phone</b> — responsive compact layout</td>
+</tr>
+</table>
+</div>
+
+**Live conversation** — the agent edits, runs, and verifies:
+
+<img src="assets/screenshot-pong.png" width="720" alt="XMINAL live session with pong reply"/>
+
+**`/` command palette** — every command in one amber-highlighted list:
+
+<img src="assets/screenshot-commands.png" width="720" alt="XMINAL /help with all 70+ commands"/>
+
+**Provider wizard** — pick, enter key, validate, save — all in-TUI:
+
+<img src="assets/screenshot-provider-wizard.png" width="720" alt="XMINAL /provider with 40+ providers"/>
+
+**Model picker** — 258 models with context windows + pricing:
+
+<img src="assets/screenshot-model-picker.png" width="720" alt="XMINAL /model with 258 aliases"/>
 
 ## Features
 
-- **Native fullscreen TUI** — built on **OpenTUI** (Zig-native render engine, same as opencode): header bar, streaming chat, sidebar (session + todos + MCP + skills), boxed prompt, `/`-palette, mode cycling.
-- **Every provider** — OpenAI, Anthropic, Gemini, OpenRouter, Groq, DeepSeek, Mistral, xAI, Cerebras, Cohere, Together, Fireworks, Moonshot, Hugging Face, GitHub Models, Ollama, LM Studio, llama.cpp, vLLM and more (**47 built-in providers, 258 models** with real pricing/context). Default is **OpenCode's free models** (no key required).
-- **Every workflow** — Plan → Build → Compose → Review → YOLO modes, plus Ralph loops that keep iterating until your verification command passes.
-- **Every scale** — one agent, background subagents, parallel git worktrees, cost-aware routing.
-- **Transparent** — every tool call is metered: `/tools` (or drop-in `/mcp`) shows calls, ≈tokens (chars/4) and errors per tool and per MCP server; totals persist in `.xminal/receipts/tool-usage.jsonl`.
-- **Safe by default** — ask/auto/full permission modes, protected paths (`.env`, `~/.ssh`…), hash-chained audit receipts, automatic file checkpoints + undo.
-- **Remembers** — JSONL sessions with resume/branch/rewind, Markdown memory with search, project-agnostic skills (`~/.agents/skills`).
-- **Everywhere** — interactive REPL, headless `xminal run --json`, OpenAI-compatible HTTP server with SSE, Telegram bridge.
+### Agent runtime
+- **Streaming** token-by-token output, real-time cost tracking, budget caps
+- **Modes**: `plan` (read-only + analysis) · `build` (implement end-to-end) · `compose` (plan→implement→verify→review) · `review` (read-only code review) · `yolo` (autonomous)
+- **Tool-use**: read · write · edit · multi_edit · glob · grep · list · bash · todo · memory · skill · checkpoint · git · worktree · verify · web_fetch · web_search · diagnostics · mcp_list · mcp_call · task · think
+
+### Sessions
+- Start / resume / branch / rewind any session
+- Automatic **checkpoints** before every file edit — `/undo` instantly restores
+- Hash-chained **audit log** (`.xminal/receipts/audit.jsonl`) — `/audit verify` proves nothing was tampered with
+- Persistent memory (Markdown + search, scope-global/project)
+- Skills on disk (`SKILL.md` folders) with lockfile verification
+
+### Orchestration
+- `task` — spawn subagents with fresh context (explore / plan / review / general)
+- `/ralph` — iterative loop that keeps fixing the project until `verify` passes
+- Git worktree manager for parallel agent work
+- MCP client (stdio) — connects to filesystem, memory, browser, GitHub, etc.
+
+### Providers (49)
+XMINAL speaks **OpenAI Chat**, **Anthropic Messages**, **Gemini native**, and **local OpenAI-compatible** servers — one config, any endpoint:
+
+| Cloud (BYOK) | Local (no key) |
+|---|---|
+| OpenCode (free) · OpenRouter (free tier) · OpenAI · Anthropic · Google Gemini · xAI · Groq · DeepSeek · Mistral · Cohere · Together AI · Fireworks · Perplexity · Moonshot/Kimi · Cerebras · SambaNova · DeepInfra · Novita · Friendli · Nebius · Poe · Z.AI · ZhipuAI · MiniMax · SiliconFlow · Volcengine · 302.AI · Venice · Vercel AI Gateway · Alibaba DashScope · Moonshot (CN) · Hugging Face · NVIDIA NIM · GitHub Models | Ollama · LM Studio · vLLM · llama.cpp · KoboldCpp · text-generation-webui · GPT4All · Open WebUI |
+
+`/provider` in the TUI: pick → paste key (masked) → **live validation** → save. `/model`: pick from 258 aliases with context window + $/Mtok pricing (models.dev snapshot 2026-11-08). All keys stored only in `~/.xminal/config.json` (chmod 600), never logged.
+
+### Safety & audit
+- **Permission modes**: `ask` (approve every risky action) · `auto` (approve known-safe, ask for risky) · `full` (approve all)
+- **Protected paths**: `.env`, `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config/gh` — never writable, even in `full` mode
+- **Secret redaction**: tool output strips `sk-*`, `ghp_*`, private keys, JWTs before the model ever sees them
+- **Hash-chained audit receipts** — every permission decision, every file edit
+- **Network allowlist** — web_fetch/web_search are separate tools with explicit opt-in
+
+### Interfaces
+- **Fullscreen TUI** (Bun-native OpenTUI renderer — same engine opencode uses). Responsive: 46-col phone → 100+-col desktop, sidebar auto-hides under 100 cols
+- **Classic REPL** — automatic fallback (or `xminal --no-tui`)
+- **`xminal run`** — non-interactive headless mode for CI (`--json`, `--quiet`, `--max-turns`, `--permission`)
+- **`xminal serve`** — OpenAI-compatible HTTP server (`POST /v1/chat/completions` with SSE streaming) + `GET /health`
+- **Telegram bridge** (`xminal telegram`) — agent answers your Telegram DMs
+- **ACP-compatible** — Agent Client Protocol for editor integration
+
+### Ergonomics
+- `/` **command palette** — every command one keystroke away, amber-highlighted, filterable
+- **Slash commands everywhere** — `/provider`, `/model`, `/variant`, `/help`, `/mode`, `/sessions` … all in-TUI
+- **Budget caps** — `$maxCostPerSession`, `maxTurns`, `maxTokensPerTurn`
+- **Compaction** — long conversations auto-summarize (tool-pair safe)
+- **Resume** — `xminal resume` picks up exactly where you left off
+
+## Install
+
+```bash
+npm install -g xminal          # or: npm install -g bun && npm install -g xminal
+```
+
+Requires Node ≥ 18 (Node path) or Bun ≥ 1.4 (TUI path). `npm install -g bun` gives you the fullscreen TUI.
 
 ## Quickstart
 
 ```bash
-# single command (npm registry):
-npm install -g xminal
+# 1) Bring your own key (free tier works — OpenCode, OpenRouter)
+export OPENROUTER_API_KEY=sk-or-...
 
-# or from the GitHub release asset without npm:
-npm install -g https://github.com/quitsaurabhverma2008-sketch/xminal/releases/download/v0.1.1/xminal-0.1.1.tgz
+# 2) Pick a model (or use the default)
+xminal
+#    inside TUI:  /model  → pick, or  /provider → set up your key
 
-# or from source:
-git clone https://github.com/quitsaurabhverma2008-sketch/xminal.git
-cd xminal
-npm install && npm run build && npm link   # installs the `xminal` command
-
-xminal doctor       # sanity-check your environment
-xminal              # start the agent
+# 3) Work
+cd my-project
+xminal "fix the failing test in src/auth.ts"
+xminal run --json "describe this repo" | jq .text
 ```
 
-Set a provider key (or use the built-in OpenCode free models):
+**Termux / Android phone**:
 
 ```bash
-export OPENROUTER_API_KEY=sk-or-...
-xminal doctor
-xminal "fix the failing test"
+pkg update && pkg install nodejs
+npm install -g xminal
+xminal        # fullscreen TUI, responsive down to ~44 cols
 ```
 
 ## Commands
 
-```
-xminal                          interactive REPL
-xminal "task"                   one-shot autonomous run
-xminal run [flags]              headless: --json, --quiet, -m provider/model, --session <id>
-xminal resume [id|latest]       continue a session
-xminal ralph <task> --verify <cmd> [--iterations N]
-xminal worktree <list|create|remove|merge>
-xminal serve [--port 8787] [--host 127.0.0.1] [--token T]
-xminal telegram [--token T]
-xminal mcp --serve            # expose XMINAL tools as an MCP stdio server
-xminal audit [verify|tail]    # inspect / verify the hash-chained audit log
-xminal skills install <path|git-url>   # add a skill (also --global)
-xminal skills --lock | --verify         # trust / verify the skills lockfile
-xminal init | doctor | models | sessions | skills | mcp | config | version
-```
-
-In the REPL, `/` commands: `/mode plan|build|compose|review|yolo` · `/model` · `/models` · `/memory add|search|forget` · `/ralph` · `/verify` · `/diff` · `/undo` · `/rewind <id>` · `/sessions` · `/status` · `/cost` · `/tools` · `/audit` · `/compact` · `/doctor` · `/help` · `/exit`.
+Session — `/new` · `/resume` · `/continue` · `/sessions` · `/rename` · `/branch` · `/rewind <id>` · `/checkpoints` · `/undo` · `/compact`
+Agent — `/mode <plan|build|compose|review|yolo>` · `/model` · `/models` · `/variant` (low · medium · high · max) · `/effort` · `/reasoning`
+Providers — `/provider` · `/connect` · `/set-key` · `/clear-key`
+Tasks — `/tasks` · `/todo` · `/memory <list|add|search|forget>` · `/skills` · `/skill <name>` · `/mcp` · `/audit`
+Git — `/diff [args]` · `/git [args]` · `/worktree <list|create|remove|merge>`
+Verify — `/verify [cmd]` · `/ralph <task> --verify <cmd> [--iterations N]` · `/diagnostics`
+System — `/doctor` · `/init` · `/config` · `/status` · `/cost` · `/tools` · `/features` · `/brain` · `/plan` · `/verify` · `/help` · `/clear` · `/exit`
+Wild — `/ralph` · `/worktree` · `/brain` · `/features` · `/plan`
 
 ## Configuration
 
+Global: `~/.xminal/config.json` (chmod 600). Project override: `.xminal/config.json`.
+
 ```jsonc
-// ~/.xminal/config.json  (global) · .xminal/config.json  (project overrides global)
 {
-  "defaultModel": "opencode/inkling-2-small-free",   // or e.g. "openai/gpt-6-luna", "anthropic/claude-sonnet-5-5"
+  "defaultModel": "openrouter/cohere/north-mini-code:free",
   "models": { "cheap": { "provider": "groq", "model": "openai/gpt-oss-20b" } },
   "permissions": { "mode": "auto", "protectedPaths": [".env", "~/.ssh"] },
   "limits": { "maxTurns": 40, "maxCostPerSession": 5 },
@@ -98,43 +155,51 @@ In the REPL, `/` commands: `/mode plan|build|compose|review|yolo` · `/model` ·
 }
 ```
 
-Model references are `provider/model` or a configured alias. `xminal models` lists every alias with pricing/context. Env vars: `XMINAL_MODEL`, `XMINAL_PERMISSION_MODE`, plus the usual `*_API_KEY`s (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, …).
+Environment: `XMINAL_MODEL` · `XMINAL_PERMISSION_MODE` · `XMINAL_TUI=1` (force TUI) · `NO_COLOR` (disable ANSI) · any `*_API_KEY`.
 
 ## Safety model
 
-| Risk | Meaning | Behavior (auto) |
+| Risk | Example | Behaviour (auto mode) |
 |---|---|---|
-| safe | `read/glob/grep/list/task/todo/memory/skill/web_fetch/…` | always allowed |
-| risky | file edits, `npm install`, `git commit`, shell | auto-approved |
-| dangerous | `rm -rf`, `sudo`, curl-pipe-shell, protected paths | asks / denied without a handler |
-
-Protected paths are denied even in `full` mode. Every allow/deny is appended to `.xminal/receipts/audit.jsonl` (hash-chained). Checkpoints are made before every edit (`/undo` to restore).
+| safe | `read`, `glob`, `grep`, `verify` | allowed |
+| risky | file writes, installs, git commit | auto-approved |
+| dangerous | `rm -rf`, `sudo`, curl-pipe-sh | prompt (or deny if no approver) |
 
 ## HTTP server
 
 ```bash
-xminal serve --port 8787 --token $TOKEN
+xminal serve --token $TOKEN        # binds 127.0.0.1:8787 by default
 
 curl localhost:8787/health
 curl -H "Authorization: Bearer $TOKEN" localhost:8787/v1/models
 curl -H "Authorization: Bearer $TOKEN" -X POST -H 'content-type: application/json' \
      -d '{"prompt":"list TODOs in this repo"}' localhost:8787/v1/agent
-# or drop-in OpenAI-compatible: POST /v1/chat/completions (streams SSE)
-# built-in web UI: open http://127.0.0.1:8787/ in a browser
+# OpenAI-compatible: POST /v1/chat/completions (streams SSE)
+# Built-in web UI: open http://127.0.0.1:8787/
 ```
+
+## Report a bug
+
+```bash
+/report              # opens https://github.com/quitsaurabhverma2008-sketch/xminal/issues/new from inside the TUI
+```
+
+Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https://github.com/quitsaurabhverma2008-sketch/xminal/issues/new)** — always welcome: crashes, quotas, broken commands, bad UX, misparsed edits.
 
 ## Status (honest)
 
-**v0.1.1** — build green, 28/28 tests, packaged and on PATH as `xminal`. Releases: [v0.1.1](https://github.com/quitsaurabhverma2008-sketch/xminal/releases/tag/v0.1.1) · CI green on `main`. Not yet verified against live LLM endpoints from this machine (OpenCode free tier is rate-limited here; no API keys present). Bedrock/Vertex/Azure native adapters are not built. npm publish pending maintainer approval. See `EXECUTION-PLAN.md` (18 phases), `PLAN.md`, `FEATURE_MATRIX.md`, `BRAIN.md`.
+**v0.7.3** — live on npm, 30/30 tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 
 ```bash
 npm run build     # tsc → dist/
-npm test          # 16 tests (node:test, no network needed)
-npm pack          # tarball for release
+npm test          # 30 tests (node:test, offline)
+npm run verify    # build + test (required before push)
 ```
+
+Layout: `src/core/` (agent loop, sessions, permissions, cost) · `src/providers/` (OpenAI/Anthropic/Gemini adapters + router) · `src/tools/` (20+ tools) · `src/cli/` (REPL, commands, renderer) · `src/tui/` (fullscreen TUI) · `src/mcp/` (MCP client + server) · `src/orchestration/` (Ralph loop) · `src/skills/` · `src/memory/`
 
 ## License
 
-MIT — see `LICENSE`.
+MIT — see `LICENSE`. Fork freely.
