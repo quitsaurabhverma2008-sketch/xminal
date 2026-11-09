@@ -22,7 +22,7 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 - **`/help` lists every command** — 70+ entries across 12 groups.
 - **Provider list now 40+ entries** — including 302.AI, Venice, Vercel AI Gateway, Alibaba DashScope, MiniMax, SiliconFlow, Volcengine, Z.AI (GLM), ZhipuAI, Moonshot/Kimi, Fireworks, SambaNova, DeepInfra, NVIDIA NIM, GitHub Models — each with kind (LOCAL/FREE/BYOK), readiness dot (green + = ready), and the env var name needed for key.
 
-## [0.7.2] — 2026-11-09
+## [0.7.1] — 2026-11-09
 
 **Published on npm: `xminal@0.7.1`** (`npm install -g xminal`).
 
