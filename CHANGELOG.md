@@ -4,6 +4,23 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-11-09
+
+**Published on npm: `xminal@0.7.0`** (`npm install -g xminal`).
+
+### Added
+
+- **App-like TUI flow (opencode-style sidebar on the right)** — boots to a full-screen "Greeting" home: title bar with session + `+` button, tagline, sidebar sections (Greeting · Context · Session · Todos · Skills · MCP), blue-accent input box, model line with `max` badge, ctrl+p status bar.
+- **`/` = full command catalog** — every XMINAL command (70+ entries across 10 groups: Session, Agent, Providers, Tasks, Skills, MCP, Dev, Git, Usage, Setup, Audit, System) in a single scrollable amber-highlighted list. Type to filter, ↑↓/PgUp/PgDn navigate, Enter runs, Esc closes.
+- **`/provider` wizard** — pick from the full 40-provider catalog (green + = ready, muted - = needs key), enter a masked API key, **validate live** against the provider's `/chat/completions`, save on success.
+- **`/model` picker** — 258 model aliases from models.dev (context + pricing), filterable, Enter sets the session's default model.
+- **`/variant`** — set reasoning effort: low / medium / high / max (this session).
+
+### Changed
+
+- `/provider`, `/model`, `/variant`, `/help` now render **inside** the TUI (full-screen overlays) instead of leaving the alternate screen.
+- Unknown `/commands` suggest close matches from the catalog instead of dumping to the classic renderer.
+
 ## [0.6.1] — 2026-11-09
 
 **Published on npm: `xminal@0.6.1`** (`npm install -g xminal`).
