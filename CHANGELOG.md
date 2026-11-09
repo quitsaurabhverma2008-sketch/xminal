@@ -4,6 +4,14 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-11-09
+
+**Published on npm: `xminal@0.5.3`** (`npm install -g xminal`).
+
+### Fixed
+
+- **TUI crashed with `EditBuffer is destroyed`** — `exitOnCtrlC: true` let OpenTUI tear down the input buffer while our ENTER handler still held references; now Ctrl+C goes through our own handler (clean teardown: stop input → `renderer.destroy()` → exit alternate screen → close runtime → exit 0), `/exit` uses the same path, and all agent callbacks no-op after `closed` so no async stream writes to a destroyed buffer.
+
 ## [0.5.2] — 2026-11-09
 
 **Published on npm: `xminal@0.5.2`** (`npm install -g xminal`).

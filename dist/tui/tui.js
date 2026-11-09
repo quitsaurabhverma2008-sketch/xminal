@@ -95,9 +95,22 @@ async function startTuiInner(runtime) {
     const shortId = runtime.session.id.slice(0, 8);
     const sessionTitle = runtime.session.meta.title === "untitled" ? "new session" : runtime.session.meta.title;
     const renderer = await createCliRenderer({
-        exitOnCtrlC: true,
+        exitOnCtrlC: false,
         backgroundColor: T.bg,
     });
+    let closed = false;
+    const close = () => {
+        if (closed)
+            return;
+        closed = true;
+        try {
+            renderer.destroy();
+        }
+        catch { /* best effort */ }
+        process.stdout.write("\x1b[?1049l\x1b[?25h\x1b[0m\n");
+        runtime.close();
+        process.exit(0);
+    };
     // ---------- root layout ----------
     const width = renderer.terminalWidth;
     const height = renderer.terminalHeight;
@@ -198,6 +211,8 @@ async function startTuiInner(runtime) {
     renderer.root.add(root);
     // ---------- agent wiring ----------
     const pushLine = (kind, text) => {
+        if (closed)
+            return;
         const fg = kind === "user" ? T.accent2
             : kind === "tool" ? T.yellow
                 : kind === "ok" ? T.green
@@ -210,6 +225,8 @@ async function startTuiInner(runtime) {
     let streamingNode = null;
     const callbacks = {
         onText: (text) => {
+            if (closed)
+                return;
             if (!streamingNode) {
                 streamingNode = new TextRenderable(renderer, { content: "", fg: T.text });
                 scrollbox.add(streamingNode);
@@ -222,6 +239,8 @@ async function startTuiInner(runtime) {
         onToolResult: (_n, r) => pushLine(r.isError ? "err" : "ok", `${r.isError ? "✗" : "✓"} ${(r.content.split("\n")[0] ?? "").slice(0, 100)}`),
         onStatus: (m) => pushLine("system", `· ${m}`),
         onUsage: () => {
+            if (closed)
+                return;
             const cost = runtime.agent.getCost();
             header.content = ` ${runtime.agent.modelSpec}  ·  mode ${runtime.agent.mode}  ·  $${cost.costUsd.toFixed(4)}`;
         },
@@ -243,6 +262,10 @@ async function startTuiInner(runtime) {
             sidebar.destroy();
             return;
         }
+        if (k.ctrl && k.name === "c") {
+            close();
+            return;
+        }
         if (k.name === "pageup") {
             scrollbox.scrollBy(-Math.max(1, Math.floor(scrollbox.height / 2)));
             return;
@@ -258,7 +281,7 @@ async function startTuiInner(runtime) {
         if (!text)
             return;
         if (text.startsWith("/")) {
-            await handleSlash(text, runtime, renderer, pushLine);
+            await handleSlash(text, runtime, renderer, close, pushLine);
             return;
         }
         pushLine("user", `you ▸ ${text}`);
@@ -307,10 +330,10 @@ function renderTodos(todos) {
     });
     return `TODOS  ${done}/${todos.length}\n${lines.join("\n")}`;
 }
-async function handleSlash(input, runtime, renderer, pushLine) {
+async function handleSlash(input, runtime, renderer, close, pushLine) {
     const cmd = input.trim();
     if (cmd === "/exit" || cmd === "/quit") {
-        renderer.destroy();
+        close();
         return;
     }
     if (cmd === "/doctor" || cmd === "/help" || cmd === "/model" || cmd === "/mcp" || cmd === "/skills" || cmd === "/cost" || cmd === "/tools" || cmd === "/sessions") {
