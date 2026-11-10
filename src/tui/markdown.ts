@@ -2,7 +2,7 @@
 // Design: stable per-block rendering. Code fences parse byte-exact. Tables are
 // width-capped. Incomplete trailing structures degrade gracefully (never throw).
 import { rgb, bgRgb, RESET, BOLD, ITALIC, T, inlineCode, fgMuted, fgAmber, fgGreen, fgPurple } from "./theme";
-import { visibleWidth, splitGraphemes, stripAnsi } from "./width";
+import { visibleWidth, splitGraphemes, stripAnsi, wrapAnsi as wrapPlain } from "./width";
 
 const C = {
   heading: fgAmber,
@@ -59,10 +59,9 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
   let codeLines: string[] = [];
   const flushCode = () => {
     if (codeLines.length === 0) return;
-    codeLines.splice(0, 0, ""); // keep code block separated visually; filled by header below
-    const header = codeLang ? `${fgMuted("  ┌ " + codeLang)}` : "";
+    const header = codeLang ? fgMuted(`  ${codeLang}`) : "";
     if (header) out.push(header);
-    for (const l of codeLines.slice(1)) {
+    for (const l of codeLines) {
       for (const wrapped of renderCodeLine(l, width, codeLang)) out.push(wrapped);
     }
     out.push(""); // breathing room after block
@@ -80,21 +79,37 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
     }
     if (inCode) { codeLines.push(line); i += 1; continue; }
 
-    // headings
+    // headings — H1 amber bold, H2 bright bold, H3+ muted bold; spacing above
     const heading = /^(#{1,6})\s+(.+)$/.exec(line);
     if (heading) {
       const level = heading[1].length;
       const text = renderInline(heading[2]);
-      out.push(level <= 2 ? `\x1b[1m${rgb(T.amber)}${text}${RESET}` : `\x1b[1m${rgb(T.text)}${text}${RESET}`);
+      const style = level === 1 ? `\x1b[1m${rgb(T.amber)}` : level === 2 ? `\x1b[1m${rgb(T.text)}` : `\x1b[1m${rgb(T.muted)}`;
+      if (level <= 2 && out.length > 0 && out[out.length - 1] !== "") out.push("");
+      out.push(style + text + RESET);
       out.push("");
       i += 1;
       continue;
     }
     // hr
     if (/^([-_*])\s*(\1\s*){2,}$/.test(line.trim())) { out.push(`${rgb(T.muted)}${"─".repeat(Math.min(width, 40))}${RESET}`); i += 1; continue; }
-    // blockquote
+    // blockquote — GitHub-style callouts get a colored label; plain quotes stay subtle
     const quote = /^>\s?(.*)$/.exec(line);
     if (quote) {
+      const callout = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(.*)$/i.exec(quote[1].trim());
+      if (callout) {
+        const kindWord = callout[1].toUpperCase();
+        const color =
+          kindWord === "NOTE" ? rgb(T.info) :
+          kindWord === "TIP" ? rgb(T.green) :
+          kindWord === "IMPORTANT" ? rgb([187, 154, 247] as const) :
+          kindWord === "WARNING" ? rgb(T.amber) : rgb(T.red);
+        for (const w of wrapPlain(renderInline(callout[2]), Math.max(4, width - 4))) {
+          out.push(`${C.quoteBar} ${color}\x1b[1m${kindWord}${RESET} ${w}`);
+        }
+        i += 1;
+        continue;
+      }
       for (const w of wrapPlain(renderInline(quote[1]), Math.max(4, width - 2))) out.push(`${C.quoteBar} ${C.quote(w)}`);
       i += 1;
       continue;
@@ -104,6 +119,20 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
       const block: string[] = [];
       while (i < lines.length && lines[i].trim().startsWith("|")) { block.push(lines[i]); i += 1; }
       out.push(...renderTable(block, width));
+      continue;
+    }
+    // task lists (- [ ] / - [x]) — checkbox-styled rows, nested by indent
+    const task = /^(\s*)([-*+])\s+\[( |x|X)\]\s+(.*)$/.exec(line);
+    if (task) {
+      const depth = Math.floor(task[1].length / 2);
+      const indent = "  ".repeat(depth);
+      const doneTask = task[3].toLowerCase() === "x";
+      const box = doneTask ? fgGreen("[x]") : fgMuted("[ ]");
+      const text = renderInline(task[4]);
+      for (const w of wrapPlain(text, Math.max(4, width - indent.length - 4))) {
+        out.push(`${indent}${box} ${doneTask ? fgMuted(w) : w}`);
+      }
+      i += 1;
       continue;
     }
     // unordered lists (with nesting via indent)
@@ -217,42 +246,25 @@ function inWide(cp: number): boolean {
   return false;
 }
 
-function wrapPlain(input: string, width: number): string[] {
-  // ANSI-aware greedy wrap preserving escape sequences
-  const out: string[] = [];
-  for (const paragraph of input.split("\n")) {
-    let line = "";
-    let visible = 0;
-    for (const word of paragraph.split(/(\s+)/)) {
-      const wv = visibleWidth(word);
-      if (visible + wv <= width && !/^\s+$/.test(word)) {
-        line += word;
-        visible += wv;
-      } else if (/^\s+$/.test(word)) {
-        line += word;
-        visible += wv;
-      } else {
-        if (visible > 0) { out.push(line.trimEnd()); line = ""; visible = 0; }
-        // hard-wrap an overlong word
-        let rest = word;
-        while (visibleWidth(rest) > width) {
-          const slice = graphemeSlice(rest, width);
-          out.push(slice);
-          rest = rest.slice(slice.length);
-        }
-        line = rest;
-        visible = visibleWidth(rest);
-      }
-    }
-    out.push(line.trimEnd());
-  }
-  return out;
-}
-
 function renderTable(block: string[], width: number): string[] {
   const rows = block.map((l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim()));
   if (rows.length < 2) return block;
   const [header, , ...body] = rows; // second row is the separator
+  // narrow terminals (< 46 cols): stack key — value rows instead of a mangled grid
+  if (width < 46) {
+    const out: string[] = [];
+    for (const row of body) {
+      out.push(`${BOLD}${renderInline(row[0] ?? "")}${RESET}`);
+      for (let j = 1; j < header.length; j++) {
+        const label = header[j] ?? `col${j + 1}`;
+        const value = row[j] ?? "";
+        if (!value) continue;
+        for (const w of wrapPlain(`${fgMuted(label + " —")} ${renderInline(value)}`, Math.max(4, width - 2))) out.push(`  ${w}`);
+      }
+      out.push("");
+    }
+    return out;
+  }
   const cols = header.length;
   const colWidths = header.map((h, i) => {
     const cells = [h, ...body.map((r) => r[i] ?? "")];

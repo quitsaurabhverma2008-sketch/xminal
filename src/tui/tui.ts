@@ -1,14 +1,16 @@
 import { Runtime } from "../runtime";
-import { loadConfig, resolveModel, defaultConfig } from "../config/config";
-import { listEffectiveAliases, refreshModelsCatalog } from "../config/models-catalog";
-import { visibleWidth, graphemeSlice, stripAnsi as stripAnsiW, splitGraphemes } from "./width";
+import { loadConfig, resolveModel } from "../config/config";
+import { listEffectiveAliases, refreshModelsCatalog, effectiveModelMap } from "../config/models-catalog";
+import { visibleWidth, graphemeSlice, stripAnsi as stripAnsiW, splitGraphemes, wrapAnsi } from "./width";
 import { formatAssistantText, isLikelyDiff, tintDiffRow } from "./format";
 import { renderMarkdown } from "./markdown";
-import type { ProviderConfig } from "../config/types";
-import { VERSION, TAGLINE } from "../version";
+import type { ProviderConfig, ModelConfig } from "../config/types";
+import { VERSION } from "../version";
 import { Renderer } from "../cli/render";
 import { handleCommand } from "../cli/commands";
 import { spawnSync } from "node:child_process";
+import { T, rgb, bgRgb, RESET, BOLD, fgMuted, fgText, fgAccent, fgAmber, fgGreen, fgRed, modeColor } from "./theme";
+import { makeActivity, completeActivity, renderActivity, type ActivityLine } from "./output/tool-activity";
 
 function openExternal(url: string): boolean {
   const platform = process.platform;
@@ -29,22 +31,8 @@ function openExternal(url: string): boolean {
 import { loadTodos, detectGitBranch } from "./state";
 import type { AgentCallbacks, AgentMode } from "../core/agent";
 
-// ─── design tokens (opencode screenshot-derived) ───────────────────
-const C = {
-  bg: [16, 17, 20] as const, panel: [27, 29, 34] as const, panel2: [35, 38, 45] as const,
-  border: [46, 49, 58] as const, accent: [110, 168, 254] as const, amber: [224, 179, 65] as const,
-  text: [230, 232, 236] as const, muted: [138, 143, 154] as const,
-  green: [126, 231, 135] as const, red: [255, 123, 114] as const,
-};
-const rgb = (c: readonly [number, number, number]) => `\x1b[38;2;${c[0]};${c[1]};${c[2]}m`;
-const bgRgb = (c: readonly [number, number, number]) => `\x1b[48;2;${c[0]};${c[1]};${c[2]}m`;
-const RESET = "\x1b[0m", BOLD = "\x1b[1m";
-const fgMuted = (t: string) => `${rgb(C.muted)}${t}${RESET}`;
-const fgText = (t: string) => `${rgb(C.text)}${t}${RESET}`;
-const fgAccent = (t: string) => `${rgb(C.accent)}${t}${RESET}`;
-const fgAmber = (t: string) => `${rgb(C.amber)}${t}${RESET}`;
-const fgGreen = (t: string) => `${rgb(C.green)}${t}${RESET}`;
-const fgRed = (t: string) => `${rgb(C.red)}${t}${RESET}`;
+// ─── design tokens — single source: src/tui/theme.ts ───────────────
+const C = T;
 const bold = (t: string) => `${BOLD}${t}${RESET}`;
 const stripAnsi = stripAnsiW;
 const visible = visibleWidth;
@@ -70,6 +58,8 @@ type LineKind = "user" | "assistant" | "tool" | "ok" | "err" | "system";
 interface Line {
   kind: LineKind;
   text: string;
+  /** present when kind === "tool" — merged onToolCall → onToolResult */
+  activity?: ActivityLine;
 }
 
 // ─── full command catalog (categories + fuzzy filter) ─────────────
@@ -92,7 +82,7 @@ const COMMANDS: Cmd[] = [
 
   { name: "/mode", desc: "switch plan/build/compose/review/yolo", group: "Agent" },
   { name: "/model", desc: "pick default model", group: "Agent" },
-  { name: "/models", desc: "list all 258 model aliases", group: "Agent" },
+  { name: "/models", desc: "list all model aliases", group: "Agent" },
   { name: "/variant", desc: "set effort (low/medium/high/max)", group: "Agent" },
   { name: "/effort", desc: "alias for /variant", group: "Agent" },
   { name: "/reasoning", desc: "alias for /variant", group: "Agent" },
@@ -313,6 +303,29 @@ const modelScopeOfSpec = (spec: string): string | null => {
   const slash = spec.indexOf("/");
   return slash > 0 ? spec.slice(0, slash) : null;
 };
+let modelMapCache: Record<string, ModelConfig> | null = null;
+const modelMap = (): Record<string, ModelConfig> => {
+  if (modelMapCache) return modelMapCache;
+  try {
+    const { config } = loadConfig(process.cwd());
+    modelMapCache = effectiveModelMap(config.models).models;
+  } catch {
+    modelMapCache = {};
+  }
+  return modelMapCache;
+};
+const ctxLabel = (n?: number): string => {
+  if (!n || n <= 0) return "";
+  if (n >= 1_000_000) return `${(n / 1e6).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
+  return `${Math.round(n / 1000)}K`;
+};
+const priceLabel = (cfg?: ModelConfig): string => {
+  if (!cfg) return "";
+  const inP = cfg.inputPricePerMTok, outP = cfg.outputPricePerMTok;
+  if (inP === 0 && outP === 0) return "free";
+  if (inP === undefined || outP === undefined) return "";
+  return `$${inP}/${outP}`;
+};
 const filteredModels = (query = ""): ModelAliasItem[] => {
   const aliases = modelAliases();
   const scoped = modelScope ? aliases.filter((m) => m.provider === modelScope) : aliases;
@@ -387,28 +400,13 @@ export async function startTui(runtime: Runtime): Promise<void> {
   let pendingPermission: { tool: string; reason: string; resolve: (allow: boolean) => void } | null = null;
   const lines: Line[] = [];
 
-  const cols = () => Math.max(40, process.stdout.columns ?? Number(process.env.COLUMNS) ?? 80);
-  const rows = () => Math.max(16, process.stdout.rows ?? Number(process.env.LINES) ?? 24);
+  const cols = () => Math.max(40, process.stdout.columns ?? (Number(process.env.COLUMNS) || 80));
+  const rows = () => Math.max(16, process.stdout.rows ?? (Number(process.env.LINES) || 24));
   const sidebarWidth = () => (cols() >= 100 ? 30 : 0);
   const contentWidth = () => cols() - sidebarWidth();
   let ctxWindowMemo: { spec: string; value: number } | null = null;
 
-  const wrap = (text: string, width: number): string[] => {
-    if (!text) return [""];
-    const out: string[] = [];
-    for (const raw of text.split("\n")) {
-      let line = raw;
-      while (line.length > width) {
-        let cut = width;
-        while (cut > 1 && line[cut - 1] !== " ") cut -= 1;
-        if (cut <= 1) cut = width;
-        out.push(line.slice(0, cut));
-        line = line.slice(cut).trimStart();
-      }
-      out.push(line);
-    }
-    return out;
-  };
+  const wrap = (text: string, width: number): string[] => wrapAnsi(text, width);
 
   const formatCache = new Map<string, string>();
   const formatMemo = (text: string): string => {
@@ -435,6 +433,22 @@ export async function startTui(runtime: Runtime): Promise<void> {
 
   const styledLine = (line: Line): string[] => {
     const w = Math.max(8, contentWidth() - 2);
+    // tool activity — dedicated compact component (merged call+result)
+    if (line.kind === "tool" && line.activity) {
+      const a = line.activity;
+      const out: string[] = [` ${renderActivity(a, Math.max(8, w - 1))}`];
+      if (a.preview && a.preview.length) {
+        for (const row of a.preview) {
+          out.push(`   ${tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed)}`);
+        }
+        if (a.extraPreviewLines) out.push(`   ${fgMuted(`… ${a.extraPreviewLines} more diff lines`)}`);
+      } else if (a.status === "err" && a.detail) {
+        out.push(`   ${fgMuted(a.detail)}`);
+      } else if (a.status === "ok" && (a.extraLines ?? 0) > 0) {
+        out.push(`   ${fgMuted(`${a.extraLines} more line(s)`)}`);
+      }
+      return out;
+    }
     const prefixFor = (k: LineKind): string => {
       switch (k) {
         case "user": return ` ${fgAccent("▍")}${fgAccent(BOLD + "you" + RESET)}`;
@@ -457,14 +471,47 @@ export async function startTui(runtime: Runtime): Promise<void> {
     for (let i = 0; i < parts.length; i++) {
       out.push((i === 0 ? prefix : " ".repeat(firstPrefixVisible)) + " " + parts[i]);
     }
-    if ((line.kind === "tool" || line.kind === "ok" || line.kind === "err") && likelyDiff(line.text)) {
+    if ((line.kind === "ok" || line.kind === "err") && likelyDiff(line.text)) {
       return diffTint(out);
     }
     return out;
   };
 
+  // ─── dynamic bottom layout — the input grows upward (max 4 lines) ───
+  const inputBudget = () => Math.max(8, cols() - 4);
+  /** hard-wrap the raw input for display (ANSI-free); caret lives on the last line */
+  const inputVisualLines = (): string[] => {
+    const out: string[] = [];
+    const budget = inputBudget();
+    for (const logical of input.split("\n")) {
+      if (!logical) { out.push(""); continue; }
+      let rest = logical;
+      while (rest.length > 0) {
+        const slice = graphemeSlice(rest, budget);
+        if (slice.length === 0) break;
+        out.push(slice);
+        rest = rest.slice(slice.length);
+      }
+    }
+    return out;
+  };
+  const inputH = () => Math.min(4, Math.max(1, inputVisualLines().length));
+  const inputTop = () => Math.max(3, rows() - 2 - inputH());
+  const statusRow = () => inputTop() + inputH();
+
+  const ctxPct = (): number => {
+    const spec = runtime.agent.modelSpec;
+    if (ctxWindowMemo?.spec !== spec) {
+      let value = 128000;
+      try { value = resolveModel(runtime.config, spec).contextWindow ?? 128000; } catch { /* keep fallback */ }
+      ctxWindowMemo = { spec, value };
+    }
+    const used = runtime.agent.getCost().inputTokens;
+    return Math.min(100, Math.round((100 * used) / (ctxWindowMemo?.value ?? 128000)));
+  };
+
   const clampScroll = (target: number) =>
-    Math.min(Math.max(0, target), Math.max(0, renderChatLines().length - (rows() - 7)));
+    Math.min(Math.max(0, target), Math.max(0, renderChatLines().length - (inputTop() - 2)));
 
   const renderChatLines = (): string[] => {
     const out: string[] = [];
@@ -476,55 +523,68 @@ export async function startTui(runtime: Runtime): Promise<void> {
   const renderRow = (row: number): string => {
     const w = cols();
     if (row === 0) {
-      const title = ` ${fgText(BOLD + sessionTitle + RESET)}`;
-      const plus = `${fgMuted("+")} `;
-      return padRight(title + " ".repeat(Math.max(1, w - visible(title) - visible(plus))) + plus, w);
+      const left = ` ${fgAccent("◆")}${fgText(BOLD + sessionTitle + RESET)}`;
+      const rightBits = [branch ? `⎇ ${branch}` : "", `v${VERSION}`].filter(Boolean).join("  ");
+      const right = `${fgMuted(rightBits)} `;
+      return padRight(left + " ".repeat(Math.max(1, w - visible(left) - visible(right))) + right, w);
     }
     if (row === 1) return `${rgb(C.border)}${"─".repeat(w)}${RESET}`;
-    const inputTop = rows() - 5;
-    if (row === inputTop) return `${bgRgb(C.panel)}${fgAccent("▍")}${" ".repeat(w - 1)}${RESET}`;
-    if (row === inputTop + 1) {
-      if (pendingPermission) {
+    const top = inputTop();
+    const iH = inputH();
+    const sRow = statusRow();
+    // ── input block (1–4 visual lines, multiline-aware)
+    if (row >= top && row < sRow) {
+      const r = row - top;
+      const vis = inputVisualLines();
+      const shown = vis.slice(Math.max(0, vis.length - iH));
+      if (pendingPermission && row === sRow - 1) {
         const p = pendingPermission;
         const text = ` ${fgAmber("?")} allow ${p.tool}${p.reason ? fgMuted(" · " + p.reason) : ""} ${fgAccent("[y/N]")}`;
         return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(text, w - 1)}${RESET}`;
       }
-      const placeholder = input === "" ? fgMuted('Ask anything…  "fix the failing test"') : undefined;
-      if (placeholder !== undefined) {
-        return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(" " + placeholder + fgAccent("▌"), w - 1)}${RESET}`;
+      if (input === "" && !pendingPermission) {
+        if (r === 0) {
+          const placeholder = fgMuted('Ask anything…  "fix the failing test"');
+          return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(" " + placeholder + fgAccent("▌"), w - 1)}${RESET}`;
+        }
+        return `${bgRgb(C.panel)}${fgAccent("▍")}${" ".repeat(w - 1)}${RESET}`;
       }
-      const budget = w - 3; // "▍" + leading space + caret
-      let start = 0;
-      while (start < input.length && visible(input.slice(start)) > budget) start++;
-      const shown = input.slice(start);
-      const row = " " + fgText(shown) + fgAccent("▌");
-      return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(row, w - 1)}${RESET}`;
+      const overflowHint = vis.length > iH && r === 0 ? fgMuted("…") : "";
+      const visLine = (shown[r] ?? "") + overflowHint;
+      const isLastLine = r === iH - 1;
+      const rowText = " " + fgText(visLine) + (isLastLine ? fgAccent("▌") : "");
+      return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(rowText, w - 1)}${RESET}`;
     }
-    if (row === inputTop + 2) {
+    // ── status bar — mode · model · effort · ctx · cost (real values only)
+    if (row === sRow) {
       const model = runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec;
       const mode = runtime.agent.mode;
-      const line = `${fgAccent(" " + mode)}${fgMuted(" · ")}${fgText(model)}${fgMuted("  ")}${fgAmber(getEffort())}`;
-      return `${bgRgb(C.bg)}${padRight(line, w)}${RESET}`;
-    }
-    if (row === rows() - 1) {
       const cost = runtime.agent.getCost();
+      const bits: string[] = [`${modeColor(mode)}${BOLD}${mode}${RESET}`, fgText(model)];
+      if (w >= 60) bits.push(fgAmber(getEffort()));
+      if (w >= 74) bits.push(fgMuted(`${ctxPct()}% ctx`));
+      if (w >= 88) bits.push(fgMuted(`$${cost.costUsd < 1 ? cost.costUsd.toFixed(4) : cost.costUsd.toFixed(2)}`));
+      return `${bgRgb(C.bg)}${padRight(" " + bits.join(fgMuted(" · ")), w)}${RESET}`;
+    }
+    // ── footer — busy/scroll state + actual keybindings
+    if (row === rows() - 1) {
       const left = busy
         ? `${fgAmber("esc")}${fgMuted(" interrupt")}`
         : scroll > 0
-          ? `${fgAmber("▲ scrolled " + scroll)}${fgMuted(" · PgDn tail · wheel works too")}`
-          : `${fgMuted("~")}`;
-      const right = `${fgMuted((cost.inputTokens / 1000).toFixed(1) + "K")} ${fgMuted("·")} ${fgMuted("ctrl+p commands")}`;
+          ? `${fgAmber("▲")}${fgMuted(" scrolled — PgDn to tail")}`
+          : "";
+      const right = w >= 52 ? fgMuted("⌃p commands · ⌃j newline · ⇥ mode") : fgMuted("⌃p");
       return `${bgRgb(C.bg)}${padRight(left + " ".repeat(Math.max(1, w - visible(left) - visible(right))) + right, w)}${RESET}`;
     }
     const chatLines = renderChatLines();
     const end = Math.max(0, chatLines.length - scroll);
-    const start = Math.max(0, end - (inputTop - 2));
+    const start = Math.max(0, end - (top - 2));
     const line = chatLines[start + (row - 2)] ?? "";
-    if (sidebarWidth() > 0 && row <= rows() - 6) {
+    if (sidebarWidth() > 0 && row < top) {
       const sideW = sidebarWidth();
       const sideX = cols() - sideW;
       const side = renderSidebarRow(row - 2);
-      const clipped = line.length > sideX ? line.slice(0, sideX) : padRight(line, sideX);
+      const clipped = visible(line) > sideX ? padRight(clip(line, sideX), sideX) : padRight(line, sideX);
       return `${clipped}${side}`;
     }
     return padRight(line, w);
@@ -534,20 +594,10 @@ export async function startTui(runtime: Runtime): Promise<void> {
     const w = sidebarWidth();
     const line = (t: string) => `${bgRgb(C.panel)}${padRight(" " + t, w)}${RESET}`;
     switch (row) {
-      case 0: return line(`${fgText(BOLD + "Greeting" + RESET)}`);
+      case 0: return line(`${fgAccent(BOLD + "xminal" + RESET)} ${fgMuted("v" + VERSION)}`);
       case 2: return line(fgMuted("Context"));
       case 3: return line(fgText((runtime.agent.getCost().inputTokens / 1000).toFixed(1) + "K tokens"));
-      case 4: {
-        const used = runtime.agent.getCost().inputTokens;
-        const spec = runtime.agent.modelSpec;
-        if (ctxWindowMemo?.spec !== spec) {
-          let value = 128000;
-          try { value = resolveModel(runtime.config, spec).contextWindow ?? 128000; } catch { /* keep fallback */ }
-          ctxWindowMemo = { spec, value };
-        }
-        const pct = Math.min(100, Math.round((100 * used) / (ctxWindowMemo?.value ?? 128000)));
-        return line(fgMuted(`${pct}% used`));
-      }
+      case 4: return line(fgMuted(`${ctxPct()}% used`));
       case 6: return line(fgMuted("Session"));
       case 7: return line(fgText(sessionTitle));
       case 8: return line(fgMuted(`${shortId} · ${cwd.split("/").pop() ?? cwd}`));
@@ -616,10 +666,16 @@ export async function startTui(runtime: Runtime): Promise<void> {
             : ov.kind === "model"
             ? (() => {
                 const q = (ov.query ?? "").toLowerCase();
-                return filteredModels(q).map((m) => ({
-                  a: `${fgAccent(m.alias.slice(0, 26).padEnd(26))}${m.free ? fgGreen(" FREE") : ""}`,
-                  b: fgMuted(`${m.provider}/${m.model}`.slice(0, 44)),
-                }));
+                const wide = cols() >= 96;
+                const narrow = cols() < 72;
+                const aliasW = narrow ? 14 : 26;
+                const map = modelMap();
+                return filteredModels(q).map((m) => {
+                  const cfg = map[`${m.provider}/${m.model}`] ?? map[m.alias];
+                  const left = `${fgAccent(m.alias.slice(0, aliasW).padEnd(aliasW + 1))}${m.free ? fgGreen("FREE ") : fgMuted("     ")}${wide && !narrow ? fgMuted(ctxLabel(cfg?.contextWindow).padEnd(6)) : ""}`;
+                  const right = fgMuted(wide ? [priceLabel(cfg).padEnd(11), m.provider].join("").trim() : priceLabel(cfg));
+                  return { a: left, b: right };
+                });
               })()
             : PROVIDERS.map((p) => {
                 const ready = providerIsReady(p.key, runtime.config.providers);
@@ -627,6 +683,9 @@ export async function startTui(runtime: Runtime): Promise<void> {
                 const tag = `${kindLabel(p.kind).padEnd(5)}`;
                 return { a: `${dot} ${fgText(p.label.padEnd(28))}`, b: `${fgMuted(tag)}  ${ready ? fgGreen("ready") : p.env ? fgMuted(p.env) : fgGreen("no key needed")}` };
               });
+      if (items.length === 0) {
+        items.push({ a: fgMuted(`no matches${input ? ` for "${input.slice(0, 40)}"` : ""}`), b: "" });
+      }
       const height = Math.min(r - 4, 18);
       const { width, top, left, height: h } = centerPanel(r, w, height);
       const innerW = width - 2;
@@ -727,6 +786,8 @@ export async function startTui(runtime: Runtime): Promise<void> {
   const overlayDim = (line: string, _y: number, _rows: number, _left: number, _width: number, _ov: Overlay): string => line;
 
   // ─── agent plumbing ──────────────────────────────────────────────
+  const firstLine = (t: string) => t.split("\n")[0] ?? "";
+  const pendingToolIdx: number[] = [];
   const pushLine = (kind: LineKind, text: string) => {
     lines.push({ kind, text });
     scroll = 0;
@@ -744,9 +805,27 @@ export async function startTui(runtime: Runtime): Promise<void> {
 
   const callbacks: AgentCallbacks = {
     onText: (t) => appendAssistant(t),
-    onToolCall: (call) => pushLine("tool", `${call.name}(${call.arguments.slice(0, 80)})`),
-    onToolResult: (_n, r) => pushLine(r.isError ? "err" : "ok", (r.content.split("\n")[0] ?? "").slice(0, 160)),
-    onStatus: (m) => pushLine("system", `· ${m}`),
+    onToolCall: (call) => {
+      const activity = makeActivity(call.name, call.arguments);
+      lines.push({ kind: "tool", text: "", activity });
+      pendingToolIdx.push(lines.length - 1);
+      scroll = 0;
+      render();
+    },
+    onToolResult: (name, r) => {
+      // pair with the oldest pending call of the same name (FIFO)
+      let slot = pendingToolIdx.findIndex((i) => lines[i].activity?.name === name);
+      if (slot === -1) slot = 0;
+      const at = pendingToolIdx.splice(slot, 1)[0];
+      const target = at !== undefined ? lines[at] : undefined;
+      if (target?.activity) {
+        target.activity = completeActivity(target.activity, Boolean(r.isError), String(r.content ?? ""));
+        render();
+        return;
+      }
+      pushLine(r.isError ? "err" : "ok", firstLine(String(r.content ?? "")).slice(0, 160));
+    },
+    onStatus: (m) => pushLine("system", m),
     onUsage: () => requestRender(),
   };
   runtime.agent.setCallbacks?.(callbacks);
@@ -875,6 +954,31 @@ export async function startTui(runtime: Runtime): Promise<void> {
     }
   };
 
+  // ─── multiline cursor movement (Ctrl+J inserts \n) ──────────────
+  const lineInfo = (idx: number) => {
+    const starts: number[] = [0];
+    for (let i = 0; i < input.length; i++) if (input[i] === "\n") starts.push(i + 1);
+    let curLine = 0;
+    for (let i = 0; i < starts.length; i++) if (idx >= starts[i]) curLine = i;
+    return { starts, curLine, col: idx - starts[curLine] };
+  };
+  const moveMultilineCursor = (dir: -1 | 1): boolean => {
+    if (!input.includes("\n")) return false;
+    const { starts, curLine, col } = lineInfo(cursor);
+    const target = curLine + dir;
+    if (target < 0 || target >= starts.length) return false;
+    const nextStart = starts[target];
+    const nextEnd = target + 1 < starts.length ? starts[target + 1] - 1 : input.length;
+    cursor = nextStart + Math.min(col, Math.max(0, nextEnd - nextStart));
+    return true;
+  };
+  const insertNewline = () => {
+    input = input.slice(0, cursor) + "\n" + input.slice(cursor);
+    cursor += 1;
+    if (overlay.kind === "palette") overlay = { kind: "none" };
+    render();
+  };
+
   const overlayUp = () => { if (overlay.kind === "palette" || overlay.kind === "model") { paletteIndex = Math.max(0, paletteIndex - 1); } else if (overlay.kind === "provider") { overlay.index = Math.max(0, overlay.index - 1); } else if (overlay.kind === "variant") { overlay.index = Math.max(0, overlay.index - 1); } };
   const overlayDown = () => {
     if (overlay.kind === "palette" || overlay.kind === "model") {
@@ -1001,6 +1105,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
       if (overlay.kind !== "none") { overlay = { kind: "none" }; render(); return; }
       return;
     }
+    if (s === "\x0a" || s === "\x1b[13;2u" || s === "\x1b[27;2;13~") { insertNewline(); return; } // Ctrl+J / Shift+Enter
     if (s === "\t") { cycleMode(); return; }
     if (s === "\x13" && overlay.kind === "model") { // Ctrl+S: toggle provider scope / all providers
       modelScope = modelScope
@@ -1021,8 +1126,8 @@ export async function startTui(runtime: Runtime): Promise<void> {
       }
       return;
     }
-    if (s === "\x1b[A") { overlayUp(); render(); return; }
-    if (s === "\x1b[B") { overlayDown(); render(); return; }
+    if (s === "\x1b[A") { if (!moveMultilineCursor(-1)) overlayUp(); render(); return; }
+    if (s === "\x1b[B") { if (!moveMultilineCursor(1)) overlayDown(); render(); return; }
     if (s === "\x10") { overlay = overlay.kind === "palette" ? { kind: "none" } : { kind: "palette", index: 0 }; render(); return; }
 
     // split embedded newlines and dispatch each segment

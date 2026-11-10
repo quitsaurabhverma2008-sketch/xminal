@@ -28,10 +28,25 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ### Added
 
-- **Tool activity renderer** (`src/tui/output/tool-activity.ts`) — compact per-tool presentation: icon, kind label, target, duration, success/failure state, for read/write/edit/multi_edit/glob/grep/list/bash/git/verify/web_fetch/web_search/task/mcp_call/memory/skill/todo/checkpoint/worktree/diagnostics/think; long results collapse to a one-line summary.
-- **Structured assistant output engine** — `renderMarkdown` gains task lists, GitHub-style callouts, a proper three-tier heading hierarchy, narrow-table fallback (key: value cards under ~44 cols), tighter table rendering.
-- Markdown heading hierarchy: H1 amber bold + spacing, H2 bright bold, H3 muted bold — never rendered as flat text.
-- Terminal width awareness everywhere (40/50/60/80/100/120 cols); Unicode width-safe.
+- **Tool activity renderer** (`src/tui/output/tool-activity.ts`) — compact per-tool presentation: icon, kind label, target, duration, success/failure state, for read/write/edit/multi_edit/glob/grep/list/bash/git/verify/web_fetch/web_search/task/mcp_call/memory/skill/todo/checkpoint/worktree/diagnostics/think. Multi-line diffs from edit/write tools collapse to a `+N −M` header with a tinted, capped unified-diff preview.
+- **Structured assistant output engine** — `renderMarkdown` gains task lists, GitHub-style callouts, a proper three-tier heading hierarchy (H1 amber bold / H2 bright bold / H3 muted bold), narrow-table fallback (key — value stacked rows under ~46 cols).
+- **Multiline composer** — Ctrl+J (or Shift+Enter in capable terminals) inserts a newline; the input area grows to four lines and shrinks back; Enter submits.
+- **Terminal-width awareness everywhere** (40/50/60/80/100/120 cols) — model picker, status bar, overlays and sidebar adapt; long paths and commands are clipped, never wrapped mid-escape.
+- **Model picker** shows each model's context window and input/output price from the live/cached catalog (never hardcoded), free-first ordering preserved.
+- Command palette and list overlays show an empty state ("no matches …") instead of a blank panel.
+
+### Fixed
+
+- Piped/non-TTY sessions rendered **zero frame rows** — `process.stdout.rows ?? Number(process.env.LINES) ?? 24` produced `NaN` (NaN is not nullish), so `Math.max(16, NaN)` was `NaN` and the frame loop never ran. Same for columns.
+- Assistant/system lines containing ANSI escapes were hard-wrapped by raw character count, mangling colors mid-sequence — chat wrapping is now ANSI-aware (`wrapAnsi`, shared by the markdown engine).
+- Sidebar chat clipping used `line.length` (escape sequences included), chopping styled lines at the divider — now uses visible-width clipping.
+- `diffCounts` never matched edit/write result headers (looked for a `(` directly before `+N`) — header parsing is scoped to the first line and accepts the real `(1 replacement, +12 −4)` format.
+
+### Changed
+
+- The built-in pure-Node TUI lives at `src/tui/tui.ts` (renamed from `clone-tui.ts`; the dead OpenTUI/Bun path is removed).
+- Status bar now shows **mode (color by mode) · model · effort · context % · session cost** — real values only.
+- Footer shows busy state + scroll position + actual keybindings (⌃p commands · ⌃j newline · ⇥ mode).
 
 ### Notes
 

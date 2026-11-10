@@ -128,7 +128,9 @@ Providers without a public free model (Anthropic, OpenAI, DeepSeek, xAI, MiniMax
 - **Network allowlist** — web_fetch/web_search are separate tools with explicit opt-in
 
 ### Interfaces
-- **Fullscreen TUI** in the opencode style (Tokyo Night, alternate-screen, sidebar). Responsive: phone-width (~44 cols) → 100+-col desktop, sidebar auto-hides under ~100 cols
+- **Fullscreen TUI** (Tokyo Night, alternate-screen, sidebar). Responsive: phone-width (~40 cols) → 100+-col desktop, sidebar auto-hides under 100 cols. Multiline composer (**Ctrl+J** newline / **Shift+Enter** where the terminal supports it, **Enter** submits — 1–4 growing lines)
+- **Structured output rendering** — Markdown headings (3 tiers), task lists, callouts, tables (grid on wide screens, stacked key — value rows under ~46 cols), fenced code with verbatim content + syntax tint, Unicode-width-safe wrapping
+- **Tool activity lines** — every tool call renders as `✓ EDIT src/index.ts +12 −4 42ms` with a tinted, capped diff preview; errors stay one line + one detail line; pending until the result lands
 - **Classic REPL** — automatic fallback (or `xminal --no-tui`)
 - **`xminal run`** — non-interactive headless mode for CI (`--json`, `--quiet`, `--max-turns`, `--permission`)
 - **`xminal serve`** — OpenAI-compatible HTTP server (`POST /v1/chat/completions` with SSE streaming) + `GET /health`

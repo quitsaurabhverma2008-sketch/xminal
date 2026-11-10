@@ -112,3 +112,34 @@ export function graphemeSlice(text: string, maxWidth: number): string {
   }
   return out;
 }
+
+/** ANSI-aware greedy word wrap — escape sequences pass through untouched. */
+export function wrapAnsi(input: string, width: number): string[] {
+  const out: string[] = [];
+  for (const paragraph of input.split("\n")) {
+    let line = "";
+    let visible = 0;
+    for (const word of paragraph.split(/(\s+)/)) {
+      const wv = visibleWidth(word);
+      if (visible + wv <= width && !/^\s+$/.test(word)) {
+        line += word;
+        visible += wv;
+      } else if (/^\s+$/.test(word)) {
+        line += word;
+        visible += wv;
+      } else {
+        if (visible > 0) { out.push(line.trimEnd()); line = ""; visible = 0; }
+        let rest = word;
+        while (visibleWidth(rest) > width) {
+          const slice = graphemeSlice(rest, width);
+          out.push(slice);
+          rest = rest.slice(slice.length);
+        }
+        line = rest;
+        visible = visibleWidth(rest);
+      }
+    }
+    out.push(line.trimEnd());
+  }
+  return out;
+}
