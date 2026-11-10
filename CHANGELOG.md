@@ -4,6 +4,31 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-11-09
+
+**Published on npm: `xminal@0.9.0`** (`npm install -g xminal`).
+
+### Added
+
+- **Markdown rendering system** (`src/tui/markdown.ts`) — block+inline rendered ANSI: ATX headings, bold/italic/inline code, fenced code (verbatim, green, `│` gutter, language header, no reformatting), nested lists, ordered lists, blockquotes, horizontal rules, **grid-rendered tables** (width-capped, inline code supported), links. Streaming-safe: unterminated fences render gracefully, no crash, no flicker between raw and rendered modes (raw is never shown). Memoized per `(text, width)`.
+- **Content-aware output quality engine** (`src/tui/format.ts`) — prose-only normalization (`!!!→!`, redundant `::`/`;`/`---`/`****` collapse) with hard content boundaries: fenced code, URLs, JSON, diffs, commands byte-exact; single formatting authority; unit tests for Hindi/English mix, URLs, code fences, excessive punctuation.
+- **Grapheme-aware width engine** (`src/tui/width.ts`) — Intl.Segmenter + East-Asian wide ranges + combining-mark zero-width + ZWJ emoji = 2; ANSI-aware `visibleWidth`, `graphemeSlice`, `splitGraphemes`. Used by wrap/clip/table/composer.
+- **Diff-tinted tool output** — `diffTint`/`isLikelyDiff` in format.ts; additions green, removals red, hunks accent, file headers muted.
+- **Status bar shows the real effort state** (was hardcoded `max`).
+
+### Fixed
+
+- **Assistant conversation rendering** — replaced raw-text wrap with the markdown renderer; paragraph wrap no longer drops content (word-fit accumulator bug in `wrapPlain`).
+- **Render storms** — full-frame repaints per token throttled via `requestRender()` + `flushRender()` (carried from 0.8.1).
+
+### Tests
+
+- New suites: `width.test.js` (Devanagari, emoji, ZWJ, ANSI), `format.test.js` (fences preserved; prose normalized; diff detection), `markdown.test.js` (headings, tables, unicode, incomplete fences). **51/51 pass.**
+
+### Docs
+
+- README: Markdown rendering, output quality engine, width engine, diff tint sections.
+
 ## [0.8.1] — 2026-11-09
 
 **Published on npm: `xminal@0.8.1`** (`npm install -g xminal`).

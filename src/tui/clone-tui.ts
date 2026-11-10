@@ -1,6 +1,9 @@
 import { Runtime } from "../runtime";
 import { loadConfig, resolveModel, defaultConfig } from "../config/config";
 import { listEffectiveAliases, refreshModelsCatalog } from "../config/models-catalog";
+import { visibleWidth, graphemeSlice, stripAnsi as stripAnsiW, splitGraphemes } from "./width";
+import { formatAssistantText, isLikelyDiff, tintDiffRow } from "./format";
+import { renderMarkdown } from "./markdown";
 import type { ProviderConfig } from "../config/types";
 import { VERSION, TAGLINE } from "../version";
 import { Renderer } from "../cli/render";
@@ -43,8 +46,8 @@ const fgAmber = (t: string) => `${rgb(C.amber)}${t}${RESET}`;
 const fgGreen = (t: string) => `${rgb(C.green)}${t}${RESET}`;
 const fgRed = (t: string) => `${rgb(C.red)}${t}${RESET}`;
 const bold = (t: string) => `${BOLD}${t}${RESET}`;
-const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07/g, "");
-const visible = (s: string) => stripAnsi(s).length;
+const stripAnsi = stripAnsiW;
+const visible = visibleWidth;
 const padRight = (s: string, w: number) => (visible(s) >= w ? s : s + " ".repeat(w - visible(s)));
 const clip = (s: string, w: number): string => {
   if (visible(s) <= w) return s;
@@ -54,8 +57,11 @@ const clip = (s: string, w: number): string => {
   while (i < s.length) {
     const esc = /^(\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07)/.exec(s.slice(i));
     if (esc) { out += esc[0]; i += esc[0].length; continue; }
-    if (cols >= w) break;
-    out += s[i]; cols += 1; i += 1;
+    const ch = splitGraphemes(s.slice(i))[0];
+    if (ch === undefined) break;
+    const cw = visible(ch);
+    if (cols + cw > w) break;
+    out += ch; cols += cw; i += ch.length;
   }
   return out + RESET;
 };
@@ -405,6 +411,29 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     return out;
   };
 
+  const formatCache = new Map<string, string>();
+  const formatMemo = (text: string): string => {
+    const hit = formatCache.get(text);
+    if (hit !== undefined) return hit;
+    const out = formatAssistantText(text);
+    if (formatCache.size > 512) formatCache.clear();
+    formatCache.set(text, out);
+    return out;
+  };
+  const mdCache = new Map<string, string[]>();
+  const mdMemo = (text: string, width: number): string[] => {
+    const key = `${width}:${text}`;
+    const hit = mdCache.get(key);
+    if (hit) return hit;
+    const out = renderMarkdown(text, { width: Math.max(4, width) });
+    if (mdCache.size > 512) mdCache.clear();
+    mdCache.set(key, out);
+    return out;
+  };
+  const diffTint = (rows: string[]): string[] =>
+    rows.map((row) => tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed));
+  const likelyDiff = isLikelyDiff;
+
   const styledLine = (line: Line): string[] => {
     const w = Math.max(8, contentWidth() - 2);
     const prefixFor = (k: LineKind): string => {
@@ -419,10 +448,18 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     };
     const prefix = prefixFor(line.kind);
     const firstPrefixVisible = stripAnsi(prefix).length;
+    if (line.kind === "assistant") {
+      const clean = formatMemo(line.text);
+      const body = mdMemo(clean, Math.max(4, w - firstPrefixVisible - 1));
+      return body.map((row, i) => (i === 0 ? prefix : " ".repeat(firstPrefixVisible)) + " " + row);
+    }
     const parts = wrap(line.text, Math.max(4, w - firstPrefixVisible));
     const out: string[] = [];
     for (let i = 0; i < parts.length; i++) {
       out.push((i === 0 ? prefix : " ".repeat(firstPrefixVisible)) + " " + parts[i]);
+    }
+    if ((line.kind === "tool" || line.kind === "ok" || line.kind === "err") && likelyDiff(line.text)) {
+      return diffTint(out);
     }
     return out;
   };
@@ -467,7 +504,7 @@ export async function startOpenCodeClone(runtime: Runtime): Promise<void> {
     if (row === inputTop + 2) {
       const model = runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec;
       const mode = runtime.agent.mode;
-      const line = `${fgAccent(" " + mode)}${fgMuted(" · ")}${fgText(model)}${fgMuted("  ")}${fgAmber("max")}`;
+      const line = `${fgAccent(" " + mode)}${fgMuted(" · ")}${fgText(model)}${fgMuted("  ")}${fgAmber(getEffort())}`;
       return `${bgRgb(C.bg)}${padRight(line, w)}${RESET}`;
     }
     if (row === rows() - 1) {

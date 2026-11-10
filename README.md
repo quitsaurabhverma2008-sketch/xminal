@@ -8,7 +8,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.8.1` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.9.0` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
@@ -141,6 +141,10 @@ Providers without a public free model (Anthropic, OpenAI, DeepSeek, xAI, MiniMax
 - **Budget caps** — `$maxCostPerSession`, `maxTurns`, `maxTokensPerTurn`
 - **Compaction** — long conversations auto-summarize (tool-pair safe)
 - **Resume** — `xminal resume` picks up exactly where you left off
+- **Real Markdown rendering** — assistant output is rendered live: headings, bold/italic/inline code, lists (nested), tables with grid alignment, blockquotes, horizontal rules, fenced code with verbatim content + syntax tint. Streaming-safe: incomplete trailing structures never throw, every block renders deterministically, original history is stored unformatted.
+- **Content-aware output quality** — the formatting layer normalizes decorative punctuation in prose only (never touches code, URLs, JSON, diffs, or `***`). Single formatting authority; no double-decoration.
+- **Grapheme-aware width engine** — `Intl.Segmenter`-based wrapping; Devanagari/Hindi, emoji, ZWJ sequences, East-Asian wide chars, combining marks, ANSI-safe alignment.
+- **Diff-tinted tool output** — unified diffs in tool output render with green additions, red removals, blue hunk headers, muted file headers.
 - **Mouse wheel scroll** (4 lines per notch) + **PgUp/PgDn** page scroll; when scrolled up, the bottom-left status shows `▲ scrolled N · PgDn tail`. Wheel over an open palette/picker moves its selection instead of the chat. Set `XMINAL_MOUSE=0` to disable mouse capture entirely (restores your terminal's text selection).
 
 ## Install
@@ -233,7 +237,7 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.8.1** — live on npm, 37/37 tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.9.0** — live on npm, 51/51 tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 
