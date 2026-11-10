@@ -9,7 +9,7 @@ import { Renderer } from "../cli/render";
 import { handleCommand } from "../cli/commands";
 import { spawnSync } from "node:child_process";
 import { T, rgb, bgRgb, RESET, BOLD, fgMuted, fgText, fgAccent, fgAmber, fgGreen, fgRed, fgCyan, modeColor } from "./theme";
-import { makeActivity, completeActivity, renderActivity, spinnerFrame, type ActivityLine } from "./output/tool-activity";
+import { makeActivity, completeActivity, renderActivity, spinnerFrame, SPINNER_FRAMES, type ActivityLine } from "./output/tool-activity";
 
 function openExternal(url: string): boolean {
   const platform = process.platform;
@@ -389,6 +389,16 @@ export async function startTui(runtime: Runtime): Promise<void> {
   const branch = detectGitBranch(cwd);
 
   const mouseMode = !/^(0|off|false)$/i.test(process.env.XMINAL_MOUSE ?? "");
+  const PLACEHOLDERS = [
+    'Ask anything…  "fix the failing test"',
+    'Ask anything…  "why is CI red?"',
+    'Ask anything…  "write a failing test first"',
+    'Ask anything…  "add a --json flag"',
+    'Ask anything…  "what changed today?"',
+  ];
+  let placeholderIdx = 0;
+  let placeholderAt = 0;
+  const bootStart = Date.now();
   let busy = false;
   let closed = false;
   let input = "";
@@ -435,7 +445,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
     // ── tool activity — opencode-style single line + tinted diff preview
     if (line.kind === "tool" && line.activity) {
       const a = line.activity;
-      const out: string[] = [` ${renderActivity(a, Math.max(8, w - 1))}`];
+      const out: string[] = renderActivity(a, Math.max(8, w - 1)).map((row) => ` ${row}`);
       if (a.preview && a.preview.length) {
         for (const row of a.preview) {
           out.push(`   ${tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed)}`);
@@ -543,9 +553,12 @@ export async function startTui(runtime: Runtime): Promise<void> {
   const renderHomeRow = (row: number, limit: number): string => {
     const cw = contentWidth();
     const block = homeLines();
+    const bootT = Math.min(1, (Date.now() - bootStart) / 1200);
+    const visibleRows = Math.ceil(bootT * block.length);
     const startRow = Math.max(0, Math.floor((limit - block.length) / 2));
     const idx = row - startRow;
     if (idx < 0 || idx >= block.length) return `${bgRgb(T.bg)}${" ".repeat(cw)}${RESET}`;
+    if (idx >= visibleRows) return `${bgRgb(T.bg)}${" ".repeat(cw)}${RESET}`; // reveal animates downward
     const line = block[idx];
     const left = Math.floor(Math.max(0, (cw - visible(line)) / 2));
     return `${bgRgb(T.bg)}${" ".repeat(left)}${line}${" ".repeat(Math.max(0, cw - left - visible(line)))}${RESET}`;
@@ -579,7 +592,12 @@ export async function startTui(runtime: Runtime): Promise<void> {
       }
       if (input === "" && !pendingPermission) {
         if (row === top + 1) {
-          const placeholder = fgMuted('Ask anything…  "fix the failing test"');
+          const nowTs = Date.now();
+          if (nowTs - placeholderAt > 4000) {
+            placeholderAt = nowTs;
+            placeholderIdx = (placeholderIdx + 1) % PLACEHOLDERS.length;
+          }
+          const placeholder = fgMuted(PLACEHOLDERS[placeholderIdx]);
           return withSide(compLine(placeholder, visible(placeholder)));
         }
         return withSide(`${bgRgb(T.composer)}${bar}▍${" ".repeat(cw - 1)}${RESET}`);
@@ -595,8 +613,10 @@ export async function startTui(runtime: Runtime): Promise<void> {
     if (row === mRow) {
       const mode = runtime.agent.mode;
       const model = (runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec).slice(0, Math.max(12, Math.floor(cw / 2)));
-      const left = `${modeColor(mode)}${BOLD}${mode}${RESET}${fgMuted(" · ")}${fgText(model)}`;
-      const right = fgMuted(getEffort());
+      const left = busy
+        ? `${fgCyan(SPINNER_FRAMES[spinnerTick % SPINNER_FRAMES.length])} ${fgText(BOLD + "working" + RESET)}  ${fgMuted("esc to interrupt")}`
+        : `${modeColor(mode)}${BOLD}${mode}${RESET}${fgMuted(" · ")}${fgText(model)}`;
+      const right = queue.length > 0 ? fgAmber(`⇧${queue.length} queued`) : fgMuted(getEffort());
       const gap = Math.max(1, cw - 2 - visible(left) - visible(right));
       return withSide(`${bgRgb(T.composer)}${bar}▍ ${left}${" ".repeat(gap)}${right}${RESET}`);
     }
@@ -607,7 +627,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
     if (row === footerRow()) {
       const key = (k: string, label: string) => `${BOLD}${fgText(k)}${RESET} ${fgMuted(label)}`;
       const left = busy
-        ? ` ${fgCyan(spinnerFrame())} ${fgText("working")}  ${fgMuted("esc interrupt")}`
+        ? ` ${fgMuted("working — esc to interrupt")}`
         : ` ${key("⇥", "agents")}${cw >= 52 ? `  ${key("⌃j", "newline")}` : ""}`;
       const cost = runtime.agent.getCost();
       const usage = `${(cost.inputTokens / 1000).toFixed(1)}K ${ctxPct()}% · $${cost.costUsd.toFixed(4)}`;
@@ -836,6 +856,26 @@ export async function startTui(runtime: Runtime): Promise<void> {
 
   // ─── agent plumbing ──────────────────────────────────────────────
   const firstLine = (t: string) => t.split("\n")[0] ?? "";
+  // pending prompts typed while the agent is busy — drained FIFO after each run
+  const queue: string[] = [];
+  let spinnerTimer: ReturnType<typeof setInterval> | null = null;
+  let spinnerTick = 0;
+  const startSpinner = () => {
+    if (spinnerTimer) return;
+    spinnerTimer = setInterval(() => {
+      spinnerTick++;
+      if (busy) render();
+      else {
+        if (spinnerTimer) clearInterval(spinnerTimer);
+        spinnerTimer = null;
+      }
+    }, 90);
+  };
+  const stopSpinner = () => {
+    if (spinnerTimer) clearInterval(spinnerTimer);
+    spinnerTimer = null;
+    spinnerTick = 0;
+  };
   const pendingToolIdx: number[] = [];
   const pushLine = (kind: LineKind, text: string) => {
     lines.push({ kind, text });
@@ -935,6 +975,34 @@ export async function startTui(runtime: Runtime): Promise<void> {
     return `${Math.floor(m / 60)}h ${m % 60}m`;
   };
   let turnStartedAt = 0;
+  const submitText = (text: string) => {
+    scroll = 0;
+    pushLine("user", text);
+    busy = true;
+    turnStartedAt = Date.now();
+    startSpinner();
+    render();
+    void (async () => {
+      try {
+        await runtime.agent.run(text);
+      } catch (error) {
+        pushLine("err", (error as Error).message);
+      } finally {
+        busy = false;
+        stopSpinner();
+        flushRender();
+        const turnMs = Date.now() - turnStartedAt;
+        const title = runtime.agent.mode.charAt(0).toUpperCase() + runtime.agent.mode.slice(1);
+        const modelShort = (runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec).slice(0, 40);
+        pushLine("system", `${modeColor(runtime.agent.mode)}${BOLD}${title}${RESET}${fgMuted(` · ${modelShort} · ${fmtTurnDuration(turnMs)}`)}`);
+        render();
+        // agent is free — drain the queue in FIFO order, one turn at a time
+        const next = queue.shift();
+        if (next) submitText(next);
+      }
+    })();
+  };
+
   const submitInput = () => {
     const text = input.trim();
     input = "";
@@ -950,26 +1018,13 @@ export async function startTui(runtime: Runtime): Promise<void> {
       return;
     }
 
-    scroll = 0;
-    pushLine("user", text);
-    busy = true;
-    turnStartedAt = Date.now();
-    render();
-    void (async () => {
-      try {
-        await runtime.agent.run(text);
-      } catch (error) {
-        pushLine("err", (error as Error).message);
-      } finally {
-        busy = false;
-        flushRender();
-        const turnMs = Date.now() - turnStartedAt;
-        const title = runtime.agent.mode.charAt(0).toUpperCase() + runtime.agent.mode.slice(1);
-        const modelShort = (runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec).slice(0, 40);
-        pushLine("system", `${modeColor(runtime.agent.mode)}${BOLD}${title}${RESET}${fgMuted(` · ${modelShort} · ${fmtTurnDuration(turnMs)}`)}`);
-        render();
-      }
-    })();
+    if (busy) {
+      queue.push(text);
+      pushLine("system", `queued (${queue.length}): ${text.length > 60 ? text.slice(0, 59) + "…" : text}`);
+      render();
+      return;
+    }
+    submitText(text);
   };
 
   const classicCommand = async (cmdLine: string) => {
@@ -1135,8 +1190,25 @@ export async function startTui(runtime: Runtime): Promise<void> {
     return false;
   };
 
-  const onData = (chunk: Buffer) => {
-    const s = chunk.toString("utf8");
+  // ─── input parsing (one owner) ─────────────────────────────────────
+  // A single normalization pass strips every CSI sequence the terminal emits.
+  // Mouse reports are counted (wheel scrolls), never typed. A trailing
+  // incomplete escape sequence is held for the next chunk so it can never
+  // leak into the composer. Anything left after extraction is plain text.
+  let inputBuffer = "";
+  const MOUSE_RE = /\x1b\[<[\d;]+[Mm]/g;
+  const CSI_RE = /\x1b\[[0-9;?]*[A-Za-z~]/g;
+  const PARTIAL_RE = /(\x1b\[[<0-9;?]*)$/;
+
+  const onData = (raw: Buffer) => {
+    let s = inputBuffer + raw.toString("utf8");
+    inputBuffer = "";
+    // hold back a trailing incomplete escape sequence for the next chunk
+    const partial = PARTIAL_RE.exec(s);
+    if (partial) {
+      inputBuffer = partial[0];
+      s = s.slice(0, s.length - partial[0].length);
+    }
 
     if (pendingPermission) {
       const ch = s.trim().toLowerCase()[0];
@@ -1148,24 +1220,50 @@ export async function startTui(runtime: Runtime): Promise<void> {
       return;
     }
     if (s === "\x03") { close(); return; }
-    if (s === "\x0c") { render(); return; }
+    if (s === "\x0c") { render(); return; } // Ctrl+L redraw
     if (s === "\x1b[5~") { scroll = clampScroll(scroll + 8); render(); return; }
     if (s === "\x1b[6~") { scroll = clampScroll(scroll - 8); render(); return; }
-    const wheel = /^(?:\x1b\[<(\d+);\d+;\d+[Mm])$/.exec(s);
-    if (wheel) {
-      const button = Number(wheel[1]);
-      if (button === 64 || button === 65) {
-        if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "provider" || overlay.kind === "variant") {
-          for (let i = 0; i < 4; i++) { if (button === 64) overlayUp(); else overlayDown(); }
-        } else {
-          scroll = clampScroll(scroll + (button === 64 ? 4 : -4));
-        }
+
+    // mouse: count wheel events (scroll / overlay), drop everything else
+    const wheel = (s.match(MOUSE_RE) ?? []).map((m) => Number(m.slice(2).split(";", 2)[0]));
+    s = s.replace(MOUSE_RE, "");
+    for (const button of wheel) {
+      if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "provider" || overlay.kind === "variant") {
+        if (button === 64) overlayUp();
+        else if (button === 65) overlayDown();
+      } else {
+        if (button === 64) scroll = clampScroll(scroll + 4);
+        else if (button === 65) scroll = clampScroll(scroll - 4);
+      }
+    }
+
+    // arrows may arrive batched — consume them as counts
+    const del = (s.match(/\x1b\[3~/g) ?? []).length;
+    const up = (s.match(/\x1b\[A/g) ?? []).length;
+    const down = (s.match(/\x1b\[B/g) ?? []).length;
+    const left = (s.match(/\x1b\[D/g) ?? []).length;
+    const right = (s.match(/\x1b\[C/g) ?? []).length;
+    s = s.replace(CSI_RE, "");
+    for (let i = 0; i < up; i++) if (!moveMultilineCursor(-1)) overlayUp();
+    for (let i = 0; i < down; i++) if (!moveMultilineCursor(1)) overlayDown();
+    if (overlay.kind === "none") {
+      if (left) cursor = Math.max(0, cursor - left);
+      if (right) cursor = Math.min(input.length, cursor + right);
+      for (let i = 0; i < del; i++) {
+        if (cursor < input.length) input = input.slice(0, cursor) + input.slice(cursor + 1);
+      }
+    }
+    if (wheel.length || up || down || left || right || del) { render(); }
+
+    if (s === "\x1b") { // Esc alone
+      if (overlay.kind !== "none") { overlay = { kind: "none" }; render(); return; }
+      if (busy) { runtime.agent.abort(); pushLine("system", "interrupted"); render(); return; }
+      if (queue.length > 0) {
+        pushLine("system", `cleared ${queue.length} queued message${queue.length === 1 ? "" : "s"}`);
+        queue.length = 0;
         render();
         return;
       }
-    }
-    if (s === "\x1b") { // Esc
-      if (overlay.kind !== "none") { overlay = { kind: "none" }; render(); return; }
       return;
     }
     if (s === "\x0a" || s === "\x1b[13;2u" || s === "\x1b[27;2;13~") { insertNewline(); return; } // Ctrl+J / Shift+Enter
@@ -1178,7 +1276,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
       render();
       return;
     }
-    if (s === "\x7f" || s === "\b") {
+    if (s === "\x7f" || s === "\b") { // Backspace
       if (cursor > 0) {
         if (overlay.kind === "provider-key") { overlay.input = overlay.input.slice(0, overlay.input.length - 1); render(); return; }
         if (overlay.kind === "model") { overlay.query = overlay.query.slice(0, overlay.query.length - 1); paletteIndex = 0; render(); return; }
@@ -1189,9 +1287,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
       }
       return;
     }
-    if (s === "\x1b[A") { if (!moveMultilineCursor(-1)) overlayUp(); render(); return; }
-    if (s === "\x1b[B") { if (!moveMultilineCursor(1)) overlayDown(); render(); return; }
-    if (s === "\x10") { overlay = overlay.kind === "palette" ? { kind: "none" } : { kind: "palette", index: 0 }; render(); return; }
+    if (s === "\x10") { overlay = overlay.kind === "palette" ? { kind: "none" } : { kind: "palette", index: 0 }; render(); return; } // Ctrl+P
 
     // split embedded newlines and dispatch each segment
     let rest = s;
@@ -1261,6 +1357,12 @@ export async function startTui(runtime: Runtime): Promise<void> {
   process.stdin.resume();
   process.stdin.on("data", onData);
   render();
+  if (lines.length === 0) {
+    const bootTimer = setInterval(() => {
+      if (Date.now() - bootStart > 1400) { clearInterval(bootTimer); return; }
+      render();
+    }, 60);
+  }
 
   if (!process.env.XMINAL_MODELS_OFFLINE) { // refresh catalog from models.dev in the background when stale
     void (async () => {

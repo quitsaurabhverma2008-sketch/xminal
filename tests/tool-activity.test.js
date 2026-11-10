@@ -67,7 +67,7 @@ test("completeActivity marks failures honestly", () => {
 
 test("renderActivity shows a spinner + target before the result lands", () => {
   const a = makeActivity("read", JSON.stringify({ path: "x.ts" }));
-  const line = stripAnsi(renderActivity(a, 60, a.startedAt));
+  const line = stripAnsi(renderActivity(a, 60, a.startedAt).join("\n"));
   assert.ok(line.includes("→"));   // opencode read glyph
   assert.ok(line.includes("x.ts"));
   assert.ok(!line.includes("ms"));
@@ -76,10 +76,18 @@ test("renderActivity shows a spinner + target before the result lands", () => {
 test("renderActivity shows duration + counts after completion", () => {
   const a = makeActivity("edit", JSON.stringify({ path: "foo.ts" }));
   const done = completeActivity(a, false, "Edited foo.ts (+2 −1)", a.startedAt + 150);
-  const line = stripAnsi(renderActivity(done, 60, a.startedAt + 150));
+  const line = stripAnsi(renderActivity(done, 60, a.startedAt + 150).join("\n"));
   assert.ok(line.includes("~"));   // opencode edit glyph
   assert.ok(line.includes("foo.ts"));
   assert.ok(line.includes("+2"));
   assert.ok(line.includes("−1"));
   assert.ok(line.includes("150ms"));
+});
+
+test("renderActivity wraps long bash commands across rows", () => {
+  const a = makeActivity("bash", JSON.stringify({ command: "cd /home/user/very-long-project-path && npm run some-extremely-long-script-name -- --with-flags --many-of-them --and-more" }));
+  const done = completeActivity(a, false, "ok", a.startedAt + 90);
+  const lines = renderActivity(done, 60, a.startedAt + 90);
+  assert.ok(lines.length > 1, "long command must wrap");
+  assert.ok(stripAnsi(lines[0]).includes("npm run"));
 });

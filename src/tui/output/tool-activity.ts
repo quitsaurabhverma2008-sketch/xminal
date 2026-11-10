@@ -5,7 +5,7 @@
 import {
   fgGreen, fgRed, fgMuted, fgText, fgAccent, fgCyan, BOLD, RESET,
 } from "../theme";
-import { visibleWidth, stripAnsi } from "../width";
+import { visibleWidth, stripAnsi, wrapAnsi } from "../width";
 
 export interface ActivityLine {
   kind: "tool";
@@ -178,21 +178,36 @@ export function completeActivity(
   };
 }
 
-/** Render one activity line to styled ANSI text (no \n). */
-export function renderActivity(a: ActivityLine, width: number, now = Date.now()): string {
+/** Render one activity as styled ANSI lines — long commands wrap across rows. */
+export function renderActivity(a: ActivityLine, width: number, now = Date.now()): string[] {
   const glyph = toolGlyph(a.name);
-  const target = toolTarget(a.name, a.argsRaw, Math.max(16, width - 12));
+  const wrapNames = a.name === "bash" || a.name === "git" || a.name === "worktree";
+  const budget = Math.max(16, width - 6);
+  const target = toolTarget(a.name, a.argsRaw, wrapNames ? Number.MAX_SAFE_INTEGER : budget);
+  const wrapTarget = wrapNames ? wrapAnsi(target, Math.max(8, width - 6)) : [target];
+  const suffixFor = (): string[] => {
+    if (a.status === "pending") return [];
+    const ok = a.status === "ok";
+    const bits: string[] = [];
+    if (a.added !== undefined || a.removed !== undefined) {
+      bits.push(`${fgGreen(`+${a.added ?? 0}`)} ${fgRed(`−${a.removed ?? 0}`)}`);
+    }
+    if (a.durationMs !== undefined) bits.push(fgMuted(formatDuration(a.durationMs)));
+    return bits;
+  };
   if (a.status === "pending") {
-    return `${fgCyan(spinnerFrame(now))} ${fgText(glyph)} ${fgText(target)}`;
+    const out = wrapTarget.map((chunk, i) =>
+      i === 0 ? `${fgCyan(spinnerFrame(now))} ${fgText(glyph)} ${chunk}` : `    ${chunk}`,
+    );
+    return out;
   }
   const ok = a.status === "ok";
   const status = ok ? fgGreen("✓") : fgRed("✗");
-  const body = ok ? `${fgText(glyph)} ${fgText(target)}` : `${fgRed(glyph)} ${fgRed(target)}`;
-  const bits: string[] = [];
-  if (a.added !== undefined || a.removed !== undefined) {
-    bits.push(`${fgGreen(`+${a.added ?? 0}`)} ${fgRed(`−${a.removed ?? 0}`)}`);
-  }
-  if (a.durationMs !== undefined) bits.push(fgMuted(formatDuration(a.durationMs)));
-  const suffix = bits.length ? `  ${bits.join(" ")}` : "";
-  return `${status} ${body}${suffix}`;
+  const bits = suffixFor();
+  const out = wrapTarget.map((chunk, i) => {
+    const head = i === 0 ? `${status} ${ok ? fgText(glyph) : fgRed(glyph)} ${ok ? fgText(chunk) : fgRed(chunk)}` : `    ${ok ? fgText(chunk) : fgRed(chunk)}`;
+    return head;
+  });
+  if (bits.length && out.length) out[out.length - 1] += `  ${bits.join(" ")}`;
+  return out;
 }
