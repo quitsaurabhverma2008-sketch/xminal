@@ -4,6 +4,16 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.12.2] — 2026-11-10
+
+**Bug-fix release: variant effort, memoized rendering, wheel-scroll.**
+
+### Fixed
+
+- **Variant (effort) was display-only** — now `low`/`medium`/`high`/`max` caps the per-turn `max_tokens` sent to providers (1024/4096/16384/full). `/variant` overlay shows the real budgets
+- **Keystroke lag** — `styledLine` and `renderChatLines` are memoized; echo latency measured at ~25–40 ms on-device
+- **Touch/mouse wheel scroll was dead** — the parser fed `Number('<64;10;5M')` into the wheel matcher → always NaN; fixed, plus the scroll indicator is back in the footer (`▲ scrolled ↑ N — PgDn to tail`)
+
 ## [0.12.1] — 2026-11-10
 
 **Identical to 0.12.0; fixes the broken npm payload of 0.12.0 (tarball 404).**
