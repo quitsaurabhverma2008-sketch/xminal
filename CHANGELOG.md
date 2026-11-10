@@ -4,6 +4,14 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-11-09
+
+**Published on npm: `xminal@0.9.2`** (`npm install -g xminal`).
+
+### Fixed
+
+- **Sidebar "1% used" was a hardcoded literal** — now computed for real from the session's input tokens against the active model's context window (`resolveModel`), memoized per model spec; falls back to 128K on resolution failure.
+
 ## [0.9.1] — 2026-11-09
 
 **Published on npm: `xminal@0.9.1`** (`npm install -g xminal`).

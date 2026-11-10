@@ -362,6 +362,7 @@ async function startOpenCodeClone(runtime) {
     const rows = () => Math.max(16, process.stdout.rows ?? Number(process.env.LINES) ?? 24);
     const sidebarWidth = () => (cols() >= 100 ? 30 : 0);
     const contentWidth = () => cols() - sidebarWidth();
+    let ctxWindowMemo = null;
     const wrap = (text, width) => {
         if (!text)
             return [""];
@@ -509,7 +510,20 @@ async function startOpenCodeClone(runtime) {
             case 0: return line(`${fgText(BOLD + "Greeting" + RESET)}`);
             case 2: return line(fgMuted("Context"));
             case 3: return line(fgText((runtime.agent.getCost().inputTokens / 1000).toFixed(1) + "K tokens"));
-            case 4: return line(fgMuted("1% used"));
+            case 4: {
+                const used = runtime.agent.getCost().inputTokens;
+                const spec = runtime.agent.modelSpec;
+                if (ctxWindowMemo?.spec !== spec) {
+                    let value = 128000;
+                    try {
+                        value = (0, config_1.resolveModel)(runtime.config, spec).contextWindow ?? 128000;
+                    }
+                    catch { /* keep fallback */ }
+                    ctxWindowMemo = { spec, value };
+                }
+                const pct = Math.min(100, Math.round((100 * used) / (ctxWindowMemo?.value ?? 128000)));
+                return line(fgMuted(`${pct}% used`));
+            }
             case 6: return line(fgMuted("Session"));
             case 7: return line(fgText(sessionTitle));
             case 8: return line(fgMuted(`${shortId} · ${cwd.split("/").pop() ?? cwd}`));
