@@ -8,7 +8,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.10.0` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.11.0` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
@@ -128,6 +128,7 @@ Providers without a public free model (Anthropic, OpenAI, DeepSeek, xAI, MiniMax
 - **Network allowlist** — web_fetch/web_search are separate tools with explicit opt-in
 
 ### Interfaces
+- **Built-in fullscreen TUI** (default) — opencode-styled Tokyo Night, works everywhere including Android/Termux (`XMINAL_TUI_ENGINE=opencode` opts into the vendored literal OpenCode engine on macOS/Linux/Windows)
 - **Fullscreen TUI** (Tokyo Night, alternate-screen, sidebar). Responsive: phone-width (~40 cols) → 100+-col desktop, sidebar auto-hides under 100 cols. Multiline composer (**Ctrl+J** newline / **Shift+Enter** where the terminal supports it, **Enter** submits — 1–4 growing lines)
 - **Structured output rendering** — Markdown headings (3 tiers), task lists, callouts, tables (grid on wide screens, stacked key — value rows under ~46 cols), fenced code with verbatim content + syntax tint, Unicode-width-safe wrapping
 - **Tool activity lines** — every tool call renders as `✓ EDIT src/index.ts +12 −4 42ms` with a tinted, capped diff preview; errors stay one line + one detail line; pending until the result lands
@@ -148,6 +149,15 @@ Providers without a public free model (Anthropic, OpenAI, DeepSeek, xAI, MiniMax
 - **Grapheme-aware width engine** — `Intl.Segmenter`-based wrapping; Devanagari/Hindi, emoji, ZWJ sequences, East-Asian wide chars, combining marks, ANSI-safe alignment.
 - **Diff-tinted tool output** — unified diffs in tool output render with green additions, red removals, blue hunk headers, muted file headers.
 - **Mouse wheel scroll** (4 lines per notch) + **PgUp/PgDn** page scroll; when scrolled up, the bottom-left status shows `▲ scrolled N · PgDn tail`. Wheel over an open palette/picker moves its selection instead of the chat. Set `XMINAL_MOUSE=0` to disable mouse capture entirely (restores your terminal's text selection).
+
+## Platform matrix
+
+| Platform | Default TUI | OpenCode engine (opt-in) |
+|---|---|---|
+| macOS (arm64/x64) | ✓ | ✓ (requires [Bun](https://bun.sh)) |
+| Linux (arm64/x64, glibc/musl) | ✓ | ✓ (requires Bun) |
+| Windows (x64/arm64) | ✓ | ✓ (requires Bun) |
+| Android / Termux | ✓ (pure Node — no native deps) | ✗ no public prebuilt `@opentui/core-android-arm64`; the engine falls back automatically with a warning |
 
 ## Install
 
@@ -239,7 +249,7 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.10.0** — live on npm, 51+ tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.11.0** — live on npm, 51+ tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 

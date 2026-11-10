@@ -6,6 +6,9 @@ const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..");
 const SKIP = new Set(["node_modules", "dist", ".git", ".github"]);
+// vendor/ is verbatim MIT upstream (opencode); its test fixtures contain intentional fake
+// token-shaped strings, so we scan only our own bridge inside it, not upstream's tree.
+const SKIP_UNDER_VENDOR = /vendor(?!\/packages\/xminal-bridge)/;
 const SKIP_FILES = new Set(["package-lock.json", "LEARNINGS.md"]);
 
 const PATTERNS = [
@@ -29,6 +32,7 @@ function walk(dir) {
     if (entry.isDirectory()) {
       out.push(...walk(full));
     } else if (entry.isFile()) {
+      if (SKIP_UNDER_VENDOR.test(full)) continue;
       if (SKIP_FILES.has(entry.name)) continue;
       out.push(full);
     }

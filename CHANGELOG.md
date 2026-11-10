@@ -4,6 +4,28 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-11-10
+
+**XMINAL × OpenCode — literal vendored engine (opt-in), everywhere it can run.**
+
+### Added
+
+- **OpenCode engine** (`XMINAL_TUI_ENGINE=opencode xminal`) — the actual OpenCode v2.2.7 TUI, vendored verbatim into the repo (MIT, `vendor/LICENSE-opencode`, `vendor/NOTICE`) and wired to XMINAL's runtime through `vendor/packages/xminal-bridge` — an in-process implementation of the OpenCode server contract (SSE, transcript projection, tool/reasoning/text streaming, permissions, models/providers/agents/commands). No HTTP server, no SQLite, no network required by the API layer itself. Only a 4-line patch in `vendor/packages/tui/src/app.tsx` injects XMINAL's transport into their client.
+- npm package now ships `vendor/` so macOS/Linux/Windows desktop users get the engine out of the box (requires Bun on PATH). Android/Termux keeps the built-in TUI — no public `@opentui/core-android-arm64` prebuilt exists; the engine detects this and falls back with a warning (never silently).
+- **CI matrix** — Ubuntu/macOS/Windows × Node 20/22.
+- `docs/OPENCODE-ENGINE.md` — how the engine works, platform support, build & caveats.
+
+### Changed
+
+- `package.json` version 0.11.0; `files` now includes `vendor/`.
+
+### Honest notes
+
+- Engine is opt-in everywhere; built-in TUI remains the default on every platform including desktop.
+- The engine cannot run on Android/Termux until a bionic `libopentui.so` is published or vendored (upstream blocker, not XMINAL's code).
+- Bridge implements the happy path end-to-end; unimplemented features (fork/revert/compact/delete/rename) return honest 501s — never fake success.
+- The vendored tree carries 3 pre-existing typecheck diagnostics (@types/node `zlib.zstdCompressSync` and `module.registerHooks` drift) — unrelated to the port; runtime unaffected.
+
 ## [0.10.0] — 2026-11-10
 
 **XMINAL × environment cleanup + full TUI/output-rendering redesign.** Removes everything tied to the sandbox the project was bootstrapped in, and transforms the terminal experience from plain-text output into a structured, layered interface.
