@@ -90,6 +90,14 @@ export class Runtime {
     if (mode === "yolo") this.permissions.setMode("full");
   }
 
+  setEffort(effort: import("./core/agent").AgentEffort): void {
+    this.agent.setEffort(effort);
+  }
+
+  getEffort(): import("./core/agent").AgentEffort {
+    return this.agent.effort;
+  }
+
   makeAgent(overrides: {
     mode?: AgentMode;
     model?: string;

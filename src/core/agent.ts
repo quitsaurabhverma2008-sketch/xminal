@@ -54,9 +54,12 @@ export interface AgentRunResult {
   error?: string;
 }
 
+export type AgentEffort = "low" | "medium" | "high" | "max";
+
 export class Agent {
   mode: AgentMode;
   modelSpec: string;
+  effort: AgentEffort = "max";
   private readonly router: ProviderRouter;
   private readonly cost: CostTracker;
   private readonly callbacks: AgentCallbacks;
@@ -78,6 +81,10 @@ export class Agent {
     if (!this.ephemeral) {
       this.history.push(...options.session.messages);
     }
+  }
+
+  setEffort(effort: AgentEffort): void {
+    this.effort = effort;
   }
 
   setMode(mode: AgentMode): void {
@@ -172,7 +179,7 @@ export class Agent {
           model: this.modelSpec,
           messages,
           tools,
-          maxTokens: Math.min(model.maxOutput, this.options.config.limits.maxTokensPerTurn),
+          maxTokens: effortCap(this.effort, model.maxOutput, this.options.config.limits.maxTokensPerTurn),
           signal,
         })) {
           if (event.type === "text") {
@@ -397,6 +404,13 @@ function compactHistory(messages: ChatMessage[], keepRecent: number): ChatMessag
     { role: "user", content: `[Earlier conversation summary — ${older.length} messages]\n${summary}` },
     ...recent,
   ];
+}
+
+const EFFORT_CAP: Record<AgentEffort, number> = { low: 1024, medium: 4096, high: 16384, max: Number.POSITIVE_INFINITY };
+
+/** Cap the per-turn output budget by the configured effort level. */
+export function effortCap(effort: AgentEffort, modelMax: number, configMax: number): number {
+  return Math.floor(Math.min(modelMax, configMax, EFFORT_CAP[effort]));
 }
 
 function normalizeToolArguments(raw: string): string {

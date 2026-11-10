@@ -59,6 +59,8 @@ interface Line {
   text: string;
   /** present when kind === "tool" — merged onToolCall → onToolResult */
   activity?: ActivityLine;
+  /** memoized render rows per width/mode — the object itself is mutated in place, so cache by content below */
+  rows?: Map<string, string[]>;
 }
 
 // ─── full command catalog (categories + fuzzy filter) ─────────────
@@ -440,8 +442,17 @@ export async function startTui(runtime: Runtime): Promise<void> {
     rows.map((row) => tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed));
   const likelyDiff = isLikelyDiff;
 
-  const styledLine = (line: Line): string[] => {
+  const styledLineFast = (line: Line): string[] => {
     const w = Math.max(8, contentWidth() - 2);
+    const key = `${w}:${runtime.agent.mode}:${line.text}:${line.activity ? JSON.stringify(line.activity) : ""}`;
+    const cached = line.rows?.get(key);
+    if (cached) return cached;
+    const out = renderStyledLine(line, w);
+    (line.rows ??= new Map()).set(key, out);
+    return out;
+  };
+
+  const renderStyledLine = (line: Line, w: number): string[] => {
     // ── tool activity — opencode-style single line + tinted diff preview
     if (line.kind === "tool" && line.activity) {
       const a = line.activity;
@@ -521,12 +532,17 @@ export async function startTui(runtime: Runtime): Promise<void> {
     return Math.min(100, Math.round((100 * used) / (ctxWindowMemo?.value ?? 128000)));
   };
 
+  const styledLine = styledLineFast;
   const clampScroll = (target: number) =>
     Math.min(Math.max(0, target), Math.max(0, renderChatLines().length - inputTop()));
 
+  let lineVersion = 0;
+  let chatCache: { version: number; rows: string[] } = { version: -1, rows: [] };
   const renderChatLines = (): string[] => {
+    if (chatCache.version === lineVersion) return chatCache.rows;
     const out: string[] = [];
     for (const line of lines) out.push(...styledLine(line));
+    chatCache = { version: lineVersion, rows: out };
     return out;
   };
 
@@ -628,7 +644,9 @@ export async function startTui(runtime: Runtime): Promise<void> {
       const key = (k: string, label: string) => `${BOLD}${fgText(k)}${RESET} ${fgMuted(label)}`;
       const left = busy
         ? ` ${fgMuted("working — esc to interrupt")}`
-        : ` ${key("⇥", "agents")}${cw >= 52 ? `  ${key("⌃j", "newline")}` : ""}`;
+        : scroll > 0
+          ? ` ${fgAmber("▲")}${fgMuted(` scrolled ↑ ${scroll} — PgDn to tail`)}`
+          : ` ${key("⇥", "agents")}${cw >= 52 ? `  ${key("⌃j", "newline")}` : ""}`;
       const cost = runtime.agent.getCost();
       const usage = `${(cost.inputTokens / 1000).toFixed(1)}K ${ctxPct()}% · $${cost.costUsd.toFixed(4)}`;
       const right = cw >= 72 ? `${fgMuted(usage)}  ${key("^p", "commands")}` : cw >= 44 ? fgMuted(usage) : fgMuted("^p");
@@ -834,11 +852,12 @@ export async function startTui(runtime: Runtime): Promise<void> {
       const innerW = width - 2;
       const lines = [
         panelBorder("Effort", innerW),
-        panelSide(`${fgMuted("Set reasoning effort for this session:")}`, innerW, C.panel),
+        panelSide(`${fgMuted("Max output tokens per turn (reasoning budget):")}`, innerW, C.panel),
       ];
+      const labels = ["low    · 1024", "medium · 4096", "high   · 16384", "max    · full"];
       EFFORTS.forEach((effort, i) => {
         const selected = i === ov.index;
-        const marker = selected ? `${bgRgb(C.panel3)}${fgAccent(BOLD + " › " + effort.padEnd(8))}${RESET}` : `   ${fgText(effort)}`;
+        const marker = selected ? `${bgRgb(C.panel3)}${fgAccent(BOLD + " › " + labels[i].padEnd(16))}${RESET}` : `   ${fgText(labels[i])}`;
         lines.push(panelSide(marker, innerW, C.panel));
       });
       lines.push(panelSide("", innerW, C.panel));
@@ -878,11 +897,13 @@ export async function startTui(runtime: Runtime): Promise<void> {
   };
   const pendingToolIdx: number[] = [];
   const pushLine = (kind: LineKind, text: string) => {
+    lineVersion++;
     lines.push({ kind, text });
     scroll = 0;
     render();
   };
   const appendAssistant = (text: string) => {
+    lineVersion++;
     const last = lines[lines.length - 1];
     if (last && last.kind === "assistant") {
       last.text += text;
@@ -896,6 +917,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
     onText: (t) => appendAssistant(t),
     onToolCall: (call) => {
       const activity = makeActivity(call.name, call.arguments);
+      lineVersion++;
       lines.push({ kind: "tool", text: "", activity });
       pendingToolIdx.push(lines.length - 1);
       scroll = 0;
@@ -908,6 +930,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
       const at = pendingToolIdx.splice(slot, 1)[0];
       const target = at !== undefined ? lines[at] : undefined;
       if (target?.activity) {
+        lineVersion++;
         target.activity = completeActivity(target.activity, Boolean(r.isError), String(r.content ?? ""));
         render();
         return;
@@ -934,17 +957,19 @@ export async function startTui(runtime: Runtime): Promise<void> {
     });
   runtime.setAskHandler(askPermission);
 
-  // current defaultEffort from global config if any (persisted across sessions)
-  let defaultEffort = "max";
+  // effort level — drives the per-turn output budget (low/medium/high/max)
+  // default from XMINAL_DEFAULT_EFFORT or the agent's own default ("max")
+  const normalizeEffort = (value: string): "low" | "medium" | "high" | "max" =>
+    ["low", "medium", "high", "max"].includes(value as "low" | "medium" | "high" | "max") ? (value as "low" | "medium" | "high" | "max") : "max";
   try {
     const raw = process.env.XMINAL_DEFAULT_EFFORT;
-    if (raw && ["low", "medium", "high", "max"].includes(raw)) defaultEffort = raw;
+    if (raw) runtime.agent.setEffort(normalizeEffort(raw));
   } catch { /* ignore */ }
-  const getEffort = () => defaultEffort;
+  const getEffort = () => runtime.agent.effort;
 
   const setEffort = (effort: string) => {
-    defaultEffort = effort;
-    pushLine("ok", `effort → ${effort} (this session)`);
+    runtime.setEffort(normalizeEffort(effort));
+    pushLine("ok", `effort → ${effort} (max ${["1024","4096","16384","∞"][["low","medium","high","max"].indexOf(effort)] ?? ""} output tokens this turn)`);
   };
 
   // ─── command execution ───────────────────────────────────────────
@@ -1225,7 +1250,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
     if (s === "\x1b[6~") { scroll = clampScroll(scroll - 8); render(); return; }
 
     // mouse: count wheel events (scroll / overlay), drop everything else
-    const wheel = (s.match(MOUSE_RE) ?? []).map((m) => Number(m.slice(2).split(";", 2)[0]));
+    const wheel = (s.match(MOUSE_RE) ?? []).map((m) => Number(/\[<(\d+)/.exec(m)?.[1] ?? -1));
     s = s.replace(MOUSE_RE, "");
     for (const button of wheel) {
       if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "provider" || overlay.kind === "variant") {
