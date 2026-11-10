@@ -401,7 +401,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
 
   const cols = () => Math.max(40, process.stdout.columns ?? (Number(process.env.COLUMNS) || 80));
   const rows = () => Math.max(16, process.stdout.rows ?? (Number(process.env.LINES) || 24));
-  const sidebarWidth = () => (cols() >= 100 ? 30 : 0);
+  const sidebarWidth = () => (cols() > 120 ? 42 : 0); // opencode SESSION_SIDEBAR_WIDTH, auto >120 cols
   const contentWidth = () => cols() - sidebarWidth();
   let ctxWindowMemo: { spec: string; value: number } | null = null;
 
@@ -477,7 +477,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
   };
 
   // ─── dynamic bottom layout — the input grows upward (max 4 lines) ───
-  const inputBudget = () => Math.max(8, cols() - 4);
+  const inputBudget = () => Math.max(8, contentWidth() - 4);
   /** hard-wrap the raw input for display (ANSI-free); caret lives on the last line */
   const inputVisualLines = (): string[] => {
     const out: string[] = [];
@@ -495,8 +495,10 @@ export async function startTui(runtime: Runtime): Promise<void> {
     return out;
   };
   const inputH = () => Math.min(4, Math.max(1, inputVisualLines().length));
-  const inputTop = () => Math.max(3, rows() - 2 - inputH());
-  const statusRow = () => inputTop() + inputH();
+  const inputTop = () => Math.max(1, rows() - inputH() - 4);
+  const metaRow = () => inputTop() + 1 + inputH();   // metadata row (inside the box)
+  const notchRow = () => metaRow() + 1;              // "╹" + half-block seam
+  const footerRow = () => rows() - 1;
 
   const ctxPct = (): number => {
     const spec = runtime.agent.modelSpec;
@@ -510,7 +512,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
   };
 
   const clampScroll = (target: number) =>
-    Math.min(Math.max(0, target), Math.max(0, renderChatLines().length - (inputTop() - 2)));
+    Math.min(Math.max(0, target), Math.max(0, renderChatLines().length - inputTop()));
 
   const renderChatLines = (): string[] => {
     const out: string[] = [];
@@ -518,71 +520,109 @@ export async function startTui(runtime: Runtime): Promise<void> {
     return out;
   };
 
+  // ── opencode home — gradient logo + tagline when the chat is empty ──
+  const GRADIENT: ReadonlyArray<readonly [number, number, number]> = [
+    [134, 225, 252], [115, 180, 255], [130, 170, 255],
+    [139, 140, 247], [187, 154, 247], [192, 153, 255],
+  ];
+  const LOGO = [
+    "██╗  ██╗███╗   ███╗██╗███╗   ██╗ █████╗ ██╗     ",
+    "╚██╗██╔╝████╗ ████║██║████╗  ██║██╔══██╗██║     ",
+    " ╚███╔╝ ██╔████╔██║██║██╔██╗ ██║███████║██║     ",
+    " ██╔██╗ ██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║     ",
+    "██╔╝ ██╗██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗",
+    "╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝ ╚═══╝╚═╝  ╚═╝╚══════╝",
+  ];
+  const homeLines = (): string[] => {
+    const cw = contentWidth();
+    if (cw < 60) {
+      return [`${fgAccent(BOLD + "xminal" + RESET)}  ${fgMuted("every coding agent")}`];
+    }
+    return [...LOGO.map((l, i) => `${rgb(GRADIENT[i])}${l}${RESET}`), "", fgMuted("E V E R Y  C O D I N G  A G E N T .  O N E  T E R M I N A L .")];
+  };
+  const renderHomeRow = (row: number, limit: number): string => {
+    const cw = contentWidth();
+    const block = homeLines();
+    const startRow = Math.max(0, Math.floor((limit - block.length) / 2));
+    const idx = row - startRow;
+    if (idx < 0 || idx >= block.length) return `${bgRgb(T.bg)}${" ".repeat(cw)}${RESET}`;
+    const line = block[idx];
+    const left = Math.floor(Math.max(0, (cw - visible(line)) / 2));
+    return `${bgRgb(T.bg)}${" ".repeat(left)}${line}${" ".repeat(Math.max(0, cw - left - visible(line)))}${RESET}`;
+  };
+
   // build base frame rows; overlay draws on top
   const renderRow = (row: number): string => {
-    const w = cols();
+    const cw = contentWidth();
+    const chatLinesPreview = renderChatLines();
+    const homeMode = chatLinesPreview.length === 0 && !busy;
+    const withSide = (inner: string): string => {
+      if (homeMode || sidebarWidth() === 0) return padRight(inner, cw);
+      return padRight(inner, cw) + renderSidebarRow(row);
+    };
     const top = inputTop();
     const iH = inputH();
-    const sRow = statusRow();
+    const mRow = metaRow();
+    const nRow = notchRow();
     const bar = modeColor(runtime.agent.mode);
-    // ── composer — decreased-raised fill, left border in the mode color
-    if (row >= top && row < sRow) {
-      const r = row - top;
-      if (pendingPermission && row === sRow - 1) {
+    // ── composer — opencode box: pad row, text rows (metadata row is separate)
+    if (row >= top && row < mRow) {
+      const compLine = (body: string, bodyVisible: number) =>
+        `${bgRgb(T.composer)}${bar}▍ ${body}${" ".repeat(Math.max(0, cw - 2 - bodyVisible))}${RESET}`;
+      if (row === top) {
+        return withSide(`${bgRgb(T.composer)}${bar}▍${" ".repeat(cw - 1)}${RESET}`);
+      }
+      if (pendingPermission && row === mRow - 1) {
         const p = pendingPermission;
         const text = ` ${fgAmber("?")} allow ${p.tool}${p.reason ? fgMuted(" · " + p.reason) : ""} ${fgAccent("[y/N]")}`;
-        return `${bgRgb(T.composer)}${bar}▍ ${padRight(text, w - 3)}${RESET}`;
+        return withSide(`${bgRgb(T.composer)}${bar}▍ ${padRight(text, cw - 3)}${RESET}`);
       }
       if (input === "" && !pendingPermission) {
-        if (r === 0) {
+        if (row === top + 1) {
           const placeholder = fgMuted('Ask anything…  "fix the failing test"');
-          return `${bgRgb(T.composer)}${bar}▍ ${placeholder}${" ".repeat(Math.max(0, w - visible(placeholder) - 3))}${RESET}`;
+          return withSide(compLine(placeholder, visible(placeholder)));
         }
-        return `${bgRgb(T.composer)}${bar}▍${" ".repeat(w - 2)}${RESET}`;
+        return withSide(`${bgRgb(T.composer)}${bar}▍${" ".repeat(cw - 1)}${RESET}`);
       }
       const vis = inputVisualLines();
       const shown = vis.slice(Math.max(0, vis.length - iH));
+      const r = row - top - 1;
       const isLastLine = r === iH - 1;
       const visLine = (shown[r] ?? "") + (isLastLine ? fgAccent("▌") : "");
       const plain = (shown[r] ?? "") + (isLastLine ? "▌" : "");
-      return `${bgRgb(T.composer)}${bar}▍ ${rgb(T.text)}${visLine}${" ".repeat(Math.max(0, w - 3 - visible(plain)))}${RESET}`;
+      return withSide(compLine(`${rgb(T.text)}${visLine}`, visible(plain)));
     }
-    // ── metadata row — "╹" notch: mode/model (or spinner while busy) ← effort →
-    if (row === sRow) {
-      const notch = `${bar}╹${RESET}`;
-      if (busy) {
-        const left = `${fgCyan(spinnerFrame())} ${fgText("working")}  ${fgMuted("esc interrupt")}`;
-        return `${bgRgb(T.bg)}${notch} ${left}${" ".repeat(Math.max(1, w - visible(left) - 2))}${RESET}`;
-      }
-      const model = (runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec).slice(0, Math.max(12, Math.floor(w / 2)));
+    if (row === mRow) {
       const mode = runtime.agent.mode;
+      const model = (runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec).slice(0, Math.max(12, Math.floor(cw / 2)));
       const left = `${modeColor(mode)}${BOLD}${mode}${RESET}${fgMuted(" · ")}${fgText(model)}`;
-      const right = fgAmber(getEffort());
-      const gap = Math.max(1, w - visible(left) - visible(right) - 2);
-      return `${bgRgb(T.bg)}${notch} ${left}${" ".repeat(gap)}${right}${RESET}`;
+      const right = fgMuted(getEffort());
+      const gap = Math.max(1, cw - 2 - visible(left) - visible(right));
+      return withSide(`${bgRgb(T.composer)}${bar}▍ ${left}${" ".repeat(gap)}${right}${RESET}`);
     }
-    // ── footer — opencode prompt hints left, real usage right
-    if (row === rows() - 1) {
+    if (row === nRow) {
+      return withSide(`${bgRgb(T.bg)}${bar}╹${rgb(T.composer)}${"▀".repeat(Math.max(0, cw - 2))}${RESET}`);
+    }
+    // ── footer — opencode prompt hints left, real usage right; spinner while busy
+    if (row === footerRow()) {
       const key = (k: string, label: string) => `${BOLD}${fgText(k)}${RESET} ${fgMuted(label)}`;
-      const left = ` ${key("⇥", "agents")}${w >= 52 ? `  ${key("⌃j", "newline")}` : ""}`;
+      const left = busy
+        ? ` ${fgCyan(spinnerFrame())} ${fgText("working")}  ${fgMuted("esc interrupt")}`
+        : ` ${key("⇥", "agents")}${cw >= 52 ? `  ${key("⌃j", "newline")}` : ""}`;
       const cost = runtime.agent.getCost();
       const usage = `${(cost.inputTokens / 1000).toFixed(1)}K ${ctxPct()}% · $${cost.costUsd.toFixed(4)}`;
-      const right = w >= 74 ? `${fgMuted(usage)}  ${key("^p", "commands")}` : w >= 44 ? fgMuted(usage) : fgMuted("^p");
-      const gap = Math.max(1, w - visible(left) - visible(right));
-      return `${bgRgb(T.bg)}${left}${" ".repeat(gap)}${right}${RESET}`;
+      const right = cw >= 72 ? `${fgMuted(usage)}  ${key("^p", "commands")}` : cw >= 44 ? fgMuted(usage) : fgMuted("^p");
+      const gap = Math.max(1, cw - visible(left) - visible(right));
+      return withSide(`${bgRgb(T.bg)}${left}${" ".repeat(gap)}${right}${RESET}`);
     }
-    const chatLines = renderChatLines();
-    const end = Math.max(0, chatLines.length - scroll);
+    // ── chat area (or opencode home)
+    if (homeMode) {
+      return padRight(renderHomeRow(row, top), cw);
+    }
+    const end = Math.max(0, chatLinesPreview.length - scroll);
     const start = Math.max(0, end - top);
-    const line = chatLines[start + row] ?? "";
-    if (sidebarWidth() > 0 && row < top) {
-      const sideW = sidebarWidth();
-      const sideX = cols() - sideW;
-      const side = renderSidebarRow(row);
-      const clipped = visible(line) > sideX ? padRight(clip(line, sideX), sideX) : padRight(line, sideX);
-      return `${clipped}${side}`;
-    }
-    return padRight(line, w);
+    const line = chatLinesPreview[start + row] ?? "";
+    return withSide(line);
   };
 
   const todoMarker = (status: string): string =>
@@ -886,6 +926,15 @@ export async function startTui(runtime: Runtime): Promise<void> {
     return false;
   };
 
+  const fmtTurnDuration = (ms: number): string => {
+    const s = ms / 1000;
+    if (s < 60) return `${s.toFixed(1)}s`;
+    const m = Math.floor(s / 60);
+    const rem = Math.floor(s % 60);
+    if (m < 60) return `${m}m ${rem}s`;
+    return `${Math.floor(m / 60)}h ${m % 60}m`;
+  };
+  let turnStartedAt = 0;
   const submitInput = () => {
     const text = input.trim();
     input = "";
@@ -904,6 +953,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
     scroll = 0;
     pushLine("user", text);
     busy = true;
+    turnStartedAt = Date.now();
     render();
     void (async () => {
       try {
@@ -913,6 +963,10 @@ export async function startTui(runtime: Runtime): Promise<void> {
       } finally {
         busy = false;
         flushRender();
+        const turnMs = Date.now() - turnStartedAt;
+        const title = runtime.agent.mode.charAt(0).toUpperCase() + runtime.agent.mode.slice(1);
+        const modelShort = (runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec).slice(0, 40);
+        pushLine("system", `${modeColor(runtime.agent.mode)}${BOLD}${title}${RESET}${fgMuted(` · ${modelShort} · ${fmtTurnDuration(turnMs)}`)}`);
         render();
       }
     })();
