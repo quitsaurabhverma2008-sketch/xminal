@@ -4,6 +4,21 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.12.3] — 2026-11-10
+
+**Docs & media: XMINAL builds a project — README with the demo, screenshots and the build log.**
+
+### Added
+
+- **Dogfood demo** — XMINAL was given a one-paragraph spec and built a complete terminal Snake game in **~13 minutes** on Android using free-tier models ($0). Published as [quitsaurabhverma2008-sketch/xminal-snake](https://github.com/quitsaurabhverma2008-sketch/xminal-snake).
+- **README showcase** — a "Built with XMINAL" section with a real terminal capture (8-frame GIF rendered from a live PTY session), the build stats table, and a refreshed screenshot gallery (session with tool activity + markdown, command palette, model picker, provider wizard, 42-column phone layout, boot screen).
+- **Capture pipeline** — an ANSI→PNG rasterizer (Pillow + FiraCode, block/box glyphs drawn as rectangles) that turns a recorded terminal session into images and animated GIFs.
+
+### Notes
+
+- Only docs/assets changed in this release — no code changes.
+- The demo game needed 3 human fix-ups (helpers that returned a function instead of a string, and screen helpers that wrote to stdout instead of returning their escape sequence); the agent itself wrote the game.
+
 ## [0.12.2] — 2026-11-10
 
 **Bug-fix release: variant effort, memoized rendering, wheel-scroll.**

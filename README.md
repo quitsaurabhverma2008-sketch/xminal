@@ -8,7 +8,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.12.2` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.12.3` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
@@ -16,44 +16,57 @@
 
 XMINAL is a **provider-agnostic terminal coding agent** and orchestration platform — 125 MIT-licensed terminal-agent projects fused into one hackable TypeScript core. Streaming agent loop, tool calling, plan/build/compose/review/yolo modes, persistent sessions, memory, subagents, MCP, hash-chained audit, checkpoints — all behind one `xminal` command.
 
-## Screenshots
+---
+
+## 🐍 Built with XMINAL
 
 <div align="center">
-<table>
-<tr>
-  <td><img src="assets/screenshot-boot.png" width="420" alt="XMINAL desktop home"/></td>
-  <td><img src="assets/screenshot-phone.png" width="200" alt="XMINAL on a phone (46 cols)"/></td>
-</tr>
-<tr>
-  <td align="center"><b>Desktop</b> — sidebar, session title, tokens, TODOS, MCP, skills</td>
-  <td align="center"><b>Phone</b> — responsive compact layout</td>
-</tr>
-</table>
+
+<img src="assets/demo-snake.gif" width="720" alt="xminal-snake — a terminal Snake game built by XMINAL in ~13 minutes" />
+
+**[quitsaurabhverma2008-sketch/xminal-snake](https://github.com/quitsaurabhverma2008-sketch/xminal-snake)** — a complete, playable terminal Snake game written by XMINAL itself.
+
 </div>
 
-**Live conversation** — the agent edits, runs, and verifies:
+XMINAL was given a one-paragraph spec and did the rest — **on an Android phone, with free-tier models, for $0**:
 
-<img src="assets/screenshot-pong.png" width="720" alt="XMINAL live session with pong reply"/>
+| | |
+|---|---|
+| **Time to playable build** | **~13 minutes** (2 agent runs) |
+| **Tokens** | ~45k (free models — `opencode/inkling-2-small-free`) |
+| **Cost** | **$0.00** |
+| **Tools used** | `read` · `write` · `list` · `bash` |
+| **Human edits** | 3 lines — two helpers returned a *function* instead of a string, and the screen helpers wrote to stdout instead of returning their escape sequence |
 
-**`/` command palette** — every command in one amber-highlighted list:
+The animation above is **a real terminal capture**, not a mockup: XMINAL's PTY capture pipeline renders the ANSI stream frame by frame into PNGs and stitches them into a GIF.
 
-<img src="assets/screenshot-commands.png" width="720" alt="XMINAL /help with all 70+ commands"/>
+---
 
-**Provider wizard** — pick, enter key, validate, save — all in-TUI:
+## Screenshots
 
-<img src="assets/screenshot-provider-wizard.png" width="720" alt="XMINAL /provider with 40+ providers"/>
+**A real session** — user prompt, tool activity with diff counts, markdown answer, code block, turn footer:
 
-**Model picker** — 258 bundled aliases (~1,960 effective with the live models.dev catalog) with context windows + pricing:
+<img src="assets/screenshot-conversation.png" width="900" alt="XMINAL session: tool activity, markdown, code block" />
 
-<img src="assets/screenshot-model-picker.png" width="720" alt="XMINAL /model with 258 bundled aliases"/>
+**Command palette** — every command, grouped, filterable, one keystroke away:
 
-**Scoped to your provider** — with OpenRouter active, `/model` shows only OpenRouter models (all FREE-first):
+<img src="assets/screenshot-commands.png" width="900" alt="XMINAL command palette" />
 
-<img src="assets/screenshot-model-provider-scope.png" width="720" alt="XMINAL /model scoped to openrouter"/>
+**Model picker** — live models.dev catalog, FREE-first ordering, provider scoping:
 
-**Ctrl+S toggles back to the full free-first catalog:**
+<img src="assets/screenshot-model-picker.png" width="900" alt="XMINAL model picker with FREE badges" />
 
-<img src="assets/screenshot-model-all-providers.png" width="720" alt="XMINAL /model all providers, free first"/>
+**Provider wizard** — pick → paste key (masked) → live validation → save:
+
+<img src="assets/screenshot-provider-wizard.png" width="900" alt="XMINAL provider connect wizard" />
+
+**On a phone** (42 columns) — the same UI, reflowed:
+
+<img src="assets/screenshot-phone.png" width="420" alt="XMINAL on a 42-column phone terminal" />
+
+**Boot screen** — gradient wordmark, cycling placeholder, live status bar:
+
+<img src="assets/screenshot-boot.png" width="900" alt="XMINAL boot screen" />
 
 ## Features
 
@@ -249,7 +262,7 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.12.2** — live on npm, 51+ tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.12.3** — live on npm, 69/69 tests, CI green on Ubuntu/macOS/Windows × Node 20/22. Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 

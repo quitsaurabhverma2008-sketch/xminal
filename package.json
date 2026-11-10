@@ -1,6 +1,6 @@
 {
   "name": "xminal",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "description": "XMINAL — Every coding agent. One terminal. Provider-agnostic fullscreen TUI (pure Node), agent runtime, 46 built-in providers, sessions, MCP, memory, worktrees, Ralph loops.",
   "license": "MIT",
   "author": "XMINAL contributors",
