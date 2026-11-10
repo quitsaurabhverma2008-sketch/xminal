@@ -206,6 +206,25 @@ async function main(): Promise<void> {
       });
       const wantTui = (process.stdin.isTTY && !args.flags["no-tui"]) || process.env.XMINAL_TUI === "1";
       if (wantTui) {
+        if (process.env.XMINAL_TUI_ENGINE === "ink") {
+          if (!process.stdin.isTTY) {
+            renderer.warn("ink engine needs a TTY (alternate screen + raw keys); falling back to classic REPL.");
+            await startRepl(runtime, { renderer });
+            return;
+          }
+          try {
+            // ESM-only bundle loaded dynamically — never require()s ink
+            const { pathToFileURL } = require("node:url");
+            const entryUrl = pathToFileURL(require("node:path").resolve(__dirname, "tui-ink/entry.mjs")).href;
+            const inkEngine = await new Function("return import(arguments[0])")(entryUrl) as { startInkTui: (rt: unknown, opts: { cwd: string }) => Promise<void> };
+            await inkEngine.startInkTui(runtime, { cwd });
+            return;
+          } catch (error) {
+            renderer.warn(`ink engine failed (${(error as Error).message}); falling back to the built-in TUI.`);
+            await startTui(runtime);
+            return;
+          }
+        }
         if (process.env.XMINAL_TUI_ENGINE === "opencode") {
           const { isOpenCodeEngineSupported, runOpenCodeEngine } = await import("./tui/opencode-engine");
           if (isOpenCodeEngineSupported()) {

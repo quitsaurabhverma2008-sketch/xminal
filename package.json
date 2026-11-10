@@ -22,13 +22,16 @@
     "vendor"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build:tsc && npm run build:ink",
     "prepare": "node scripts/prepare.cjs",
     "pretest": "npm run build",
     "test": "node scripts/run-tests.cjs",
     "dev": "node dist/index.js",
     "verify": "npm run build && npm test",
-    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build:tsc": "tsc -p tsconfig.json",
+    "build:ink": "node scripts/build-ink.mjs",
+    "typecheck:ink": "tsc -p tsconfig.ink.json --noEmit"
   },
   "engines": {
     "node": ">=18"
@@ -50,6 +53,8 @@
   ],
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "@types/react": "^19.3.0",
+    "esbuild": "^0.28.2",
     "typescript": "^5.9.3"
   },
   "repository": {
@@ -57,5 +62,11 @@
     "url": "https://github.com/quitsaurabhverma2008-sketch/xminal.git"
   },
   "homepage": "https://github.com/quitsaurabhverma2008-sketch/xminal",
-  "bugs": "https://github.com/quitsaurabhverma2008-sketch/xminal/issues"
+  "bugs": "https://github.com/quitsaurabhverma2008-sketch/xminal/issues",
+  "dependencies": {
+    "@inkjs/ui": "^2.0.0",
+    "ink": "^8.0.0",
+    "react": "^19.3.1",
+    "react-reconciler": "^0.34.0"
+  }
 }
