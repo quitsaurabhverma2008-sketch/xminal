@@ -1,12 +1,12 @@
 // Streaming-safe block+inline markdown renderer → ANSI lines.
 // Design: stable per-block rendering. Code fences parse byte-exact. Tables are
 // width-capped. Incomplete trailing structures degrade gracefully (never throw).
-import { rgb, bgRgb, RESET, BOLD, ITALIC, T, inlineCode, fgMuted, fgAmber, fgGreen, fgPurple } from "./theme";
+import { rgb, bgRgb, RESET, BOLD, ITALIC, T, inlineCode, fgMuted, fgAmber, fgGreen, fgPurple, fgAccent, fgOrange } from "./theme";
 import { visibleWidth, splitGraphemes, stripAnsi, wrapAnsi as wrapPlain } from "./width";
 
 const C = {
   heading: fgAmber,
-  bold: (t: string) => `${BOLD}${t}${RESET}`,
+  bold: (t: string) => `${BOLD}${rgb(T.orange)}${t}${RESET}`,
   italic: (t: string) => `${ITALIC}${t}${RESET}`,
   code: inlineCode,
   link: (t: string) => `${rgb(T.accent)}\x1b[4m${t}${RESET}`,
@@ -59,8 +59,7 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
   let codeLines: string[] = [];
   const flushCode = () => {
     if (codeLines.length === 0) return;
-    const header = codeLang ? fgMuted(`  ${codeLang}`) : "";
-    if (header) out.push(header);
+    if (codeLang) out.push(`${bgRgb(T.panel2)}${fgMuted("  " + codeLang)}${" ".repeat(Math.max(0, width - 2 - visibleWidth(codeLang)))}${RESET}`);
     for (const l of codeLines) {
       for (const wrapped of renderCodeLine(l, width, codeLang)) out.push(wrapped);
     }
@@ -84,7 +83,7 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
     if (heading) {
       const level = heading[1].length;
       const text = renderInline(heading[2]);
-      const style = level === 1 ? `\x1b[1m${rgb(T.amber)}` : level === 2 ? `\x1b[1m${rgb(T.text)}` : `\x1b[1m${rgb(T.muted)}`;
+      const style = level === 1 ? `\x1b[1m${rgb(T.violet)}` : level === 2 ? `\x1b[1m${rgb(T.text)}` : `\x1b[1m${rgb(T.muted)}`;
       if (level <= 2 && out.length > 0 && out[out.length - 1] !== "") out.push("");
       out.push(style + text + RESET);
       out.push("");
@@ -92,7 +91,7 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
       continue;
     }
     // hr
-    if (/^([-_*])\s*(\1\s*){2,}$/.test(line.trim())) { out.push(`${rgb(T.muted)}${"─".repeat(Math.min(width, 40))}${RESET}`); i += 1; continue; }
+    if (/^([-_*])\s*(\1\s*){2,}$/.test(line.trim())) { out.push(`${rgb(T.borderSubtle)}${"─".repeat(Math.min(width, 40))}${RESET}`); i += 1; continue; }
     // blockquote — GitHub-style callouts get a colored label; plain quotes stay subtle
     const quote = /^>\s?(.*)$/.exec(line);
     if (quote) {
@@ -103,7 +102,7 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
           kindWord === "NOTE" ? rgb(T.info) :
           kindWord === "TIP" ? rgb(T.green) :
           kindWord === "IMPORTANT" ? rgb([187, 154, 247] as const) :
-          kindWord === "WARNING" ? rgb(T.amber) : rgb(T.red);
+          kindWord === "WARNING" ? rgb(T.yellow) : rgb(T.red);
         for (const w of wrapPlain(renderInline(callout[2]), Math.max(4, width - 4))) {
           out.push(`${C.quoteBar} ${color}\x1b[1m${kindWord}${RESET} ${w}`);
         }
@@ -140,7 +139,7 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
     if (ul) {
       const depth = Math.floor(ul[1].length / 2);
       const indent = "  ".repeat(depth);
-      const bullet = depth === 0 ? fgAmber("•") : fgMuted("◦");
+      const bullet = depth === 0 ? fgAccent("•") : fgMuted("◦");
       for (const w of wrapPlain(renderInline(ul[3]), Math.max(4, width - indent.length - 2))) {
         out.push(`${indent}${bullet} ${w}`);
       }
@@ -153,7 +152,7 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
       const depth = Math.floor(ol[1].length / 2);
       const indent = "  ".repeat(depth);
       for (const w of wrapPlain(renderInline(ol[3]), Math.max(4, width - indent.length - 4))) {
-        out.push(`${indent}${fgAmber(ol[2] + ".")} ${w}`);
+        out.push(`${indent}${fgAccent(ol[2] + ".")} ${w}`);
       }
       i += 1;
       continue;
@@ -190,7 +189,7 @@ function highlightCode(line: string, lang: string): string {
     const [whole, comment, str, num, word] = match;
     if (comment !== undefined) out += fgMuted(comment);
     else if (str !== undefined) out += fgAmber(str);
-    else if (num !== undefined) out += fgAmber(num);
+    else if (num !== undefined) out += fgOrange(num);
     else if (word !== undefined) out += kw && kw.has(word) ? fgPurple(word) : rgb(T.green) + word + RESET;
     last = idx + whole.length;
   }
@@ -200,18 +199,21 @@ function highlightCode(line: string, lang: string): string {
 
 function renderCodeLine(line: string, width: number, lang = ""): string[] {
   const bare = stripAnsi(line);
-  const pad = "  "; // code blocks render flush-left with a leading marker
-  const prefix = fgMuted("  │");
-  if (visibleWidth(bare) <= width - visibleWidth(prefix) - 1) {
-    return [`${prefix} ${lang ? highlightCode(bare, lang) : rgb(T.green) + escapeProse2(bare) + RESET}`];
+  const inner = width; // code surface spans the full content width
+  const bgLine = (content: string, visibleLen: number): string =>
+    `${bgRgb(T.panel2)}${content}${" ".repeat(Math.max(0, inner - visibleLen))}${RESET}`;
+  const limit = Math.max(4, inner - 2); // two spaces of padding inside the surface
+  if (visibleWidth(bare) <= limit) {
+    const body = (lang ? highlightCode(bare, lang) : rgb(T.green) + escapeProse2(bare) + RESET);
+    return [bgLine(`  ${body}`, 2 + visibleWidth(bare))];
   }
   // wrap long code lines — preserve verbatim chars, never modify
   const out: string[] = [];
   let rest = bare;
   while (rest.length > 0) {
-    const chunk = graphemeSliceToWidth(rest, width - visibleWidth(prefix) - 1);
+    const chunk = graphemeSliceToWidth(rest, limit);
     rest = rest.slice(chunk.columns === 0 ? 1 : chunk.consumed);
-    out.push(`${prefix} ${rgb(T.green)}${chunk.text}${RESET}`);
+    out.push(bgLine(`  ${rgb(T.green)}${chunk.text}${RESET}`, 2 + chunk.columns));
     if (chunk.columns === 0) break;
   }
   return out;

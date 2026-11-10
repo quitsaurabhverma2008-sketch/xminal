@@ -5,12 +5,11 @@ import { visibleWidth, graphemeSlice, stripAnsi as stripAnsiW, splitGraphemes, w
 import { formatAssistantText, isLikelyDiff, tintDiffRow } from "./format";
 import { renderMarkdown } from "./markdown";
 import type { ProviderConfig, ModelConfig } from "../config/types";
-import { VERSION } from "../version";
 import { Renderer } from "../cli/render";
 import { handleCommand } from "../cli/commands";
 import { spawnSync } from "node:child_process";
-import { T, rgb, bgRgb, RESET, BOLD, fgMuted, fgText, fgAccent, fgAmber, fgGreen, fgRed, modeColor } from "./theme";
-import { makeActivity, completeActivity, renderActivity, type ActivityLine } from "./output/tool-activity";
+import { T, rgb, bgRgb, RESET, BOLD, fgMuted, fgText, fgAccent, fgAmber, fgGreen, fgRed, fgCyan, modeColor } from "./theme";
+import { makeActivity, completeActivity, renderActivity, spinnerFrame, type ActivityLine } from "./output/tool-activity";
 
 function openExternal(url: string): boolean {
   const platform = process.platform;
@@ -433,7 +432,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
 
   const styledLine = (line: Line): string[] => {
     const w = Math.max(8, contentWidth() - 2);
-    // tool activity — dedicated compact component (merged call+result)
+    // ── tool activity — opencode-style single line + tinted diff preview
     if (line.kind === "tool" && line.activity) {
       const a = line.activity;
       const out: string[] = [` ${renderActivity(a, Math.max(8, w - 1))}`];
@@ -449,27 +448,27 @@ export async function startTui(runtime: Runtime): Promise<void> {
       }
       return out;
     }
-    const prefixFor = (k: LineKind): string => {
-      switch (k) {
-        case "user": return ` ${fgAccent("▍")}${fgAccent(BOLD + "you" + RESET)}`;
-        case "assistant": return ` ${fgAmber("▍")}`;
-        case "tool": return ` ${fgAmber("$")}`;
-        case "ok": return ` ${fgGreen("✓")}`;
-        case "err": return ` ${fgRed("✗")}`;
-        default: return "  ";
-      }
-    };
-    const prefix = prefixFor(line.kind);
-    const firstPrefixVisible = stripAnsi(prefix).length;
+    // ── user — opencode: raised-bg box, left border in the mode/agent color
+    if (line.kind === "user") {
+      const bar = modeColor(runtime.agent.mode);
+      const textW = Math.max(4, w - 4);
+      const padRow = `${bgRgb(T.panel)} ${bar}▍${" ".repeat(w - 2)}${RESET}`;
+      const bodyRows = wrap(line.text, textW).map(
+        (part) => `${bgRgb(T.panel)} ${bar}▍ ${rgb(T.text)}${part}${" ".repeat(Math.max(0, w - 4 - visible(part)))}${RESET}`,
+      );
+      return [padRow, ...bodyRows, padRow];
+    }
+    // ── assistant — plain indent, markdown
     if (line.kind === "assistant") {
       const clean = formatMemo(line.text);
-      const body = mdMemo(clean, Math.max(4, w - firstPrefixVisible - 1));
-      return body.map((row, i) => (i === 0 ? prefix : " ".repeat(firstPrefixVisible)) + " " + row);
+      const body = mdMemo(clean, Math.max(4, w - 3));
+      return body.map((row) => `   ${row}`);
     }
-    const parts = wrap(line.text, Math.max(4, w - firstPrefixVisible));
+    // ── everything else (ok/err/system) — quiet, indented
+    const color = line.kind === "err" ? fgRed : line.kind === "ok" ? fgGreen : fgMuted;
     const out: string[] = [];
-    for (let i = 0; i < parts.length; i++) {
-      out.push((i === 0 ? prefix : " ".repeat(firstPrefixVisible)) + " " + parts[i]);
+    for (const part of wrap(line.text, Math.max(4, w - 3))) {
+      out.push(`   ${color(part)}`);
     }
     if ((line.kind === "ok" || line.kind === "err") && likelyDiff(line.text)) {
       return diffTint(out);
@@ -522,94 +521,104 @@ export async function startTui(runtime: Runtime): Promise<void> {
   // build base frame rows; overlay draws on top
   const renderRow = (row: number): string => {
     const w = cols();
-    if (row === 0) {
-      const left = ` ${fgAccent("◆")}${fgText(BOLD + sessionTitle + RESET)}`;
-      const rightBits = [branch ? `⎇ ${branch}` : "", `v${VERSION}`].filter(Boolean).join("  ");
-      const right = `${fgMuted(rightBits)} `;
-      return padRight(left + " ".repeat(Math.max(1, w - visible(left) - visible(right))) + right, w);
-    }
-    if (row === 1) return `${rgb(C.border)}${"─".repeat(w)}${RESET}`;
     const top = inputTop();
     const iH = inputH();
     const sRow = statusRow();
-    // ── input block (1–4 visual lines, multiline-aware)
+    const bar = modeColor(runtime.agent.mode);
+    // ── composer — decreased-raised fill, left border in the mode color
     if (row >= top && row < sRow) {
       const r = row - top;
-      const vis = inputVisualLines();
-      const shown = vis.slice(Math.max(0, vis.length - iH));
       if (pendingPermission && row === sRow - 1) {
         const p = pendingPermission;
         const text = ` ${fgAmber("?")} allow ${p.tool}${p.reason ? fgMuted(" · " + p.reason) : ""} ${fgAccent("[y/N]")}`;
-        return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(text, w - 1)}${RESET}`;
+        return `${bgRgb(T.composer)}${bar}▍ ${padRight(text, w - 3)}${RESET}`;
       }
       if (input === "" && !pendingPermission) {
         if (r === 0) {
           const placeholder = fgMuted('Ask anything…  "fix the failing test"');
-          return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(" " + placeholder + fgAccent("▌"), w - 1)}${RESET}`;
+          return `${bgRgb(T.composer)}${bar}▍ ${placeholder}${" ".repeat(Math.max(0, w - visible(placeholder) - 3))}${RESET}`;
         }
-        return `${bgRgb(C.panel)}${fgAccent("▍")}${" ".repeat(w - 1)}${RESET}`;
+        return `${bgRgb(T.composer)}${bar}▍${" ".repeat(w - 2)}${RESET}`;
       }
-      const overflowHint = vis.length > iH && r === 0 ? fgMuted("…") : "";
-      const visLine = (shown[r] ?? "") + overflowHint;
+      const vis = inputVisualLines();
+      const shown = vis.slice(Math.max(0, vis.length - iH));
       const isLastLine = r === iH - 1;
-      const rowText = " " + fgText(visLine) + (isLastLine ? fgAccent("▌") : "");
-      return `${bgRgb(C.panel)}${fgAccent("▍")}${padRight(rowText, w - 1)}${RESET}`;
+      const visLine = (shown[r] ?? "") + (isLastLine ? fgAccent("▌") : "");
+      const plain = (shown[r] ?? "") + (isLastLine ? "▌" : "");
+      return `${bgRgb(T.composer)}${bar}▍ ${rgb(T.text)}${visLine}${" ".repeat(Math.max(0, w - 3 - visible(plain)))}${RESET}`;
     }
-    // ── status bar — mode · model · effort · ctx · cost (real values only)
+    // ── metadata row — "╹" notch: mode/model (or spinner while busy) ← effort →
     if (row === sRow) {
-      const model = runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec;
+      const notch = `${bar}╹${RESET}`;
+      if (busy) {
+        const left = `${fgCyan(spinnerFrame())} ${fgText("working")}  ${fgMuted("esc interrupt")}`;
+        return `${bgRgb(T.bg)}${notch} ${left}${" ".repeat(Math.max(1, w - visible(left) - 2))}${RESET}`;
+      }
+      const model = (runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec).slice(0, Math.max(12, Math.floor(w / 2)));
       const mode = runtime.agent.mode;
-      const cost = runtime.agent.getCost();
-      const bits: string[] = [`${modeColor(mode)}${BOLD}${mode}${RESET}`, fgText(model)];
-      if (w >= 60) bits.push(fgAmber(getEffort()));
-      if (w >= 74) bits.push(fgMuted(`${ctxPct()}% ctx`));
-      if (w >= 88) bits.push(fgMuted(`$${cost.costUsd < 1 ? cost.costUsd.toFixed(4) : cost.costUsd.toFixed(2)}`));
-      return `${bgRgb(C.bg)}${padRight(" " + bits.join(fgMuted(" · ")), w)}${RESET}`;
+      const left = `${modeColor(mode)}${BOLD}${mode}${RESET}${fgMuted(" · ")}${fgText(model)}`;
+      const right = fgAmber(getEffort());
+      const gap = Math.max(1, w - visible(left) - visible(right) - 2);
+      return `${bgRgb(T.bg)}${notch} ${left}${" ".repeat(gap)}${right}${RESET}`;
     }
-    // ── footer — busy/scroll state + actual keybindings
+    // ── footer — opencode prompt hints left, real usage right
     if (row === rows() - 1) {
-      const left = busy
-        ? `${fgAmber("esc")}${fgMuted(" interrupt")}`
-        : scroll > 0
-          ? `${fgAmber("▲")}${fgMuted(" scrolled — PgDn to tail")}`
-          : "";
-      const right = w >= 52 ? fgMuted("⌃p commands · ⌃j newline · ⇥ mode") : fgMuted("⌃p");
-      return `${bgRgb(C.bg)}${padRight(left + " ".repeat(Math.max(1, w - visible(left) - visible(right))) + right, w)}${RESET}`;
+      const key = (k: string, label: string) => `${BOLD}${fgText(k)}${RESET} ${fgMuted(label)}`;
+      const left = ` ${key("⇥", "agents")}${w >= 52 ? `  ${key("⌃j", "newline")}` : ""}`;
+      const cost = runtime.agent.getCost();
+      const usage = `${(cost.inputTokens / 1000).toFixed(1)}K ${ctxPct()}% · $${cost.costUsd.toFixed(4)}`;
+      const right = w >= 74 ? `${fgMuted(usage)}  ${key("^p", "commands")}` : w >= 44 ? fgMuted(usage) : fgMuted("^p");
+      const gap = Math.max(1, w - visible(left) - visible(right));
+      return `${bgRgb(T.bg)}${left}${" ".repeat(gap)}${right}${RESET}`;
     }
     const chatLines = renderChatLines();
     const end = Math.max(0, chatLines.length - scroll);
-    const start = Math.max(0, end - (top - 2));
-    const line = chatLines[start + (row - 2)] ?? "";
+    const start = Math.max(0, end - top);
+    const line = chatLines[start + row] ?? "";
     if (sidebarWidth() > 0 && row < top) {
       const sideW = sidebarWidth();
       const sideX = cols() - sideW;
-      const side = renderSidebarRow(row - 2);
+      const side = renderSidebarRow(row);
       const clipped = visible(line) > sideX ? padRight(clip(line, sideX), sideX) : padRight(line, sideX);
       return `${clipped}${side}`;
     }
     return padRight(line, w);
   };
 
+  const todoMarker = (status: string): string =>
+    status === "completed" ? fgGreen("✓") : status === "in_progress" ? fgAmber("◐") : status === "blocked" ? fgRed("✗") : fgMuted("○");
+
   const renderSidebarRow = (row: number): string => {
     const w = sidebarWidth();
-    const line = (t: string) => `${bgRgb(C.panel)}${padRight(" " + t, w)}${RESET}`;
+    const line = (t: string) => `${bgRgb(T.panel)}${padRight(" " + t, w)}${RESET}`;
+    const heading = (t: string) => line(`${BOLD}${fgText(t)}${RESET}`);
     switch (row) {
-      case 0: return line(`${fgAccent(BOLD + "xminal" + RESET)} ${fgMuted("v" + VERSION)}`);
-      case 2: return line(fgMuted("Context"));
-      case 3: return line(fgText((runtime.agent.getCost().inputTokens / 1000).toFixed(1) + "K tokens"));
-      case 4: return line(fgMuted(`${ctxPct()}% used`));
-      case 6: return line(fgMuted("Session"));
-      case 7: return line(fgText(sessionTitle));
-      case 8: return line(fgMuted(`${shortId} · ${cwd.split("/").pop() ?? cwd}`));
-      case 10: return line(fgMuted("TODOS"));
-      case 11: {
-        const done = todos.filter((t) => t.status === "completed").length;
-        return line(todos.length ? fgText(`${done}/${todos.length} done`) : fgMuted("(none)"));
+      case 0: return line(`${BOLD}${fgText(sessionTitle.slice(0, Math.max(4, w - 2)))}${RESET}`);
+      case 1: return line(branch ? fgMuted(`⎇ ${branch}`) : "");
+      case 3: return heading("Todo");
+      case 4: case 5: case 6: case 7: case 8: case 9: {
+        const i = row - 4;
+        if (todos.length === 0) return row === 4 ? line(fgMuted("(none)")) : line("");
+        const shown = todos.slice(0, 6);
+        if (i < shown.length) {
+          const t = shown[i];
+          const text = t.text.length > w - 4 ? t.text.slice(0, Math.max(1, w - 5)) + "…" : t.text;
+          const done = t.status === "completed";
+          return line(`${todoMarker(t.status)} ${done ? fgMuted(text) : fgText(text)}`);
+        }
+        if (i === shown.length && todos.length > shown.length) return line(fgMuted(`… ${todos.length - shown.length} more`));
+        return line("");
       }
-      case 13: return line(fgMuted("SKILLS"));
-      case 14: return line(fgText(String(runtime.skills.list().length)));
-      case 16: return line(fgMuted("MCP"));
-      case 17: return line(fgText(`${runtime.mcp.listServerNames().length} servers`));
+      case 11: return heading("Context");
+      case 12: {
+        const cost = runtime.agent.getCost();
+        return line(fgText(`${(cost.inputTokens / 1000).toFixed(1)}K (${ctxPct()}%)`));
+      }
+      case 13: return line(fgMuted(`$${runtime.agent.getCost().costUsd.toFixed(4)} spent`));
+      case 15: return heading("Session");
+      case 16: return line(fgMuted(`${shortId} · ${cwd.split("/").pop() ?? cwd}`));
+      case 18: return heading("Skills & MCP");
+      case 19: return line(fgText(`${runtime.skills.list().length} skills`) + fgMuted(" · ") + fgText(`${runtime.mcp.listServerNames().length} MCP`));
       default: return line("");
     }
   };
@@ -699,8 +708,8 @@ export async function startTui(runtime: Runtime): Promise<void> {
       lines.push(titleRow);
       for (let i = startIdx; i < Math.min(items.length, startIdx + visibleItems); i++) {
         const selected = i === ovIndex;
-        const row = `${selected ? bgRgb(C.amber) + rgb(C.bg) + BOLD : ""}${items[i].a}${selected ? " " : ""}${items[i].b}`;
-        const cleaned = selected ? `${bgRgb(C.amber)}${rgb(C.bg)}${BOLD}${stripAnsi(items[i].a)} ${stripAnsi(items[i].b)}${RESET}` : row;
+        const row = `${selected ? bgRgb(C.panel3) : ""}${items[i].a}${selected ? " " : ""}${items[i].b}`;
+        const cleaned = selected ? `${bgRgb(C.panel3)}${BOLD}${stripAnsi(items[i].a)} ${stripAnsi(items[i].b)}${RESET}` : row;
         lines.push(panelSide(cleaned, innerW, C.panel));
       }
       for (let i = startIdx + visibleItems; i < startIdx + visibleItems; i++) blankRow(0, innerW);
@@ -769,7 +778,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
       ];
       EFFORTS.forEach((effort, i) => {
         const selected = i === ov.index;
-        const marker = selected ? `${bgRgb(C.amber)}${rgb(C.bg)}${BOLD} › ${effort.padEnd(8)}${RESET}` : `   ${fgText(effort)}`;
+        const marker = selected ? `${bgRgb(C.panel3)}${fgAccent(BOLD + " › " + effort.padEnd(8))}${RESET}` : `   ${fgText(effort)}`;
         lines.push(panelSide(marker, innerW, C.panel));
       });
       lines.push(panelSide("", innerW, C.panel));
@@ -1192,11 +1201,12 @@ export async function startTui(runtime: Runtime): Promise<void> {
     pushLine("system", `mode → ${MODES[(idx + 1) % MODES.length]}`);
   };
 
-  process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l\x1b[48;2;16;17;20m\x1b[38;2;230;232;236m" + (mouseMode ? "\x1b[?1000h\x1b[?1006h" : ""));
+  process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l\x1b[48;2;26;27;38m\x1b[38;2;200;211;245m" + (mouseMode ? "\x1b[?1000h\x1b[?1006h" : ""));
   process.stdout.on("resize", render);
   process.stdin.setRawMode?.(true);
   process.stdin.resume();
   process.stdin.on("data", onData);
+  render();
 
   if (!process.env.XMINAL_MODELS_OFFLINE) { // refresh catalog from models.dev in the background when stale
     void (async () => {
@@ -1212,9 +1222,6 @@ export async function startTui(runtime: Runtime): Promise<void> {
       } catch { /* best effort */ }
     })();
   }
-
-  pushLine("system", `${fgText(BOLD + "◆ " + sessionTitle + RESET)}${branch ? fgMuted("  ⎇ " + branch) : ""}`);
-  pushLine("system", fgAccent("You are XMINAL — Every coding agent. One terminal."));
 
   await new Promise<void>((resolve) => {
     const check = () => (closed ? resolve() : setTimeout(check, 200));

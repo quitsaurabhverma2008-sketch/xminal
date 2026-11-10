@@ -3,7 +3,7 @@
 // onToolCall → onToolResult pair into one ActivityLine and render it here.
 // Honesty rule: never fabricate a status — pending until the result lands.
 import {
-  fgGreen, fgRed, fgMuted, fgText, fgAmber, fgAccent, BOLD, RESET,
+  fgGreen, fgRed, fgMuted, fgText, fgAccent, fgCyan, BOLD, RESET,
 } from "../theme";
 import { visibleWidth, stripAnsi } from "../width";
 
@@ -79,6 +79,23 @@ export function toolTarget(name: string, argsRaw: string, width = 80): string {
       return vals.length ? truncate(vals.join(", "), width) : "";
     }
   }
+}
+
+const TOOL_GLYPH: Record<string, string> = {
+  read: "→", write: "←", edit: "~", multi_edit: "~",
+  bash: "$", glob: "✱", grep: "✱", list: "≡",
+  verify: "◎", git: "±", worktree: "±", stash: "±",
+  web_fetch: "◈", web_search: "◈",
+  task: "◇", mcp_call: "▣", mcp_list: "▣",
+  memory: "◆", todo: "○", skill: "✦", skills: "✦",
+  checkpoint: "◷", diagnostics: "±", think: "∴",
+};
+export function toolGlyph(name: string): string {
+  return TOOL_GLYPH[name] ?? "·";
+}
+export const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+export function spinnerFrame(now = Date.now()): string {
+  return SPINNER_FRAMES[Math.floor(now / 90) % SPINNER_FRAMES.length];
 }
 
 /** Human-friendly kind label — never invent a tool that doesn't exist. */
@@ -162,22 +179,20 @@ export function completeActivity(
 }
 
 /** Render one activity line to styled ANSI text (no \n). */
-export function renderActivity(a: ActivityLine, width: number): string {
-  const icon = a.status === "pending" ? fgMuted("◌") : a.status === "ok" ? fgGreen("✓") : fgRed("✗");
-  const kind = `${BOLD}${a.status === "err" ? fgRed(kindLabel(a.name)) : fgText(kindLabel(a.name))}${RESET}`;
-  const target = toolTarget(a.name, a.argsRaw, Math.max(16, width - 22));
-  const targetStyled = target ? ` ${fgText(target)}` : "";
-  let suffix = "";
-  if (a.status !== "pending") {
-    const bits: string[] = [];
-    if (a.added !== undefined || a.removed !== undefined) {
-      bits.push(`${fgGreen(`+${a.added ?? 0}`)} ${fgRed(`−${a.removed ?? 0}`)}`);
-    }
-    if (a.durationMs !== undefined) bits.push(fgMuted(formatDuration(a.durationMs)));
-    if (bits.length) suffix = `  ${bits.join(" ")}`;
+export function renderActivity(a: ActivityLine, width: number, now = Date.now()): string {
+  const glyph = toolGlyph(a.name);
+  const target = toolTarget(a.name, a.argsRaw, Math.max(16, width - 12));
+  if (a.status === "pending") {
+    return `${fgCyan(spinnerFrame(now))} ${fgText(glyph)} ${fgText(target)}`;
   }
-  const line = `${icon} ${kind}${targetStyled}${suffix}`;
-  // hard clip — activity rows must never wrap the terminal
-  if (visibleWidth(stripAnsi(line)) <= width) return line;
-  return line; // caller clips with the ANSI-aware clip()
+  const ok = a.status === "ok";
+  const status = ok ? fgGreen("✓") : fgRed("✗");
+  const body = ok ? `${fgText(glyph)} ${fgText(target)}` : `${fgRed(glyph)} ${fgRed(target)}`;
+  const bits: string[] = [];
+  if (a.added !== undefined || a.removed !== undefined) {
+    bits.push(`${fgGreen(`+${a.added ?? 0}`)} ${fgRed(`−${a.removed ?? 0}`)}`);
+  }
+  if (a.durationMs !== undefined) bits.push(fgMuted(formatDuration(a.durationMs)));
+  const suffix = bits.length ? `  ${bits.join(" ")}` : "";
+  return `${status} ${body}${suffix}`;
 }

@@ -65,10 +65,10 @@ test("completeActivity marks failures honestly", () => {
   assert.equal(done.status, "err");
 });
 
-test("renderActivity shows a pending indicator before the result lands", () => {
+test("renderActivity shows a spinner + target before the result lands", () => {
   const a = makeActivity("read", JSON.stringify({ path: "x.ts" }));
-  const line = stripAnsi(renderActivity(a, 60));
-  assert.ok(line.includes("READ"));
+  const line = stripAnsi(renderActivity(a, 60, a.startedAt));
+  assert.ok(line.includes("→"));   // opencode read glyph
   assert.ok(line.includes("x.ts"));
   assert.ok(!line.includes("ms"));
 });
@@ -76,8 +76,9 @@ test("renderActivity shows a pending indicator before the result lands", () => {
 test("renderActivity shows duration + counts after completion", () => {
   const a = makeActivity("edit", JSON.stringify({ path: "foo.ts" }));
   const done = completeActivity(a, false, "Edited foo.ts (+2 −1)", a.startedAt + 150);
-  const line = stripAnsi(renderActivity(done, 60));
-  assert.ok(line.includes("EDIT"));
+  const line = stripAnsi(renderActivity(done, 60, a.startedAt + 150));
+  assert.ok(line.includes("~"));   // opencode edit glyph
+  assert.ok(line.includes("foo.ts"));
   assert.ok(line.includes("+2"));
   assert.ok(line.includes("−1"));
   assert.ok(line.includes("150ms"));
