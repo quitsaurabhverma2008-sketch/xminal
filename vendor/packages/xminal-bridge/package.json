@@ -1,0 +1,18 @@
+{
+  "name": "@opencode/xminal-bridge",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "In-process bridge: talk to a locally running XMINAL agent through the OpenCode server contract, from the vendored OpenCode TUI. No HTTP, no SQLite.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./preload": "./src/preload.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@opencode/client": "workspace:*"
+  }
+}

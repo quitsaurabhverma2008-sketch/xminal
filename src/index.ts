@@ -206,6 +206,21 @@ async function main(): Promise<void> {
       });
       const wantTui = (process.stdin.isTTY && !args.flags["no-tui"]) || process.env.XMINAL_TUI === "1";
       if (wantTui) {
+        if (process.env.XMINAL_TUI_ENGINE === "opencode") {
+          const { isOpenCodeEngineSupported, runOpenCodeEngine } = await import("./tui/opencode-engine");
+          if (isOpenCodeEngineSupported()) {
+            try {
+              const code = await runOpenCodeEngine(cwd);
+              process.exit(code);
+            } catch (error) {
+              renderer.warn(`opencode engine failed (${(error as Error).message}); falling back to the built-in TUI.`);
+              await startTui(runtime);
+              return;
+            }
+            return;
+          }
+          renderer.warn("opencode engine is not supported on this platform (no android-arm64 native renderer); using the built-in TUI.");
+        }
         try {
           await startTui(runtime);
           return;

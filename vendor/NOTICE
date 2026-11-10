@@ -1,0 +1,10 @@
+XMINAL contains no third-party code from OpenCode in its own licensing terms.
+
+The ``vendor/` directory is a vendored copy of OpenCode (https://github.com/anomalyco/opencode),
+pinned to tag v2.2.7,
+repackaged unmodified except for a four-line patch in
+`vendor/packages/tui/src/app.tsx` that lets the XMINAL launcher inject its
+in-process API transport instead of the HTTP client (see xminal-bridge).
+
+OpenCode is Copyright (c) 2025-2026 anomalyco (MIT). See `vendor/LICENSE-opencode`.
+XMINAL-specific adapter code (xminal-bridge, opencode-engine) is Copyright (c) 2026 XMINAL contributors, MIT.
