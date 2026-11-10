@@ -4,6 +4,26 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-11-10
+
+**XMINAL on Ink — readymade TUI toolkit, full opencode visual language.**
+
+### Added
+
+- **Ink engine** (`XMINAL_TUI_ENGINE=ink xminal`) — the complete OpenCode look rebuilt on **Ink 8** (React for the terminal) + **@inkjs/ui** (Select, Spinner, TextInput…) with **yoga-layout**'s WebAssembly flexbox engine — zero native modules, runs on Android/Termux and every desktop. Gradient boot logo with reveal, alt-screen, markdown code blocks, tool rows (`→ ~ $ ✱ ± ◈`), sidebar (Todo/Context/Session/Skills & MCP), spinner-driven **working** row, **queue** row, **permission** bar, usage/cost footer with `⇧N queued` chip — all Ink components over XMINAL's runtime.
+- `XMINAL_TUI_ENGINE=ink` opt-in; built-in TUI stays the default everywhere. Ink engine requires Node ≥ 22 (ink 8 `engines`); falls back to the built-in TUI on anything older or without a TTY.
+
+### Fixed
+
+- Mouse input garbage: SGR wheel/button sequences typed into the composer as raw `[<64;…` text — the input pipeline is now a single-owner CSI lexer (PTY regression-tested).
+- Long bash/git commands now wrap across rows instead of clipping; spinner animates at 11 Hz while the agent runs; Esc interrupts a running turn; Ctrl+L redraws; Delete and batched arrow keys work.
+
+### Notes
+
+- Built-in TUI (ANSI, hand-rolled) remains the default on every platform — mobile/Termux included.
+- Ink engine is additive; existing `XMINAL_TUI_ENGINE=opencode` (vendored engine, desktop-only, Bun required) still works.
+- `docs/OPENCODE-ENGINE.md` documents both engines; CHANGELOG entries explain trade-offs.
+
 ## [0.11.0] — 2026-11-10
 
 **XMINAL × OpenCode — literal vendored engine (opt-in), everywhere it can run.**
