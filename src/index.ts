@@ -7,7 +7,6 @@ import { Renderer } from "./cli/render";
 import { rendererCallbacks } from "./cli/callbacks";
 import { startRepl } from "./cli/repl";
 import { startTui } from "./tui/tui";
-import { startOpenCodeClone } from "./tui/clone-tui";
 import { Runtime } from "./runtime";
 import { loadConfig, defaultConfig, saveGlobalConfig, initProject, providerReady, listModelAliases } from "./config/config";
 import { globalConfigPath, projectConfigPath, globalXminalDir } from "./config/paths";
@@ -29,23 +28,6 @@ import { VERSION, TAGLINE } from "./version";
 import { refreshModelsCatalog, catalogMeta, MODEL_DEV_URL } from "./config/models-catalog";
 import type { AgentCallbacks, AgentMode } from "./core/agent";
 import type { PermissionMode } from "./config/types";
-
-function reexecUnderBun(): boolean {
-  if (process.env.XMINAL_RUNTIME === "bun") return true;
-  const bun = process.env.BUN ?? "bun";
-  try {
-    const check = spawnSync(bun, ["--version"], { stdio: "pipe" });
-    if (check.status !== 0) return false;
-  } catch {
-    return false;
-  }
-  const args = [process.argv[1] ?? "xminal", ...process.argv.slice(2)];
-  const result = spawnSync(bun, args, {
-    stdio: "inherit",
-    env: { ...process.env, XMINAL_RUNTIME: "bun" },
-  });
-  process.exit(result.status ?? 1);
-}
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
@@ -224,17 +206,8 @@ async function main(): Promise<void> {
       });
       const wantTui = (process.stdin.isTTY && !args.flags["no-tui"]) || process.env.XMINAL_TUI === "1";
       if (wantTui) {
-        const useOpenTui = process.env.XMINAL_TUI_ENGINE === "opentui";
-        if (useOpenTui && reexecUnderBun()) {
-          try {
-            await startTui(runtime);
-            return;
-          } catch (error) {
-            renderer.warn(`OpenTUI failed (${(error as Error).message}); using built-in TUI.`);
-          }
-        }
         try {
-          await startOpenCodeClone(runtime);
+          await startTui(runtime);
           return;
         } catch (error) {
           renderer.warn(`TUI failed (${(error as Error).message}); falling back to classic REPL.`);
