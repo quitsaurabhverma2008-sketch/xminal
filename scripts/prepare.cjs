@@ -20,8 +20,10 @@ if (!hasTypeScript()) {
 }
 
 const isWin = process.platform === "win32";
-// Windows cannot exec `npm` (an npm.cmd shim) without an explicit .cmd reference
-const result = spawnSync(isWin ? "npm.cmd" : "npm", ["run", "build"], { stdio: "inherit" });
+// Windows needs cmd.exe to run the npm.cmd shim (CreateProcess alone can't exec .cmd files)
+const result = isWin
+  ? spawnSync("cmd.exe", ["/d", "/s", "/c", "npm", "run", "build"], { stdio: "inherit" })
+  : spawnSync("npm", ["run", "build"], { stdio: "inherit" });
 if (result.error) {
   console.error(`xminal: build failed: ${result.error.message}`);
   process.exit(1);
