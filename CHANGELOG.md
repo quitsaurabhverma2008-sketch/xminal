@@ -4,6 +4,14 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.12.1] — 2026-11-10
+
+**Identical to 0.12.0; fixes the broken npm payload of 0.12.0 (tarball 404).**
+
+- Same code, same features (Ink engine, mouse-input rewrite, working line, queue) — no functional changes.
+- The npm publish of 0.12.0 was partially applied (packument accepted, tarball never replicated — 404 across registry + replicate). 0.12.1 is the installable release.
+- `npm i -g xminal@0.12.1` gets you everything 0.12.0 promised.
+
 ## [0.12.0] — 2026-11-10
 
 **XMINAL on Ink — readymade TUI toolkit, full opencode visual language.**

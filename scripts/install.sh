@@ -17,7 +17,7 @@ if command -v npm >/dev/null 2>&1 && npm view xminal version >/dev/null 2>&1; th
   npm install -g xminal
 else
   echo "xminal: installing from the latest GitHub release tarball." >&2
-  npm install -g https://github.com/quitsaurabhverma2008-sketch/xminal/releases/download/v0.12.0/xminal-0.12.0.tgz && exit 0
+  npm install -g https://github.com/quitsaurabhverma2008-sketch/xminal/releases/download/v0.12.1/xminal-0.12.1.tgz && exit 0
   echo "xminal: npm package not found or registry unreachable; building from source." >&2
   if [ ! -f package.json ]; then
     echo "xminal: run this from a clone of the repository (package.json not found)." >&2
