@@ -69,8 +69,7 @@ Context
   /mcp                       list MCP servers + per-MCP token usage
   /tools                     per-tool token usage (calls / est. tokens / errors)
   /audit [verify|tail]       verify the hash-chained audit log
-  /brain                     show BRAIN.md
-  /features                  show the feature matrix path
+  /docs                      show docs/ROADMAP.md (what XMINAL is and where it is headed)
   /version                   version
   /exit                      quit`;
 
@@ -491,15 +490,13 @@ export async function handleCommand(input: string, ctx: CommandContext): Promise
       return true;
     }
 
-    case "brain": {
-      const file = path.join(runtime.cwd, "BRAIN.md");
-      renderer.info(fs.existsSync(file) ? truncateText(fs.readFileSync(file, "utf8"), 20_000) : "(no BRAIN.md)");
-      return true;
-    }
-
-    case "features": {
-      const file = path.join(runtime.cwd, "FEATURE_MATRIX.md");
-      renderer.info(fs.existsSync(file) ? `feature matrix: ${file}` : "(no FEATURE_MATRIX.md in this project)");
+    case "docs": {
+      const file = path.join(runtime.cwd, "docs", "ROADMAP.md");
+      if (fs.existsSync(file)) {
+        renderer.info(truncateText(fs.readFileSync(file, "utf8"), 20_000));
+        return true;
+      }
+      renderer.info("no docs/ROADMAP.md in this directory — see https://github.com/quitsaurabhverma2008-sketch/xminal/blob/main/docs/ROADMAP.md");
       return true;
     }
 

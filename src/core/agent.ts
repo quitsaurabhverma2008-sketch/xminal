@@ -421,7 +421,7 @@ function safeParseArgs(text: string): Record<string, unknown> {
 }
 
 function readProjectRules(cwd: string): string {
-  for (const name of ["AGENTS.md", "BRAIN.md"]) {
+  for (const name of ["AGENTS.md"]) {
     const file = path.join(cwd, name);
     if (fs.existsSync(file)) {
       try {

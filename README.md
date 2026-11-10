@@ -8,7 +8,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.9.2` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.10.0` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
@@ -43,9 +43,9 @@ XMINAL is a **provider-agnostic terminal coding agent** and orchestration platfo
 
 <img src="assets/screenshot-provider-wizard.png" width="720" alt="XMINAL /provider with 40+ providers"/>
 
-**Model picker** — 258 models with context windows + pricing:
+**Model picker** — 258 bundled aliases (~1,960 effective with the live models.dev catalog) with context windows + pricing:
 
-<img src="assets/screenshot-model-picker.png" width="720" alt="XMINAL /model with 258 aliases"/>
+<img src="assets/screenshot-model-picker.png" width="720" alt="XMINAL /model with 258 bundled aliases"/>
 
 **Scoped to your provider** — with OpenRouter active, `/model` shows only OpenRouter models (all FREE-first):
 
@@ -75,12 +75,12 @@ XMINAL is a **provider-agnostic terminal coding agent** and orchestration platfo
 - Git worktree manager for parallel agent work
 - MCP client (stdio) — connects to filesystem, memory, browser, GitHub, etc.
 
-### Providers (49)
+### Providers (46)
 XMINAL speaks **OpenAI Chat**, **Anthropic Messages**, **Gemini native**, and **local OpenAI-compatible** servers — one config, any endpoint:
 
 | Cloud (BYOK) | Local (no key) |
 |---|---|
-| OpenCode (free) · OpenRouter (free tier) · OpenAI · Anthropic · Google Gemini · xAI · Groq · DeepSeek · Mistral · Cohere · Together AI · Fireworks · Perplexity · Moonshot/Kimi · Cerebras · SambaNova · DeepInfra · Novita · Friendli · Nebius · Poe · Z.AI · ZhipuAI · MiniMax · SiliconFlow · Volcengine · 302.AI · Venice · Vercel AI Gateway · Alibaba DashScope · Moonshot (CN) · Hugging Face · NVIDIA NIM · GitHub Models | Ollama · LM Studio · vLLM · llama.cpp · KoboldCpp · text-generation-webui · GPT4All · Open WebUI |
+| OpenCode (free) · OpenRouter (free tier) · OpenAI · Anthropic · Google Gemini · xAI · Groq · DeepSeek · Mistral · Cohere · Together AI · Fireworks · Perplexity · Moonshot/Kimi · Cerebras · SambaNova · DeepInfra · Novita · Friendli · Nebius · Poe · Z.AI · ZhipuAI · MiniMax · Stepfun · Stepfun (CN) · SiliconFlow · Volcengine · 302.AI · Venice · Vercel AI Gateway · Alibaba DashScope · Moonshot (CN) · Ollama Cloud · Hugging Face · NVIDIA NIM · GitHub Models | Ollama · Ollama (CN) · LM Studio · vLLM · llama.cpp · KoboldCpp · text-generation-webui · GPT4All · Open WebUI |
 
 `/provider` in the TUI: pick → paste key (masked) → **live validation** → save. Keys are stored only in `~/.xminal/config.json` (chmod 600), never logged.
 
@@ -132,7 +132,7 @@ Providers without a public free model (Anthropic, OpenAI, DeepSeek, xAI, MiniMax
 - **Classic REPL** — automatic fallback (or `xminal --no-tui`)
 - **`xminal run`** — non-interactive headless mode for CI (`--json`, `--quiet`, `--max-turns`, `--permission`)
 - **`xminal serve`** — OpenAI-compatible HTTP server (`POST /v1/chat/completions` with SSE streaming) + `GET /health`
-- **Telegram bridge** (`xminal telegram`) — agent answers your Telegram DMs
+- **Telegram bridge** (`xminal telegram`) — experimental; implemented but never live-tested (needs a bot token)
 - **ACP-compatible** — Agent Client Protocol for editor integration
 
 ### Ergonomics
@@ -187,8 +187,8 @@ Providers — `/provider` · `/connect` · `/set-key` · `/clear-key`
 Tasks — `/tasks` · `/todo` · `/memory <list|add|search|forget>` · `/skills` · `/skill <name>` · `/mcp` · `/audit`
 Git — `/diff [args]` · `/git [args]` · `/worktree <list|create|remove|merge>`
 Verify — `/verify [cmd]` · `/ralph <task> --verify <cmd> [--iterations N]` · `/diagnostics`
-System — `/doctor` · `/init` · `/config` · `/status` · `/cost` · `/tools` · `/features` · `/brain` · `/plan` · `/verify` · `/help` · `/clear` · `/exit` · `/report` (opens GitHub issue tracker)
-Wild — `/ralph` · `/worktree` · `/brain` · `/features` · `/plan`
+System — `/doctor` · `/init` · `/config` · `/status` · `/cost` · `/tools` · `/docs` · `/verify` · `/help` · `/clear` · `/exit` · `/report` (opens GitHub issue tracker)
+Wild — `/ralph` · `/worktree`
 
 ## Configuration
 
@@ -237,7 +237,7 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.9.2** — live on npm, 51/51 tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.10.0** — live on npm, 51+ tests, CI green. Known limitations: no native Windows build, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 

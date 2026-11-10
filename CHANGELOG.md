@@ -4,6 +4,40 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-11-10
+
+**XMINAL × environment cleanup + full TUI/output-rendering redesign.** Removes everything tied to the sandbox the project was bootstrapped in, and transforms the terminal experience from plain-text output into a structured, layered interface.
+
+### Removed (xcomb-environment residue)
+
+- `BRAIN.md`, `PLAN.md`, `EXECUTION-PLAN.md`, `FEATURE_MATRIX.md` — internal working notes with machine-specific paths and process history (not curated product docs). Their substance moved to a private backup and a curated `docs/ROADMAP.md` + `docs/DEVELOPMENT.md`. No git history rewrite.
+- `src/tui/clone-tui.ts.bak` — accidentally committed duplicate (v0.7.0), dead code.
+- `src/tui/engine.ts` — unused legacy layout/theme helpers.
+- `src/tui/tui.ts` + the `XMINAL_TUI_ENGINE=opentui` re-exec path — the experimental OpenTUI/Bun renderer, dead since v0.6.0; XMINAL is pure Node.
+- `dist/` is no longer committed — built on demand via `prepare` (git-URL/npm installs) and from source.
+
+### Changed
+
+- `package.json` description no longer claims OpenTUI (Zig core); honest wording ("pure Node", 46 built-in providers).
+- MCP `initialize` `clientInfo.version` now reports the real package version (was hardcoded `0.1.0`).
+- `/brain` and `/features` commands replaced by `/docs` (prints `docs/ROADMAP.md`).
+- `/report`'s issue-tracker link and palette docs updated; README counts synced to reality (46 providers, 258 bundled aliases / ~1,960 effective).
+- `scripts/install.sh` fallback tarball now points at v0.10.0.
+- AGENTS.md: 51 tests, dist policy, repo docs policy.
+- Telegram bridge documented as experimental (never live-tested).
+
+### Added
+
+- **Tool activity renderer** (`src/tui/output/tool-activity.ts`) — compact per-tool presentation: icon, kind label, target, duration, success/failure state, for read/write/edit/multi_edit/glob/grep/list/bash/git/verify/web_fetch/web_search/task/mcp_call/memory/skill/todo/checkpoint/worktree/diagnostics/think; long results collapse to a one-line summary.
+- **Structured assistant output engine** — `renderMarkdown` gains task lists, GitHub-style callouts, a proper three-tier heading hierarchy, narrow-table fallback (key: value cards under ~44 cols), tighter table rendering.
+- Markdown heading hierarchy: H1 amber bold + spacing, H2 bright bold, H3 muted bold — never rendered as flat text.
+- Terminal width awareness everywhere (40/50/60/80/100/120 cols); Unicode width-safe.
+
+### Notes
+
+- Not published to npm by this change; cut the release per `docs/DEVELOPMENT.md`.
+- Telegram bridge remains experimental until exercised against a real bot.
+
 ## [0.9.2] — 2026-11-09
 
 **Published on npm: `xminal@0.9.2`** (`npm install -g xminal`).

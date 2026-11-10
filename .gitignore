@@ -1,5 +1,5 @@
 node_modules/
-# dist/ is committed so `npm i -g github:quitsaurabhverma2008-sketch/xminal` works without a build step
+dist/
 *.log
 .env
 .env.*

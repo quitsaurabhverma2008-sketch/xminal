@@ -1,7 +1,7 @@
 {
   "name": "xminal",
-  "version": "0.9.2",
-  "description": "XMINAL \u2014 Every coding agent. One terminal. Provider-agnostic fullscreen TUI powered by OpenTUI (Zig core), agent runtime, 47 providers, sessions, MCP, memory, worktrees, Ralph loops.",
+  "version": "0.10.0",
+  "description": "XMINAL \u2014 Every coding agent. One terminal. Provider-agnostic fullscreen TUI (pure Node), agent runtime, 46 built-in providers, sessions, MCP, memory, worktrees, Ralph loops.",
   "license": "MIT",
   "author": "XMINAL contributors",
   "bin": {
@@ -13,10 +13,8 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
-    "PLAN.md",
-    "EXECUTION-PLAN.md",
-    "FEATURE_MATRIX.md",
     "assets",
+    "docs",
     "scripts",
     "SECURITY.md",
     "AGENTS.md",

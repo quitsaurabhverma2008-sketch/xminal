@@ -142,9 +142,7 @@ const COMMANDS: Cmd[] = [
   { name: "/compact", desc: "compact in-memory conversation", group: "Session" },
 
   { name: "/audit", desc: "verify hash-chained audit log", group: "Audit" },
-  { name: "/brain", desc: "show BRAIN.md", group: "Audit" },
-  { name: "/features", desc: "show FEATURE_MATRIX.md", group: "Audit" },
-  { name: "/plan", desc: "show EXECUTION-PLAN.md", group: "Audit" },
+  { name: "/docs", desc: "show docs/ROADMAP.md", group: "Docs" },
 
   { name: "/version", desc: "print xminal version", group: "System" },
   { name: "/about", desc: "about XMINAL", group: "System" },

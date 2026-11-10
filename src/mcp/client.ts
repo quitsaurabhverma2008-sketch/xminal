@@ -1,3 +1,4 @@
+import { VERSION } from "../version";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { McpServerConfig } from "../config/types";
 
@@ -112,7 +113,7 @@ export class McpClient {
     await this.request("initialize", {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "xminal", version: "0.1.0" },
+      clientInfo: { name: "xminal", version: VERSION },
     });
     this.notify("notifications/initialized", {});
   }
