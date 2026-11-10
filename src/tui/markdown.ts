@@ -1,7 +1,7 @@
 // Streaming-safe block+inline markdown renderer → ANSI lines.
 // Design: stable per-block rendering. Code fences parse byte-exact. Tables are
 // width-capped. Incomplete trailing structures degrade gracefully (never throw).
-import { rgb, bgRgb, RESET, BOLD, ITALIC, T, inlineCode, fgMuted, fgAmber, fgGreen } from "./theme";
+import { rgb, bgRgb, RESET, BOLD, ITALIC, T, inlineCode, fgMuted, fgAmber, fgGreen, fgPurple } from "./theme";
 import { visibleWidth, splitGraphemes, stripAnsi } from "./width";
 
 const C = {
@@ -63,7 +63,7 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
     const header = codeLang ? `${fgMuted("  ┌ " + codeLang)}` : "";
     if (header) out.push(header);
     for (const l of codeLines.slice(1)) {
-      for (const wrapped of renderCodeLine(l, width)) out.push(wrapped);
+      for (const wrapped of renderCodeLine(l, width, codeLang)) out.push(wrapped);
     }
     out.push(""); // breathing room after block
     codeLines = [];
@@ -139,11 +139,43 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
   return out;
 }
 
-function renderCodeLine(line: string, width: number): string[] {
+const KEYWORDS: Record<string, string> = {
+  ts: "const let var function return if else for while import from export default async await try catch finally throw new class extends interface type enum public private readonly static switch case break continue typeof instanceof in of do yield delete void null undefined",
+  js: "const let var function return if else for while import from export default async await try catch finally throw new class extends switch case break continue typeof instanceof in of do yield delete void null undefined",
+  py: "def return if elif else for while import from as with try except finally raise lambda pass break continue in not and or is None True False class yield async await global nonlocal assert del print",
+  sh: "if then else elif fi for while do done case esac function in return echo exit local export",
+  json: "",
+  yaml: "",
+  markdown: "",
+};
+function highlightCode(line: string, lang: string): string {
+  const source = stripAnsi(line);
+  const kw = KEYWORDS[lang] ? new Set(KEYWORDS[lang].split(" ")) : null;
+  // one literal regex: comments (// or #) · strings · numbers · words
+  const tokenRe = /(\/\/[^\n]*|#[^\n]*)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`[^`]*`)|(\b\d[\d_]*(?:\.\d+)?\b)|([A-Za-z_$][A-Za-z0-9_$]*)/g;
+  let out = "";
+  let last = 0;
+  for (const match of source.matchAll(tokenRe)) {
+    const idx = match.index ?? 0;
+    out += rgb(T.green) + source.slice(last, idx) + RESET;
+    const [whole, comment, str, num, word] = match;
+    if (comment !== undefined) out += fgMuted(comment);
+    else if (str !== undefined) out += fgAmber(str);
+    else if (num !== undefined) out += fgAmber(num);
+    else if (word !== undefined) out += kw && kw.has(word) ? fgPurple(word) : rgb(T.green) + word + RESET;
+    last = idx + whole.length;
+  }
+  out += rgb(T.green) + source.slice(last) + RESET;
+  return out;
+}
+
+function renderCodeLine(line: string, width: number, lang = ""): string[] {
   const bare = stripAnsi(line);
   const pad = "  "; // code blocks render flush-left with a leading marker
   const prefix = fgMuted("  │");
-  if (visibleWidth(bare) <= width - visibleWidth(prefix) - 1) return [`${prefix} ${rgb(T.green)}${escapeProse2(bare)}${RESET}`];
+  if (visibleWidth(bare) <= width - visibleWidth(prefix) - 1) {
+    return [`${prefix} ${lang ? highlightCode(bare, lang) : rgb(T.green) + escapeProse2(bare) + RESET}`];
+  }
   // wrap long code lines — preserve verbatim chars, never modify
   const out: string[] = [];
   let rest = bare;

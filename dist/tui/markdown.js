@@ -66,7 +66,7 @@ function renderMarkdown(input, options) {
         if (header)
             out.push(header);
         for (const l of codeLines.slice(1)) {
-            for (const wrapped of renderCodeLine(l, width))
+            for (const wrapped of renderCodeLine(l, width, codeLang))
                 out.push(wrapped);
         }
         out.push(""); // breathing room after block
@@ -165,12 +165,46 @@ function renderMarkdown(input, options) {
         flushCode(); // unterminated fence: render what we have, no crash
     return out;
 }
-function renderCodeLine(line, width) {
+const KEYWORDS = {
+    ts: "const let var function return if else for while import from export default async await try catch finally throw new class extends interface type enum public private readonly static switch case break continue typeof instanceof in of do yield delete void null undefined",
+    js: "const let var function return if else for while import from export default async await try catch finally throw new class extends switch case break continue typeof instanceof in of do yield delete void null undefined",
+    py: "def return if elif else for while import from as with try except finally raise lambda pass break continue in not and or is None True False class yield async await global nonlocal assert del print",
+    sh: "if then else elif fi for while do done case esac function in return echo exit local export",
+    json: "",
+    yaml: "",
+    markdown: "",
+};
+function highlightCode(line, lang) {
+    const source = (0, width_1.stripAnsi)(line);
+    const kw = KEYWORDS[lang] ? new Set(KEYWORDS[lang].split(" ")) : null;
+    // one literal regex: comments (// or #) · strings · numbers · words
+    const tokenRe = /(\/\/[^\n]*|#[^\n]*)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`[^`]*`)|(\b\d[\d_]*(?:\.\d+)?\b)|([A-Za-z_$][A-Za-z0-9_$]*)/g;
+    let out = "";
+    let last = 0;
+    for (const match of source.matchAll(tokenRe)) {
+        const idx = match.index ?? 0;
+        out += (0, theme_1.rgb)(theme_1.T.green) + source.slice(last, idx) + theme_1.RESET;
+        const [whole, comment, str, num, word] = match;
+        if (comment !== undefined)
+            out += (0, theme_1.fgMuted)(comment);
+        else if (str !== undefined)
+            out += (0, theme_1.fgAmber)(str);
+        else if (num !== undefined)
+            out += (0, theme_1.fgAmber)(num);
+        else if (word !== undefined)
+            out += kw && kw.has(word) ? (0, theme_1.fgPurple)(word) : (0, theme_1.rgb)(theme_1.T.green) + word + theme_1.RESET;
+        last = idx + whole.length;
+    }
+    out += (0, theme_1.rgb)(theme_1.T.green) + source.slice(last) + theme_1.RESET;
+    return out;
+}
+function renderCodeLine(line, width, lang = "") {
     const bare = (0, width_1.stripAnsi)(line);
     const pad = "  "; // code blocks render flush-left with a leading marker
     const prefix = (0, theme_1.fgMuted)("  │");
-    if ((0, width_1.visibleWidth)(bare) <= width - (0, width_1.visibleWidth)(prefix) - 1)
-        return [`${prefix} ${(0, theme_1.rgb)(theme_1.T.green)}${escapeProse2(bare)}${theme_1.RESET}`];
+    if ((0, width_1.visibleWidth)(bare) <= width - (0, width_1.visibleWidth)(prefix) - 1) {
+        return [`${prefix} ${lang ? highlightCode(bare, lang) : (0, theme_1.rgb)(theme_1.T.green) + escapeProse2(bare) + theme_1.RESET}`];
+    }
     // wrap long code lines — preserve verbatim chars, never modify
     const out = [];
     let rest = bare;

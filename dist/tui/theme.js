@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.inlineCode = exports.fgText = exports.fgMuted = exports.fgRed = exports.fgGreen = exports.fgAmber = exports.fgAccent = exports.T = exports.ITALIC = exports.BOLD = exports.RESET = exports.bgRgb = exports.rgb = void 0;
+exports.inlineCode = exports.fgText = exports.fgMuted = exports.fgRed = exports.fgPurple = exports.fgGreen = exports.fgAmber = exports.fgAccent = exports.T = exports.ITALIC = exports.BOLD = exports.RESET = exports.bgRgb = exports.rgb = void 0;
 // Tokyo Night palette — single source for TUI design tokens.
 const rgb = (c) => `\x1b[38;2;${c[0]};${c[1]};${c[2]}m`;
 exports.rgb = rgb;
@@ -27,6 +27,8 @@ const fgAmber = (t) => `${(0, exports.rgb)(exports.T.amber)}${t}${exports.RESET}
 exports.fgAmber = fgAmber;
 const fgGreen = (t) => `${(0, exports.rgb)(exports.T.green)}${t}${exports.RESET}`;
 exports.fgGreen = fgGreen;
+const fgPurple = (t) => `${(0, exports.rgb)([187, 154, 247])}${t}${exports.RESET}`;
+exports.fgPurple = fgPurple;
 const fgRed = (t) => `${(0, exports.rgb)(exports.T.red)}${t}${exports.RESET}`;
 exports.fgRed = fgRed;
 const fgMuted = (t) => `${(0, exports.rgb)(exports.T.muted)}${t}${exports.RESET}`;

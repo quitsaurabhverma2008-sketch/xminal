@@ -4,6 +4,19 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-11-09
+
+**Published on npm: `xminal@0.9.1`** (`npm install -g xminal`).
+
+### Added
+
+- **Code block syntax highlighting** — fenced code renders with keywords in Tokyo Night purple, strings/numbers in amber, comments muted, and verbatim source otherwise (ts/js/py/sh; unknown languages render plain green). Highlighting runs post-wrap so long lines stay wrapped correctly.
+
+### Fixed
+
+- **Code highlighting bug** — the token regex built from a template literal matched a literal backspace instead of a word boundary (`\b` vs `\\b`), so no highlighting ever applied. Replaced with one literal regex (comments // or #, strings, numbers, words); keywords now actually highlight (purple).
+- **Keyword colors too similar to strings** — keywords use Tokyo Night purple (`fgPurple`), distinct from string amber and comment muted gray.
+
 ## [0.9.0] — 2026-11-09
 
 **Published on npm: `xminal@0.9.0`** (`npm install -g xminal`).

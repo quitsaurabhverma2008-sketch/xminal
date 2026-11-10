@@ -19,6 +19,7 @@ export const T = {
 export const fgAccent = (t: string) => `${rgb(T.accent)}${t}${RESET}`;
 export const fgAmber = (t: string) => `${rgb(T.amber)}${t}${RESET}`;
 export const fgGreen = (t: string) => `${rgb(T.green)}${t}${RESET}`;
+export const fgPurple = (t: string) => `${rgb([187, 154, 247])}${t}${RESET}`;
 export const fgRed = (t: string) => `${rgb(T.red)}${t}${RESET}`;
 export const fgMuted = (t: string) => `${rgb(T.muted)}${t}${RESET}`;
 export const fgText = (t: string) => `${rgb(T.text)}${t}${RESET}`;
