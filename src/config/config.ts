@@ -85,6 +85,8 @@ export function defaultConfig(): XminalConfig {
     fallbackModels: [],
     router: { policy: ["failover", "quota", "cost", "capability"] },
     limits: { maxTurns: 40, maxTokensPerTurn: 0, maxCostPerSession: 5 }, // 0 = unlimited per-turn output
+    autoVerify: true,
+    autoVerifyRepairs: 1,
     permissions: {
       mode: "auto",
       protectedPaths: ["~/.ssh", "~/.aws", "~/.gnupg", "~/.config/gh", ".env", ".env.local"],

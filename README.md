@@ -289,15 +289,30 @@ curl -H "Authorization: Bearer $TOKEN" -X POST -H 'content-type: application/jso
 
 Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https://github.com/quitsaurabhverma2008-sketch/xminal/issues/new)** — always welcome: crashes, quotas, broken commands, bad UX, misparsed edits.
 
+## How it works (the coding workflow)
+
+The agent does not "type code at a prompt" — it runs a workflow and shows its work:
+
+```
+understand → inspect → plan → implement → verify → review → summarize
+```
+
+- **Task brief** — every request becomes a short brief (goal, constraints, acceptance criteria, edge cases, how it will be verified) that is kept for the whole task. A request that names no target gets **one** clarifying question; a clear one is never delayed.
+- **Project brief** — the repository's instructions, layout and build/test commands are collected once (offline) and injected into the prompt.
+- **Verification is real** — after a change, the project's own command (`npm test`, `cargo test`, `go test ./...`, …) runs and its output is fed back to the model. The turn summary says `verify ✓` or `verify ✗`; nothing is ever reported as passing unless it passed.
+- **Free-tier fallback** — when a model runs out of its daily free quota, the router switches to the provider's next free model and says so.
+
+Details: [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
+
 ## Status (honest)
 
-**v0.17.0** — live on npm, 96/96 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.18.0** — live on npm, 115/115 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 
 ```bash
 npm run build            # tsc → dist/
-npm test                 # 96 tests (node:test, offline)
+npm test                 # 115 tests (node:test, offline)
 npm run verify           # build + test + secret scan (required before push)
 npm run verify:package   # pack → install into a temp prefix → run the CLI
 npm run verify:secrets   # fail if a credential-shaped string is committed

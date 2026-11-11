@@ -34,6 +34,7 @@ export type ChatEvent =
   | { type: "tool_call"; call: ToolCall }
   | { type: "usage"; usage: ChatUsage; model?: ResolvedModel }
   | { type: "error"; message: string }
+  | { type: "notice"; message: string }
   | { type: "done"; stopReason?: string };
 
 export interface ChatRequest {

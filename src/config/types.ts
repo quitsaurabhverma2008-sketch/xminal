@@ -61,6 +61,12 @@ export interface XminalConfig {
     stream: boolean;
   };
   verifyCommand?: string;
+  /** run the project's verify command after a change (default: true) */
+  autoVerify?: boolean;
+  /** how many times the agent may fix-and-retry after a failed verification */
+  autoVerifyRepairs?: number;
+  /** kill the verification command after this many milliseconds */
+  verifyTimeoutMs?: number;
 }
 
 export interface ResolvedModel {

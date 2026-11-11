@@ -3,9 +3,16 @@
 ## Commands
 
 - Build: `npm run build` (tsc → `dist/`)
-- Verify everything (build + 51 tests): `npm run verify`
+- Verify everything (build + 115 tests): `npm run verify`
 - Run the CLI from source: `npm run build && node dist/index.js doctor`
 - Tests: `npm test` (node:test, no network required; tests run against `dist/`)
+
+## The coding workflow (what the agent itself does)
+
+- `src/core/requirements.ts` — the request becomes a bounded brief (goal, constraints, acceptance, edge cases, verification); an action without a target gets exactly one clarifying question.
+- `src/core/project-context.ts` — the repository's instructions, layout and build/test commands, detected offline; also detects the project's verify command.
+- `src/core/workflow.ts` — the phases understand → inspect → plan → implement → verify → review → summarize; the phase follows the work that actually happened.
+- `src/core/verify-runner.ts` — runs the project's verify command after a change and feeds the real output back; the agent may never claim a test passed unless it ran and passed.
 
 ## Conventions
 

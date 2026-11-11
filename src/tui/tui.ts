@@ -334,10 +334,17 @@ const modelMap = (): Record<string, ModelConfig> => {
   }
   return modelMapCache;
 };
+/**
+ * Context-window label.
+ *
+ * It is labelled "ctx" on purpose: the number is how many tokens fit in one
+ * request, NOT the provider's daily free allowance. Showing a bare "1.0M"
+ * next to "FREE" is exactly what makes people think it is the daily quota.
+ */
 const ctxLabel = (n?: number): string => {
   if (!n || n <= 0) return "";
-  if (n >= 1_000_000) return `${(n / 1e6).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
-  return `${Math.round(n / 1000)}K`;
+  const value = n >= 1_000_000 ? `${(n / 1e6).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M` : `${Math.round(n / 1000)}K`;
+  return `ctx ${value}`;
 };
 const priceLabel = (cfg?: ModelConfig): string => {
   if (!cfg) return "";
@@ -1469,7 +1476,12 @@ const sessionRows = (query: string): SessionRow[] => {
         const spent = runtime.agent.getCost();
         const rate = turnMs > 0 ? spent.totalTokens / (turnMs / 1000) : 0;
         const rateText = rate >= 1 ? ` · ${rate.toFixed(1)} tok/s` : "";
-        pushLine("system", `${modeColor(runtime.agent.mode)}${BOLD}${title}${RESET}${fgMuted(` · ${modelShort} · ${fmtTurnDuration(turnMs)}${rateText}`)}`);
+        // opencode's assistant footer + the honest verification state
+        const verifyText = runtime.agent.verifyStatus();
+        pushLine(
+          "system",
+          `${modeColor(runtime.agent.mode)}${BOLD}${title}${RESET}${fgMuted(` · ${modelShort} · ${fmtTurnDuration(turnMs)}${rateText}`)}${verifyText ? fgMuted(` · ${verifyText}`) : ""}`,
+        );
         render();
         // agent is free — drain the queue in FIFO order, one turn at a time
         const next = queue.shift();

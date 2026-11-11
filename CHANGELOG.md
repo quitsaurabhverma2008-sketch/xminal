@@ -4,6 +4,31 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-11-11
+
+**The agent now runs a real coding workflow — brief, phases, and a verification loop that cannot lie.**
+
+### Added
+
+- **The coding workflow** (`src/core/workflow.ts`): understand → inspect → plan → implement → verify → review → summarize. The phase is derived from the work that actually happened (a read marks *inspect*, a write marks *implement*) and the rule for the current phase is injected into the prompt. Explicit in compose/plan mode, implicit but ordered in build mode.
+- **Task brief** (`src/core/requirements.ts`): every request becomes a bounded brief — goal, kind, constraints, acceptance criteria, edge cases and the verification step — re-injected on every turn so the requirements survive implementation. A request that names an action but no target ("make it better") yields exactly one clarifying question; a clear request is never delayed.
+- **Project brief** (`src/core/project-context.ts`): the repository's instruction files, layout, language mix and build/test commands are detected once, offline, and injected into the prompt. The verify command is detected from `package.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, `pom.xml`, `build.gradle` or `Makefile`.
+- **Verification loop** (`src/core/verify-runner.ts`): after a turn that changed files, the project's verify command runs and its **real** output is fed back to the model; a failure gets a bounded fix-and-retry round (`autoVerifyRepairs`). The turn summary shows `verify ✓` / `verify ✗`. The agent is told never to claim a test passed unless it ran and passed.
+- Review mode now starts from `git diff` and must report findings with a severity and a `file:line` — suspicions are not reported as confirmed bugs.
+- Settings: `verifyCommand`, `autoVerify`, `autoVerifyRepairs`, `verifyTimeoutMs`.
+- `docs/WORKFLOW.md`.
+
+### Fixed
+
+- **A model that ran out of free quota now falls through to the provider's other free models.** The router used to try one model per provider, so a daily-quota error ended the turn after two or three candidates. It now keeps a queue and enqueues the provider's next free models (free first, biggest context first), announcing the switch in the transcript: `opencode/inkling-2-small-free: free-tier quota reached — switching to opencode/crouton-alpha-free`.
+- The model picker labels the context window as `ctx 1.0M` — a bare "1.0M" next to "FREE" is easily mistaken for the provider's daily allowance.
+- The system prompt caches the project rules and the project brief instead of re-reading them on every turn (the prompt is rebuilt per request — on a free daily allowance that matters).
+
+### Notes
+
+- 115/115 tests green, including offline agent-level tests that drive the whole verify loop against a scripted local model server.
+
+
 ## [0.17.0] — 2026-11-11
 
 **Two rendering bugs that made the UI look broken: the composer had holes in its background, and the whole screen vibrated.**
