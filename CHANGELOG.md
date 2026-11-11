@@ -4,6 +4,39 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-11-11
+
+**The TUI is now pixel-ported from opencode's own source — theme, geometry and glyphs.**
+
+### Changed
+
+- **The theme is opencode's default palette, not Tokyo Night.** Background `#0a0a0a`, raised `#141414`, composer `#1e1e1e`, text `#eeeeee`, muted `#808080`, border `#484848`, error `#e06c75`, warning `#f5a742`, success `#7fd88f`, info `#56b6c2` — the exact tokens from opencode v2's theme assets.
+- **Agent colours follow opencode's categorical order** (blue, purple, green, orange, red): build = blue, plan = purple, compose = green, review = orange, yolo = red.
+- **The session column is padded like opencode's scroll container** — 2 columns of side padding (1 below 44 columns), so every rule, label and message starts on the same column as upstream.
+- **The composer is opencode's band**: a `┃` rule in the agent colour, the raised fill, the textarea, the metadata row (`Build · model provider · variant`) inside the band, and the `╹` + `▀` strip that closes it.
+- **The footer is opencode's**: workspace + branch on the left (`~/my-app:main`), context usage and cost on the right, followed by the `shift+tab agents` / `ctrl+p commands` hints.
+- **A session tab rail** at the top (the session name as a tab, plus `+`), like opencode's session tabs.
+- **Tool rows follow opencode's inline/block split**: a 2-column icon cell with the label after it (`Read src/a.ts`, `Glob "*.ts" in src`), and shell/git calls rendered as a block card — `$ command`, then the output, inside the raised panel with the (background-coloured) `┃` rule.
+- **The assistant footer line** is opencode's: `Build · model · 5.4s · 1901.2 tok/s`.
+- **Markdown tokens are opencode's**: heading `#9d7cd8`, link `#fab283`, code `#7fd88f`, strong `#f5a742`, quote `#e5c07b`.
+- The Ink engine (`XMINAL_TUI_ENGINE=ink`) got the same palette, composer and footer.
+
+### Added
+
+- `scripts/media/capture-screenshots.py` — regenerates every README screenshot from a live PTY session, so the docs can never drift from the UI.
+- The rasterizer behind it now defers the line wrap like a real terminal (it used to drift one row per line) and uses opencode's background.
+
+### Fixed
+
+- The session column is painted with the theme background on every row (unpainted cells fell back to the terminal's own background).
+- The placeholder uses opencode's own samples: `Ask anything… "Fix a TODO in the codebase"`.
+- The turn summary shows tokens per second, like upstream.
+
+### Notes
+
+- 94/94 tests green. The e2e TUI tests assert the new frame (footer hint, composer meta row).
+
+
 ## [0.15.0] — 2026-11-11
 
 **Every slash command works in the TUI, the security model got teeth, and the npm package went from 62 MB to 3.5 MB.**

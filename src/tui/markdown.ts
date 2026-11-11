@@ -6,10 +6,10 @@ import { visibleWidth, splitGraphemes, stripAnsi, wrapAnsi as wrapPlain } from "
 
 const C = {
   heading: fgAmber,
-  bold: (t: string) => `${BOLD}${rgb(T.orange)}${t}${RESET}`,
+  bold: (t: string) => `${BOLD}${rgb(T.yellow)}${t}${RESET}`,   // markdown.strong #f5a742
   italic: (t: string) => `${ITALIC}${t}${RESET}`,
   code: inlineCode,
-  link: (t: string) => `${rgb(T.accent)}\x1b[4m${t}${RESET}`,
+  link: (t: string) => `${rgb(T.orange)}\x1b[4m${t}${RESET}`,   // markdown.link #fab283
   quote: (t: string) => `${rgb(T.muted)}${t}${RESET}`,
   quoteBar: `${rgb(T.muted)}│${RESET}`,
 };

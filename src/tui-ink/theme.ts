@@ -1,34 +1,34 @@
-// Ink theme tokens — opencode's Tokyo Night, hex strings for Ink <Text color=…>
+// Ink theme tokens — opencode's default dark theme, hex strings for Ink <Text color=…>
 export const C = {
-  bg: "#1a1b26",
-  panel: "#1e2030",
-  panel2: "#222436",
-  panel3: "#292e42",
-  borderSubtle: "#545c7e",
-  border: "#737aa2",
-  borderActive: "#9099b2",
-  text: "#c8d3f5",
-  muted: "#828bb8",
-  accent: "#82aaff",
-  violet: "#c099ff",
-  orange: "#ff966c",
-  yellow: "#ffc777",
-  green: "#c3e88d",
-  cyan: "#86e1fc",
-  red: "#ff757f",
+  bg: "#0a0a0a",
+  panel: "#141414",
+  panel2: "#1e1e1e",
+  panel3: "#4c4c4c",
+  borderSubtle: "#484848",
+  border: "#484848",
+  borderActive: "#b5b5b5",
+  text: "#eeeeee",
+  muted: "#808080",
+  accent: "#5c9cf5",
+  violet: "#9d7cd8",
+  orange: "#fab283",
+  yellow: "#f5a742",
+  green: "#7fd88f",
+  cyan: "#56b6c2",
+  red: "#e06c75",
   teal: "#4fd6be",
 };
 
 export function modeColor(mode: string): string {
   switch (mode) {
-    case "plan":
-      return C.yellow;
     case "build":
       return C.accent;
-    case "compose":
+    case "plan":
       return C.violet;
+    case "compose":
+      return C.green;
     case "review":
-      return C.cyan;
+      return C.orange;
     case "yolo":
       return C.red;
     default:

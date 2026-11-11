@@ -61,8 +61,10 @@ test("the TUI boots and renders the opencode-style frame", async () => {
   assert.ok(/█╗/.test(out) || /C O D I N G/.test(out), "the banner is missing");
   // the opencode-style input box
   assert.ok(/Ask anything/.test(out), "the input box is missing");
-  // the status bar
-  assert.ok(/max|build/.test(out), "the status bar is missing");
+  // the opencode footer: workspace on the left, "ctrl+p commands" on the right
+  assert.ok(/ctrl\+p commands/.test(out), "the footer hint is missing");
+  // the composer meta row: mode · model
+  assert.ok(/Build|Plan|Review|Compose/.test(out), "the composer meta row is missing");
 });
 
 test("a slash command runs inside the TUI instead of leaving the alternate screen", async () => {

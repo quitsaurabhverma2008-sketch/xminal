@@ -21,7 +21,7 @@ test("callout renders a colored label, not raw bracket tokens", () => {
 test("H1 and H3 headings get different emphasis", () => {
   const h1 = renderMarkdown("# Big", { width: 60 }).join("\n");
   const h3 = renderMarkdown("### Small", { width: 60 }).join("\n");
-  const violet = "38;2;192;153;255"; // opencode markdownHeading — #c099ff
+  const violet = "38;2;157;124;216"; // opencode markdown.heading — #9d7cd8
   assert.ok(h1.includes(violet), "H1 should use violet");
   assert.ok(!h3.includes(violet), "H3 should not use violet");
 });

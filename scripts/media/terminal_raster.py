@@ -35,8 +35,8 @@ class Cell:
     __slots__ = ("ch", "fg", "bg", "bold")
     def __init__(self):
         self.ch = " "
-        self.fg = "#c8d3f5"
-        self.bg = "#1a1b26"
+        self.fg = "#eeeeee"
+        self.bg = "#0a0a0a"
         self.bold = False
 
 class Screen:
@@ -44,7 +44,7 @@ class Screen:
         self.rows, self.cols = rows, cols
         self.grid = [[Cell() for _ in range(cols)] for _ in range(rows)]
         self.cx, self.cy = 0, 0
-        self.fg, self.bg = "#c8d3f5", "#1a1b26"
+        self.fg, self.bg = "#eeeeee", "#0a0a0a"
         self.bold = False
         self.alt = False   # alt-screen apps repaint rows in place — never scroll
 
@@ -58,37 +58,44 @@ class Screen:
         del self.grid[0]
         self.grid.append([Cell() for _ in range(self.cols)])
 
+    def _newline(self):
+        self.cx = 0
+        self.cy += 1
+        if self.cy >= self.rows:
+            if self.alt:
+                self.cy = self.rows - 1
+            else:
+                self.scroll_up(); self.cy = self.rows - 1
+
     def print(self, text):
+        # a real terminal defers the wrap: writing the last column does not move
+        # to the next line until another glyph arrives (otherwise a full-width
+        # frame drifts down by one row per line)
+        pending_wrap = False
         for ch in text:
             if ch == "\n":
-                self.cx = 0
-                self.cy += 1
-                if self.cy >= self.rows:
-                    if self.alt:
-                        self.cy = self.rows - 1
-                    else:
-                        self.scroll_up(); self.cy = self.rows - 1
+                pending_wrap = False
+                self._newline()
                 continue
             if ch == "\r":
+                pending_wrap = False
                 self.cx = 0
                 continue
+            if pending_wrap:
+                self._newline()
+                pending_wrap = False
             if self.cy < self.rows and self.cx < self.cols:
                 cell = self.grid[self.cy][self.cx]
                 cell.ch, cell.fg, cell.bg, cell.bold = ch, self.fg, self.bg, self.bold
             self.cx += 1
             if self.cx >= self.cols:
-                self.cx = 0
-                self.cy += 1
-                if self.cy >= self.rows:
-                    if self.alt:
-                        self.cy = self.rows - 1
-                    else:
-                        self.scroll_up(); self.cy = self.rows - 1
+                self.cx = self.cols - 1
+                pending_wrap = True
 
     def set_fg(self, color): self.fg = color
     def set_bg(self, color): self.bg = color
-    def set_default_fg(self): self.fg = "#c8d3f5"
-    def set_default_bg(self): self.bg = "#1a1b26"
+    def set_default_fg(self): self.fg = "#eeeeee"
+    def set_default_bg(self): self.bg = "#0a0a0a"
 
 # ── ANSI parser ─────────────────────────────────────────────────────────
 ESC = "\x1b"
@@ -100,12 +107,12 @@ def parse_sgr(params, scr: Screen):
     while i < len(parts):
         p = parts[i]
         if p == "" or p == "0":
-            scr.bold = False; scr.fg = "#c8d3f5"; scr.bg = "#1a1b26"; i += 1; continue
+            scr.bold = False; scr.fg = "#eeeeee"; scr.bg = "#0a0a0a"; i += 1; continue
         if p == "1": scr.bold = True; i += 1; continue
         if p == "22": scr.bold = False; i += 1; continue
         if p in ("39", "49"):
-            if p == "39": scr.fg = "#c8d3f5"
-            else: scr.bg = "#1a1b26"
+            if p == "39": scr.fg = "#eeeeee"
+            else: scr.bg = "#0a0a0a"
             i += 1; continue
         if p == "38" or p == "48":
             target = "fg" if p == "38" else "bg"
@@ -163,7 +170,7 @@ def feed(scr: Screen, data: bytes):
                 if scr.cy < scr.rows:
                     for x in range(scr.cx, scr.cols):
                         cell = scr.grid[scr.cy][x]
-                        cell.ch = " "; cell.fg = "#c8d3f5"; cell.bg = "#1a1b26"; cell.bold = False
+                        cell.ch = " "; cell.fg = scr.fg; cell.bg = scr.bg; cell.bold = False
                 continue
             if cmd == "A":
                 scr.cy = max(0, scr.cy - (int(body) if body else 1)); continue
@@ -198,7 +205,7 @@ BLOCKS = {
 }
 
 def render(scr: Screen, cell_w: int, cell_h: int):
-    img = Image.new("RGB", (scr.cols * cell_w, scr.rows * cell_h), "#1a1b26")
+    img = Image.new("RGB", (scr.cols * cell_w, scr.rows * cell_h), "#0a0a0a")
     draw = ImageDraw.Draw(img)
     font_size = int(cell_h * 0.72)
     try:
@@ -209,7 +216,7 @@ def render(scr: Screen, cell_w: int, cell_h: int):
     for y, row in enumerate(scr.grid):
         for x, cell in enumerate(row):
             px, py = x * cell_w, y * cell_h
-            if cell.bg != "#1a1b26":
+            if cell.bg != "#0a0a0a":
                 draw.rectangle([px, py, px + cell_w, py + cell_h], fill=cell.bg)
             if cell.ch in BLOCKS:
                 for (rx0, ry0, rx1, ry1) in BLOCKS[cell.ch]:

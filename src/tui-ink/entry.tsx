@@ -37,11 +37,9 @@ const LOGO = [
 ];
 const TAGLINE = "E V E R Y  C O D I N G  A G E N T .  O N E  T E R M I N A L .";
 const PLACEHOLDERS = [
-  'Ask anything…  "fix the failing test"',
-  'Ask anything…  "why is CI red?"',
-  'Ask anything…  "write a failing test first"',
-  'Ask anything…  "add a --json flag"',
-  'Ask anything…  "what changed today?"',
+  'Ask anything…  "Fix a TODO in the codebase"',
+  'Ask anything…  "What is the tech stack of this project?"',
+  'Ask anything…  "Fix broken tests"',
 ];
 
 function ctxLabel(n: number) {
@@ -251,20 +249,37 @@ function Composer({
           <Text color={C.muted}>{s.pendingPermission.reason ? ` · ${s.pendingPermission.reason} ` : " "}[y/N]</Text>
         </Box>
       ) : null}
-      <Box borderStyle="single" borderLeft={true} borderTop={false} borderBottom={false} borderRight={false} borderColor={modeColor(s.mode)} backgroundColor={C.panel} paddingX={1} flexDirection="column">
-        {s.input === "" ? (
-          <Text color={C.muted}>{PLACEHOLDERS[placeholderIndex]}{caret}</Text>
-        ) : (
-          lines.map((line, i) => (
-            <Text key={i} color={C.text}>{line}{i === lines.length - 1 ? caret : ""}</Text>
-          ))
-        )}
+      {/* opencode: ┃ rule + raised panel, the metadata row lives inside */}
+      <Box flexDirection="row">
+        <Box width={1} flexShrink={0}>
+          <Text color={modeColor(s.mode)}>{"┃"}</Text>
+        </Box>
+        <Box flexDirection="column" flexGrow={1} backgroundColor={C.panel2} paddingX={2} paddingTop={1}>
+          {s.input === "" ? (
+            <Text color={C.muted}>{PLACEHOLDERS[placeholderIndex]}{caret}</Text>
+          ) : (
+            lines.map((line, i) => (
+              <Text key={i} color={C.text}>{line}{i === lines.length - 1 ? caret : ""}</Text>
+            ))
+          )}
+          <Box paddingTop={1} flexDirection="row">
+            <Text color={modeColor(s.mode)} bold>{s.mode[0].toUpperCase() + s.mode.slice(1)}</Text>
+            <Text color={C.muted}>{" · "}</Text>
+            <Text color={C.text}>{s.model.split("/").pop() ?? s.model}</Text>
+            <Text color={C.muted}>{" " + (s.model.split("/")[0] ?? "")}</Text>
+            <Text color={C.muted}>{" · "}</Text>
+            <Text color={C.yellow} bold>{s.effort}</Text>
+          </Box>
+        </Box>
       </Box>
-      <Box flexDirection="row" paddingLeft={1}>
-        <Text color={modeColor(s.mode)} bold>{s.mode}</Text>
-        <Text color={C.muted}>{` · ${s.model.split("/").pop() ?? s.model}`}</Text>
-        <Spacer />
-        <Text color={C.muted}>{s.effort}</Text>
+      {/* the ╹ / ▀ strip that closes the composer */}
+      <Box flexDirection="row">
+        <Box width={1} flexShrink={0}>
+          <Text color={modeColor(s.mode)}>{"╹"}</Text>
+        </Box>
+        <Box flexGrow={1}>
+          <Text color={C.panel2}>{"▀".repeat(Math.max(1, width - 1))}</Text>
+        </Box>
       </Box>
     </Box>
   );
@@ -307,20 +322,23 @@ function QueueRow({ s }: { s: TState }) {
 
 function Footer({ s, width }: { s: TState; width: number }) {
   const pct = Math.min(100, Math.round((100 * s.inputTokens) / s.ctxWindow));
-  const usage = `${COST_TOK(s.inputTokens)} ${pct}% · $${s.costUsd.toFixed(4)}`;
+  // opencode: workspace + branch left, context usage + hints right
+  const usage = `${COST_TOK(s.inputTokens)} (${pct}%) · $${s.costUsd.toFixed(4)}`;
+  const cwd = s.cwd ? s.cwd.replace(process.env.HOME ?? "~", "~") : "";
+  const left = s.branch ? `${cwd}:${s.branch}` : cwd;
   return (
     <Box flexDirection="row" width={width}>
-      <Text color={C.text}>⇥</Text>
-      <Text color={C.muted}> agents</Text>
-      {width >= 52 ? (
+      <Text color={C.muted}>{left}</Text>
+      <Spacer />
+      {width >= 44 ? <Text color={C.muted}>{usage}{"  "}</Text> : null}
+      {width >= 64 ? (
         <>
-          <Text color={C.text}>{"  ⌃j"}</Text>
-          <Text color={C.muted}> newline</Text>
+          <Text color={C.text} bold>shift+tab</Text>
+          <Text color={C.muted}> agents</Text>
+          <Text color={C.text}>{"  "}</Text>
         </>
       ) : null}
-      <Spacer />
-      {width >= 72 ? <Text color={C.muted}>{usage}{"  "}</Text> : null}
-      <Text color={C.text}>^p</Text>
+      <Text color={C.text} bold>ctrl+p</Text>
       <Text color={C.muted}> commands</Text>
     </Box>
   );

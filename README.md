@@ -78,9 +78,9 @@ canvas renderer, so the animation above is a real render of the page, not a mock
 
 <img src="assets/screenshot-mcp-catalog.png" width="900" alt="XMINAL MCP catalog overlay" />
 
-**Opencode parity** — the built-in TUI now follows opencode's own box rules (SplitBorder `┃` + raised background + 1 row / 2 col padding, 3-column indents, opencode's tool glyphs and pending labels). Left: XMINAL on Android. Right: opencode's vendored markup rendered through Ink:
+**Opencode parity** — the built-in TUI is ported from opencode's own source: the same theme tokens (`#0a0a0a` background, `#141414` raised panels, `#1e1e1e` composer), the same geometry (2-column session padding, `┃` rules, the `╹`/`▀` composer strip, the `~/dir:branch` footer with context usage) and the same tool rows. Left: opencode upstream. Right: XMINAL, plain ANSI, running on Android:
 
-<img src="assets/opencode-parity.png" width="900" alt="XMINAL built-in TUI next to opencode's own markup" />
+<img src="assets/opencode-parity.png" width="900" alt="opencode upstream next to XMINAL's built-in TUI" />
 
 **On a phone** (42 columns) — the same UI, reflowed:
 
@@ -291,7 +291,7 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.15.0** — live on npm, 94/94 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.16.0** — live on npm, 94/94 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 

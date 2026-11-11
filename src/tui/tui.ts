@@ -14,8 +14,8 @@ import type { ProviderConfig, ModelConfig } from "../config/types";
 import { Renderer } from "../cli/render";
 import { handleCommand } from "../cli/commands";
 import { spawnSync } from "node:child_process";
-import { T, rgb, bgRgb, RESET, BOLD, fgMuted, fgText, fgAccent, fgAmber, fgGreen, fgRed, fgCyan, modeColor } from "./theme";
-import { makeActivity, completeActivity, renderActivity, spinnerFrame, SPINNER_FRAMES, type ActivityLine } from "./output/tool-activity";
+import { T, rgb, bgRgb, RESET, BOLD, fgMuted, fgText, fgAccent, fgAmber, fgGreen, fgRed, fgCyan, fgYellow, modeColor } from "./theme";
+import { makeActivity, completeActivity, renderActivity, spinnerFrame, toolTarget, SPINNER_FRAMES, type ActivityLine } from "./output/tool-activity";
 
 function openExternal(url: string): boolean {
   const platform = process.platform;
@@ -444,12 +444,11 @@ const sessionRows = (query: string): SessionRow[] => {
 
 
   const mouseMode = !/^(0|off|false)$/i.test(process.env.XMINAL_MOUSE ?? "");
+  // opencode's own placeholder samples (routes/home.tsx)
   const PLACEHOLDERS = [
-    'Ask anything…  "fix the failing test"',
-    'Ask anything…  "why is CI red?"',
-    'Ask anything…  "write a failing test first"',
-    'Ask anything…  "add a --json flag"',
-    'Ask anything…  "what changed today?"',
+    'Ask anything…  "Fix a TODO in the codebase"',
+    'Ask anything…  "What is the tech stack of this project?"',
+    'Ask anything…  "Fix broken tests"',
   ];
   let placeholderIdx = 0;
   let placeholderAt = 0;
@@ -506,24 +505,40 @@ const sessionRows = (query: string): SessionRow[] => {
   };
 
   const renderStyledLine = (line: Line, w: number): string[] => {
-    // ── tool activity — opencode-style single line + tinted diff preview
+    // ── tool activity — opencode: inline row (glyph col 3, label col 5) or a block card
     if (line.kind === "tool" && line.activity) {
       const a = line.activity;
-      const out: string[] = renderActivity(a, Math.max(8, w - 3)).map((row) => `   ${row}`);
+      const block = a.name === "bash" || a.name === "git" || a.name === "worktree";
+      if (block && a.status !== "pending" && a.output && a.output.length) {
+        // opencode block tool: ┃ rule at content col 0, raised panel, text at col 3
+        const cardW = Math.max(8, w);
+        const cmd = toolTarget(a.name, a.argsRaw, cardW - 4);
+        const rule = `${rgb(T.bg)}┃${RESET}`;
+        const card = (body: string) =>
+          `${rule}${bgRgb(T.panel)}  ${body}${" ".repeat(Math.max(0, cardW - 4 - visible(body)))}${RESET}`;
+        const rows: string[] = [];
+        rows.push(`${rule}${bgRgb(T.panel)}  ${fgText("$")} ${fgText(cmd)}${" ".repeat(Math.max(0, cardW - 4 - visible(cmd) - 2))}${RESET}`);
+        for (const outLine of a.output.slice(0, 10)) {
+          rows.push(card(a.status === "err" ? fgRed(outLine) : fgMuted(outLine)));
+        }
+        if (a.extraLines && a.extraLines > a.output.length - 1) {
+          rows.push(card(fgMuted(`… ${a.extraLines - (a.output.length - 1)} more lines`)));
+        }
+        return rows;
+      }
+      const out: string[] = renderActivity(a, Math.max(8, w - 5)).map((row) => `   ${row}`);
       if (a.preview && a.preview.length) {
         for (const row of a.preview) {
-          out.push(`   ${tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed)}`);
+          out.push(`    ${tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed)}`);
         }
-        if (a.extraPreviewLines) out.push(`   ${fgMuted(`… ${a.extraPreviewLines} more diff lines`)}`);
+        if (a.extraPreviewLines) out.push(`    ${fgMuted(`… ${a.extraPreviewLines} more diff lines`)}`);
       } else if (a.status === "err" && a.detail) {
-        out.push(`   ${fgMuted(redactSecrets(a.detail).text)}`);
+        out.push(`     ${fgMuted(redactSecrets(a.detail).text)}`);
       }
       return out;
     }
-    // ── user — opencode: raised-bg box, left border in the mode/agent color
+    // ── user — opencode: ┃ rule in the agent colour, raised fill, 2 col padding
     if (line.kind === "user") {
-      // opencode: outer box = SplitBorder left "┃" in the agent colour,
-      // inner box = raised background with 1 row / 2 col padding
       const bar = modeColor(runtime.agent.mode);
       const inner = Math.max(4, w - 1);
       const textW = Math.max(4, inner - 4);
@@ -533,19 +548,19 @@ const sessionRows = (query: string): SessionRow[] => {
       );
       return [padRow, ...bodyRows, padRow];
     }
-    // ── assistant — plain indent, markdown
+    // ── assistant — opencode: plain text at content col 3, markdown
     if (line.kind === "assistant") {
       const clean = formatMemo(line.text);
       const body = mdMemo(clean, Math.max(4, w - 3));
       return body.map((row) => `   ${row}`);
     }
-    // ── reasoning — opencode: dim block behind a muted SplitBorder left bar
+    // ── reasoning — opencode: ┃ rule at col 3, body at col 5
     if (line.kind === "reasoning") {
-      const inner = Math.max(4, w - 4);
-      const rows = wrap(line.text, Math.max(4, inner - 2));
+      const inner = Math.max(4, w - 6);
+      const rows = wrap(line.text, Math.max(4, inner));
       return rows.map((part) => `   ${fgMuted("┃")} ${fgMuted(part)}`);
     }
-    // ── everything else (ok/err/system) — quiet, indented
+    // ── everything else (ok/err/system) — quiet, indented at col 3
     const color = line.kind === "err" ? fgRed : line.kind === "ok" ? fgGreen : fgMuted;
     const safe = redactSecrets(line.text).text;
     const out: string[] = [];
@@ -577,10 +592,22 @@ const sessionRows = (query: string): SessionRow[] => {
     return out;
   };
   const inputH = () => Math.min(4, Math.max(1, inputVisualLines().length));
-  const inputTop = () => Math.max(1, rows() - inputH() - 4);
-  const metaRow = () => inputTop() + 1 + inputH();   // metadata row (inside the box)
-  const notchRow = () => metaRow() + 1;              // "╹" + half-block seam
+  // opencode frame (top → bottom): session tab rail · conversation ·
+  // composer band (pad + textarea + pad + metadata) · ╹/▀ strip · footer line
+  const composerHeight = () => inputH() + 3;
+  const composerTop = () => Math.max(1, rows() - composerHeight() - 2);
+  const stripRow = () => composerTop() + composerHeight();
   const footerRow = () => rows() - 1;
+  const tabRow = () => 0;
+  // opencode pads the session column by 2 (1 on narrow terminals)
+  const padCols = () => (cols() < 44 ? 1 : 2);
+  const mainW = () => Math.max(20, contentWidth() - padCols());
+  /** ~/dir style path for the footer, like opencode shows it */
+  const shortCwd = (): string => {
+    const home = process.env.HOME ?? "";
+    if (home && cwd.startsWith(home)) return "~" + cwd.slice(home.length);
+    return cwd;
+  };
 
   const ctxPct = (): number => {
     const spec = runtime.agent.modelSpec;
@@ -595,7 +622,7 @@ const sessionRows = (query: string): SessionRow[] => {
 
   const styledLine = styledLineFast;
   const clampScroll = (target: number) =>
-    Math.min(Math.max(0, target), Math.max(0, renderChatLines().length - inputTop()));
+    Math.min(Math.max(0, target), Math.max(0, renderChatLines().length - composerTop() + 1));
 
   let lineVersion = 0;
   let chatCache: { version: number; rows: string[] } = { version: -1, rows: [] };
@@ -638,89 +665,112 @@ const sessionRows = (query: string): SessionRow[] => {
     if (idx >= visibleRows) return `${bgRgb(T.bg)}${" ".repeat(cw)}${RESET}`; // reveal animates downward
     const line = block[idx];
     const left = Math.floor(Math.max(0, (cw - visible(line)) / 2));
-    return `${bgRgb(T.bg)}${" ".repeat(left)}${line}${" ".repeat(Math.max(0, cw - left - visible(line)))}${RESET}`;
+    return `${bgRgb(T.bg)}${" ".repeat(left)}${line}${bgRgb(T.bg)}${" ".repeat(Math.max(0, cw - left - visible(line)))}${RESET}`;
   };
 
   // build base frame rows; overlay draws on top
   const renderRow = (row: number): string => {
     const cw = contentWidth();
+    const pad = padCols();
+    const mw = mainW();
     const chatLinesPreview = renderChatLines();
     const homeMode = chatLinesPreview.length === 0 && !busy;
+    // every main-column row starts after opencode's scroll padding
+    // every cell of the session column is painted with the theme background
     const withSide = (inner: string): string => {
-      if (homeMode || sidebarWidth() === 0) return padRight(inner, cw);
-      return padRight(inner, cw) + renderSidebarRow(row);
+      const painted = `${bgRgb(T.bg)}${" ".repeat(pad)}${inner}${bgRgb(T.bg)}${" ".repeat(Math.max(0, cw - pad - visible(inner)))}${RESET}`;
+      if (homeMode || sidebarWidth() === 0) return painted;
+      return painted + renderSidebarRow(row);
     };
-    const top = inputTop();
+    const top = composerTop();
+    const cH = composerHeight();
     const iH = inputH();
-    const mRow = metaRow();
-    const nRow = notchRow();
-    const bar = modeColor(runtime.agent.mode);
-    // ── composer — opencode box: pad row, text rows (metadata row is separate)
-    if (row >= top && row < mRow) {
-      const compLine = (body: string, bodyVisible: number) =>
-        `${bgRgb(T.composer)}${bar}┃ ${body}${" ".repeat(Math.max(0, cw - 2 - bodyVisible))}${RESET}`;
-      if (row === top) {
-        return withSide(`${bgRgb(T.composer)}${bar}┃${" ".repeat(cw - 1)}${RESET}`);
+    const inner = Math.max(4, mw - 1);          // after the left rule
+    const agent = modeColor(runtime.agent.mode);
+    // ── session tab rail (opencode): the session name as a tab, then "+"
+    if (row === tabRow()) {
+      const title = sessionTitle.slice(0, Math.max(8, Math.floor(mw / 3)));
+      const tab = ` ${title} `;
+      const rest = Math.max(0, mw - visible(tab) - 2);
+      return withSide(`${bgRgb(T.panel2)}${BOLD}${fgText(tab)}${RESET}${fgMuted(" +")}${bgRgb(T.bg)}${" ".repeat(rest)}${RESET}`);
+    }
+    // ── composer band — opencode: ┃ rule, raised fill, textarea, metadata row
+    if (row >= top && row < top + cH) {
+      const rel = row - top;
+      const rule = `${agent}┃${RESET}`;
+      const blank = `${rule}${bgRgb(T.composer)}${" ".repeat(inner)}${RESET}`;
+      const compLine = (body: string) =>
+        `${rule}${bgRgb(T.composer)}  ${body}${" ".repeat(Math.max(0, inner - 2 - visible(body)))}${RESET}`;
+      if (rel === 0) return withSide(blank);                      // paddingTop
+      if (rel === cH - 1) {
+        // metadata row — agent · model · provider · variant (opencode order)
+        const mode = runtime.agent.mode;
+        const label = mode.charAt(0).toUpperCase() + mode.slice(1);
+        const model = (runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec).slice(0, Math.max(12, Math.floor(mw / 2)));
+        const provider = runtime.agent.modelSpec.split("/")[0] ?? "";
+        const variant = getEffort();
+        const tokens = [
+          `${agent}${BOLD}${label}${RESET}`,
+          `${fgMuted(" · ")}${fgText(model)}${provider ? ` ${fgMuted(provider)}` : ""}`,
+          variant ? `${fgMuted(" · ")}${fgYellow(BOLD + variant + RESET)}` : "",
+        ].join("");
+        const right = queue.length > 0 ? fgAmber(`⇧${queue.length} queued`) : "";
+        const gap = Math.max(1, inner - 2 - visible(tokens) - visible(right));
+        return withSide(`${rule}${bgRgb(T.composer)}  ${tokens}${" ".repeat(gap)}${right}${RESET}`);
       }
-      if (pendingPermission && row === mRow - 1) {
+      if (pendingPermission && rel === cH - 2) {
         const p = pendingPermission;
-        const text = ` ${fgAmber("?")} allow ${p.tool}${p.reason ? fgMuted(" · " + p.reason) : ""} ${fgAccent("[y/N]")}`;
-        return withSide(`${bgRgb(T.composer)}${bar}┃ ${padRight(text, cw - 3)}${RESET}`);
+        const text = `${fgAmber("?")} allow ${p.tool}${p.reason ? fgMuted(" · " + p.reason) : ""} ${fgAccent("[y/N]")}`;
+        return withSide(compLine(text));
       }
       if (input === "" && !pendingPermission) {
-        if (row === top + 1) {
+        if (rel === 1) {
           const nowTs = Date.now();
           if (nowTs - placeholderAt > 4000) {
             placeholderAt = nowTs;
             placeholderIdx = (placeholderIdx + 1) % PLACEHOLDERS.length;
           }
-          const placeholder = fgMuted(PLACEHOLDERS[placeholderIdx]);
-          return withSide(compLine(placeholder, visible(placeholder)));
+          return withSide(compLine(fgMuted(PLACEHOLDERS[placeholderIdx])));
         }
-        return withSide(`${bgRgb(T.composer)}${bar}┃${" ".repeat(cw - 1)}${RESET}`);
+        return withSide(blank);
       }
       const vis = inputVisualLines();
       const shown = vis.slice(Math.max(0, vis.length - iH));
-      const r = row - top - 1;
+      const r = rel - 1;
       const isLastLine = r === iH - 1;
       const visLine = (shown[r] ?? "") + (isLastLine ? fgAccent("▌") : "");
-      const plain = (shown[r] ?? "") + (isLastLine ? "▌" : "");
-      return withSide(compLine(`${rgb(T.text)}${visLine}`, visible(plain)));
+      return withSide(compLine(`${rgb(T.text)}${visLine}`));
     }
-    if (row === mRow) {
-      const mode = runtime.agent.mode;
-      const model = (runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec).slice(0, Math.max(12, Math.floor(cw / 2)));
-      const left = busy
-        ? `${fgCyan(SPINNER_FRAMES[spinnerTick % SPINNER_FRAMES.length])} ${fgText(BOLD + "working" + RESET)}  ${fgMuted("esc to interrupt")}`
-        : `${modeColor(mode)}${BOLD}${mode}${RESET}${fgMuted(" · ")}${fgText(model)}`;
-      const right = queue.length > 0 ? fgAmber(`⇧${queue.length} queued`) : fgMuted(getEffort());
-      const gap = Math.max(1, cw - 2 - visible(left) - visible(right));
-      return withSide(`${bgRgb(T.composer)}${bar}┃ ${left}${" ".repeat(gap)}${right}${RESET}`);
+    // ── the ╹ / ▀ strip that closes the composer (opencode)
+    if (row === stripRow()) {
+      return withSide(`${agent}╹${rgb(T.composer)}${"▀".repeat(Math.max(0, mw - 1))}${RESET}`);
     }
-    if (row === nRow) {
-      return withSide(`${bgRgb(T.bg)}${bar}╹${rgb(T.composer)}${"▀".repeat(Math.max(0, cw - 2))}${RESET}`);
-    }
-    // ── footer — opencode prompt hints left, real usage right; spinner while busy
+    // ── footer — opencode: workspace + branch left, usage + hints right
     if (row === footerRow()) {
-      const key = (k: string, label: string) => `${BOLD}${fgText(k)}${RESET} ${fgMuted(label)}`;
-      const left = busy
-        ? ` ${fgMuted("working — esc to interrupt")}`
-        : scroll > 0
-          ? ` ${fgAmber("▲")}${fgMuted(` scrolled ↑ ${scroll} — PgDn to tail`)}`
-          : ` ${key("⇥", "agents")}${cw >= 52 ? `  ${key("⌃j", "newline")}` : ""}`;
       const cost = runtime.agent.getCost();
-      const usage = `${(cost.inputTokens / 1000).toFixed(1)}K ${ctxPct()}% · $${cost.costUsd.toFixed(4)}`;
-      const right = cw >= 72 ? `${fgMuted(usage)}  ${key("^p", "commands")}` : cw >= 44 ? fgMuted(usage) : fgMuted("^p");
-      const gap = Math.max(1, cw - visible(left) - visible(right));
-      return withSide(`${bgRgb(T.bg)}${left}${" ".repeat(gap)}${right}${RESET}`);
+      const usage = `${(cost.inputTokens / 1000).toFixed(1)}K (${ctxPct()}%)`;
+      const left = busy
+        ? `${fgCyan(SPINNER_FRAMES[spinnerTick % SPINNER_FRAMES.length])} ${fgText("esc")} ${fgMuted("interrupt")}`
+        : scroll > 0
+          ? fgAmber(`▲ ${scroll} lines up — PgDn to tail`)
+          : fgMuted(`${shortCwd()}${branch ? `:${branch}` : ""}`);
+      const hint = (k: string, label: string) => `${BOLD}${fgText(k)}${RESET} ${fgMuted(label)}`;
+      const hints = cw >= 64 ? `${hint("shift+tab", "agents")}  ${hint("ctrl+p", "commands")}` : cw >= 44 ? hint("ctrl+p", "commands") : "";
+      const usageText = `${fgMuted(usage)} · ${fgMuted(`$${cost.costUsd.toFixed(4)}`)}`;
+      const right = cw >= 44 ? `${usageText}  ${hints}` : cw >= 28 ? usageText : "";
+      const gap = Math.max(1, mw - visible(left) - visible(right));
+      return withSide(`${left}${" ".repeat(gap)}${right}`);
     }
-    // ── chat area (or opencode home)
+    // ── chat area (or opencode home) — sits under the tab rail
+    const chatTop = tabRow() + 1;
+    const chatH = Math.max(1, top - chatTop);
+    if (row < chatTop) return withSide(`${bgRgb(T.bg)}${" ".repeat(mw)}${RESET}`);
     if (homeMode) {
-      return padRight(renderHomeRow(row, top), cw);
+      return withSide(renderHomeRow(row - chatTop, chatH));
     }
     const end = Math.max(0, chatLinesPreview.length - scroll);
-    const start = Math.max(0, end - top);
-    const line = chatLinesPreview[start + row] ?? "";
+    const start = Math.max(0, end - chatH);
+    const line = chatLinesPreview[start + (row - chatTop)] ?? "";
     return withSide(line);
   };
 
@@ -734,10 +784,18 @@ const sessionRows = (query: string): SessionRow[] => {
     switch (row) {
       case 0: return line(`${BOLD}${fgText(sessionTitle.slice(0, Math.max(4, w - 2)))}${RESET}`);
       case 1: return line(branch ? fgMuted(`⎇ ${branch}`) : "");
-      case 3: return heading("Todo");
-      case 4: case 5: case 6: case 7: case 8: case 9: {
-        const i = row - 4;
-        if (todos.length === 0) return row === 4 ? line(fgMuted("(none)")) : line("");
+      // opencode shows the context window first
+      case 3: return heading("Context");
+      case 4: {
+        const cost = runtime.agent.getCost();
+        return line(fgText(`${cost.inputTokens.toLocaleString("en-US")} tokens`));
+      }
+      case 5: return line(fgMuted(`${ctxPct()}% used`));
+      case 6: return line(fgMuted(`$${runtime.agent.getCost().costUsd.toFixed(4)} spent`));
+      case 8: return heading("Todo");
+      case 9: case 10: case 11: case 12: case 13: case 14: {
+        const i = row - 9;
+        if (todos.length === 0) return row === 9 ? line(fgMuted("(none)")) : line("");
         const shown = todos.slice(0, 6);
         if (i < shown.length) {
           const t = shown[i];
@@ -745,19 +803,13 @@ const sessionRows = (query: string): SessionRow[] => {
           const done = t.status === "completed";
           return line(`${todoMarker(t.status)} ${done ? fgMuted(text) : fgText(text)}`);
         }
-        if (i === shown.length && todos.length > shown.length) return line(fgMuted(`… ${todos.length - shown.length} more`));
+        if (i === shown.length && shown.length < todos.length) return line(fgMuted(`… ${todos.length - shown.length} more`));
         return line("");
       }
-      case 11: return heading("Context");
-      case 12: {
-        const cost = runtime.agent.getCost();
-        return line(fgText(`${(cost.inputTokens / 1000).toFixed(1)}K (${ctxPct()}%)`));
-      }
-      case 13: return line(fgMuted(`$${runtime.agent.getCost().costUsd.toFixed(4)} spent`));
-      case 15: return heading("Session");
-      case 16: return line(fgMuted(`${shortId} · ${cwd.split("/").pop() ?? cwd}`));
-      case 18: return heading("Skills & MCP");
-      case 19: return line(fgText(`${runtime.skills.list().length} skills`) + fgMuted(" · ") + fgText(`${runtime.mcp.listServerNames().length} MCP`));
+      case 16: return heading("Session");
+      case 17: return line(fgMuted(`${shortId} · ${cwd.split("/").pop() ?? cwd}`));
+      case 19: return heading("Skills & MCP");
+      case 20: return line(fgText(`${runtime.skills.list().length} skills`) + fgMuted(" · ") + fgText(`${runtime.mcp.listServerNames().length} MCP`));
       default: return line("");
     }
   };
@@ -1377,7 +1429,11 @@ const sessionRows = (query: string): SessionRow[] => {
         const turnMs = Date.now() - turnStartedAt;
         const title = runtime.agent.mode.charAt(0).toUpperCase() + runtime.agent.mode.slice(1);
         const modelShort = (runtime.agent.modelSpec.split("/").pop() ?? runtime.agent.modelSpec).slice(0, 40);
-        pushLine("system", `${modeColor(runtime.agent.mode)}${BOLD}${title}${RESET}${fgMuted(` · ${modelShort} · ${fmtTurnDuration(turnMs)}`)}`);
+        // opencode's assistant footer: Agent · model · duration · tok/s
+        const spent = runtime.agent.getCost();
+        const rate = turnMs > 0 ? spent.totalTokens / (turnMs / 1000) : 0;
+        const rateText = rate >= 1 ? ` · ${rate.toFixed(1)} tok/s` : "";
+        pushLine("system", `${modeColor(runtime.agent.mode)}${BOLD}${title}${RESET}${fgMuted(` · ${modelShort} · ${fmtTurnDuration(turnMs)}${rateText}`)}`);
         render();
         // agent is free — drain the queue in FIFO order, one turn at a time
         const next = queue.shift();

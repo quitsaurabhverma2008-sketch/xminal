@@ -24,6 +24,8 @@ export interface ActivityLine {
   preview?: string[];
   /** diff-body lines beyond the captured preview */
   extraPreviewLines?: number;
+  /** the first lines of the result — opencode shows command output in a card */
+  output?: string[];
 }
 
 export function makeActivity(name: string, argsRaw: string): ActivityLine {
@@ -182,6 +184,8 @@ export function completeActivity(
     preview = body.slice(0, 8);
     if (body.length > 8) extraPreviewLines = body.length - 8;
   }
+  // opencode renders a command card: the command line, then its output
+  const output = counts ? undefined : lines.slice(0, 12).map((l) => stripAnsi(l));
   return {
     ...activity,
     status: isError ? "err" : "ok",
@@ -190,39 +194,72 @@ export function completeActivity(
     extraLines: Math.max(0, totalLines - 1),
     ...(counts ? { added: counts.added, removed: counts.removed } : {}),
     ...(preview ? { preview, ...(extraPreviewLines ? { extraPreviewLines } : {}) } : {}),
+    ...(output ? { output } : {}),
   };
 }
 
-/** Render one activity as styled ANSI lines — long commands wrap across rows. */
+/** Human label for a tool call — opencode renders "Read <path>", "Glob …". */
+export function toolLabel(name: string, argsRaw: string): string {
+  let args: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(argsRaw || "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) args = parsed as Record<string, unknown>;
+  } catch {
+    return name;
+  }
+  const str = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
+  const path = str(args.path ?? args.file ?? "");
+  switch (name) {
+    case "read": return `Read ${path}`;
+    case "write": return `Write ${path}`;
+    case "edit": case "multi_edit": return `Edit ${path}`;
+    case "list": return `List ${str(args.dir ?? args.path ?? ".")}`;
+    case "glob": return `Glob "${str(args.pattern)}" in ${str(args.path ?? ".")}`;
+    case "grep": return `Grep "${str(args.pattern ?? args.query)}" in ${str(args.path ?? ".")}`;
+    case "web_fetch": return `WebFetch ${str(args.url)}`;
+    case "web_search": return `Web Search "${str(args.query ?? args.q)}"`;
+    case "task": return `Task ${str(args.prompt)}`;
+    case "mcp_call": return `MCP ${str(args.server)}/${str(args.tool)}`;
+    case "mcp_list": return `MCP ${str(args.server ?? "all")}`;
+    case "memory": return `Memory ${str(args.query ?? args.text ?? args.action ?? "")}`;
+    case "skill": case "skills": return `Skill "${str(args.name ?? args.skill ?? args.action ?? "")}"`;
+    case "todo": return `Todo ${str(args.text ?? args.action ?? "")}`;
+    case "verify": case "diagnostics": return `Verify ${str(args.command ?? args.path ?? "auto")}`;
+    case "git": case "worktree": case "stash": return `Git ${str(args.command ?? args.args ?? args.subcommand ?? args.operation ?? args.path ?? "")}`;
+    case "checkpoint": return `Checkpoint ${str(args.name ?? args.label ?? args.action ?? "")}`;
+    default: {
+      const target = toolTarget(name, argsRaw, 60);
+      return target ? `${name} ${target}` : name;
+    }
+  }
+}
+
+/**
+ * Render one activity as styled ANSI lines.
+ * opencode: the icon cell is 2 columns wide, the label follows it.
+ */
 export function renderActivity(a: ActivityLine, width: number, now = Date.now()): string[] {
-  const wrapNames = a.name === "bash" || a.name === "git" || a.name === "worktree";
-  const budget = Math.max(16, width - 6);
-  const target = toolTarget(a.name, a.argsRaw, wrapNames ? Number.MAX_SAFE_INTEGER : budget);
-  const wrapTarget = wrapNames ? wrapAnsi(target, Math.max(8, width - 6)) : [target];
+  const budget = Math.max(16, width - 4);
+  const label = toolLabel(a.name, a.argsRaw);
   const glyph = toolGlyph(a.name);
 
   if (a.status === "pending") {
-    // opencode shows a spinner + a pending label while the tool runs
     const pending = TOOL_PENDING[a.name] ?? a.name;
-    return wrapTarget.map((chunk, i) =>
-      i === 0 ? `${fgCyan(spinnerFrame(now))} ${fgMuted(pending)}` : `    ${fgMuted(chunk)}`,
-    );
+    const head = `${fgCyan(spinnerFrame(now))} ${fgMuted(pending)}`;
+    return wrapAnsi(head, budget).map((chunk, i) => (i === 0 ? chunk : `    ${fgMuted(chunk)}`));
   }
 
   const failed = a.status === "err";
-  // opencode: the tool glyph for known tools, ✓/✗ for the generic case
-  const generic = a.name in ["verify", "diagnostics", "git", "worktree", "stash", "checkpoint"];
+  // opencode: ✓ for a finished generic tool, ✗ in the error colour on failure
+  const generic = !Object.prototype.hasOwnProperty.call(TOOL_GLYPH, a.name);
   const icon = generic ? (failed ? fgRed("✗") : fgGreen("✓")) : failed ? fgRed(glyph) : fgMuted(glyph);
-  const label = failed ? fgRed(target) : fgText(target);
+  const text = failed ? fgRed(label) : fgText(label);
   const bits: string[] = [];
-  // opencode shows a diff for writes — we surface the counts, but only when there is something to show
   if ((a.added ?? 0) + (a.removed ?? 0) > 0) {
-    bits.push(`${fgGreen(`+${a.added ?? 0}`)} ${fgRed(`−${a.removed ?? 0}`)}`);
+    bits.push(`${fgGreen(`+${a.added ?? 0}`)} ${fgRed(`\u2212${a.removed ?? 0}`)}`);
   }
-  const out = wrapTarget.map((chunk, i) =>
-    i === 0 ? `${icon} ${label}` : `    ${failed ? fgRed(chunk) : fgText(chunk)}`,
-  );
+  const head = `${icon} ${text}`;
+  const out = wrapAnsi(head, budget).map((chunk, i) => (i === 0 ? chunk : `    ${failed ? fgRed(chunk) : fgText(chunk)}`));
   if (bits.length && out.length) out[out.length - 1] += `  ${bits.join(" ")}`;
   return out;
 }
-
