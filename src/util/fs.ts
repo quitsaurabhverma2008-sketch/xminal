@@ -21,9 +21,25 @@ export function readJson<T>(file: string, fallback: T): T {
   }
 }
 
-export function writeJson(file: string, value: unknown): void {
+export function writeJson(file: string, value: unknown, mode?: number): void {
   ensureDir(path.dirname(file));
   fs.writeFileSync(file, JSON.stringify(value, null, 2) + "\n", "utf8");
+  if (mode !== undefined) {
+    try {
+      fs.chmodSync(file, mode);
+    } catch {
+      // best effort — some filesystems (FAT/exFAT) do not support chmod
+    }
+  }
+}
+
+/** Restrict a file to the owner (best effort). */
+export function chmodPrivate(file: string): void {
+  try {
+    fs.chmodSync(file, 0o600);
+  } catch {
+    // best effort
+  }
 }
 
 export function readText(file: string): string {

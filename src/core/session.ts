@@ -179,6 +179,13 @@ export class Session {
     this.appendEvent("mode", { mode });
   }
 
+  /** Rename the session (persisted). */
+  setTitle(title: string): void {
+    this.meta.title = title;
+    this.appendEvent("note", { text: `renamed: ${title}` });
+    this.updateIndex();
+  }
+
   setModel(model: string): void {
     this.meta.model = model;
     this.appendEvent("model", { model });

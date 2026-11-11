@@ -9,7 +9,7 @@ import { rendererCallbacks } from "./cli/callbacks";
 import { startRepl } from "./cli/repl";
 import { startTui } from "./tui/tui";
 import { Runtime } from "./runtime";
-import { loadConfig, defaultConfig, saveGlobalConfig, initProject, providerReady, listModelAliases } from "./config/config";
+import { loadConfig, defaultConfig, saveGlobalConfig, initProject, providerReady, listModelAliases, hardenConfigPermissions } from "./config/config";
 import { globalConfigPath, projectConfigPath, globalXminalDir } from "./config/paths";
 import { runDoctor, formatDoctor } from "./config/doctor";
 import { Session } from "./core/session";
@@ -32,6 +32,12 @@ import type { PermissionMode } from "./config/types";
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+  // the global config holds provider keys → owner-only, every run
+  try {
+    hardenConfigPermissions();
+  } catch {
+    // never block startup on a chmod failure
+  }
   if (args.flags["no-color"]) process.env.NO_COLOR = "1";
   if (typeof args.flags.permission === "string") process.env.XMINAL_PERMISSION_MODE = args.flags.permission;
   const cwd = typeof args.flags.cwd === "string" ? path.resolve(args.flags.cwd) : process.cwd();
@@ -127,7 +133,7 @@ async function main(): Promise<void> {
         await startMcpStdioServer(cwd);
         return;
       }
-      await commandMcp(cwd, renderer, args.positionals);
+      await commandMcp(cwd, renderer, args.positionals, args.flags);
       return;
 
     case "audit": {
@@ -342,16 +348,17 @@ function commandSessions(cwd: string, renderer: Renderer): void {
   );
 }
 
-async function commandMcp(cwd: string, renderer: Renderer, positionals: string[] = []): Promise<void> {
+async function commandMcp(
+  cwd: string,
+  renderer: Renderer,
+  positionals: string[] = [],
+  flags: Record<string, string | boolean | undefined> = {},
+): Promise<void> {
   // catalogue search: `xminal mcp search <query> [--platform mobile]`
   const parts = positionals.map((p) => String(p)).filter(Boolean);
   if (parts[0] === "search" || parts[0] === "catalog" || parts[0] === "find") {
-    const platformIndex = parts.findIndex((p) => p === "--platform" || p === "-p");
-    const platform = platformIndex >= 0 ? parts[platformIndex + 1] : undefined;
-    const query = parts
-      .slice(1)
-      .filter((_, i) => !(platformIndex >= 0 && (i === platformIndex - 1 || i === platformIndex)))
-      .join(" ");
+    const platform = typeof flags.platform === "string" ? flags.platform : undefined;
+    const query = parts.slice(1).join(" ");
     const catalog = loadMcpCatalog();
     if (!catalog) {
       renderer.warn("MCP catalog missing — run scripts/fetch-mcp-catalog.py to build data/mcp-catalog.json");

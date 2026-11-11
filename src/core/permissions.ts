@@ -157,9 +157,19 @@ export class PermissionManager {
   }
 
   classifyTool(tool: string, args: Record<string, unknown>): { risk: RiskLevel; reason: string } {
-    if (READ_ONLY_TOOLS.has(tool)) return { risk: "safe", reason: "read-only tool" };
+    if (READ_ONLY_TOOLS.has(tool)) {
+      // reading a protected file (keys, .env, ssh) is not "safe" — it leaks into the model context
+      if (tool === "read") {
+        const file = String(args.path ?? args.file ?? "");
+        const protectedHit = this.isProtected(file);
+        if (protectedHit) return { risk: "dangerous", reason: `protected path read: ${protectedHit}` };
+      }
+      return { risk: "safe", reason: "read-only tool" };
+    }
     if (tool === "bash") {
       const command = String(args.command ?? "");
+      const escape = this.bashOutsideWorkspace(command);
+      if (escape) return { risk: "dangerous", reason: escape };
       for (const item of DANGEROUS_PATTERNS) {
         if (item.pattern.test(command)) return { risk: "dangerous", reason: item.reason };
       }
@@ -172,6 +182,9 @@ export class PermissionManager {
       const file = String(args.path ?? args.file ?? "");
       const protectedHit = this.isProtected(file);
       if (protectedHit) return { risk: "dangerous", reason: `protected path: ${protectedHit}` };
+      if (this.isOutsideWorkspace(file)) {
+        return { risk: "dangerous", reason: `outside the workspace: ${file}` };
+      }
       return { risk: "risky", reason: "file mutation" };
     }
     if (tool === "git_commit" || tool === "git_branch" || tool === "worktree") {
@@ -179,6 +192,42 @@ export class PermissionManager {
     }
     if (tool === "verify" || tool === "ralph") return { risk: "risky", reason: "runs project commands" };
     return { risk: "risky", reason: "unknown tool" };
+  }
+
+  /**
+   * Detect a shell command that clearly mutates something outside the
+   * workspace (writing to $HOME, /etc, /usr, …). Best effort — a heuristic,
+   * not a sandbox. Anything it flags is denied unless the user approves.
+   */
+  bashOutsideWorkspace(command: string): string | undefined {
+    if (!command) return undefined;
+    const mutating = /(^|[;&|]\s*)(sudo\s+)?(rm|mv|cp|tee|dd|chmod|chown|truncate|install|ln|mkdir|touch|echo|printf|cat|shred)\b|>>?\s*\//;
+    if (!mutating.test(command)) return undefined;
+    const absolute = command.match(/(^|[\s'"=])\/[A-Za-z0-9_./-]+/g) ?? [];
+    for (const raw of absolute) {
+      const target = raw.trim().replace(/^["'=]+/, "");
+      if (!target.startsWith("/")) continue;
+      if (this.isOutsideWorkspace(target) && !target.startsWith("/tmp") && !target.startsWith("/dev")) {
+        return `shell writes outside the workspace: ${target}`;
+      }
+    }
+    const home = process.env.HOME ?? "";
+    if (home && new RegExp(`(^|[\\s'"])${home.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(command)) {
+      return "shell writes inside the home directory, outside the workspace";
+    }
+    return undefined;
+  }
+
+  /** True when the path resolves outside the project directory. */
+  isOutsideWorkspace(file: string): boolean {
+    if (!file) return false;
+    const abs = path.resolve(this.cwd, expandHome(file));
+    if (abs === this.cwd) return false;
+    if (abs.startsWith(this.cwd + path.sep)) return false;
+    // the project's own state directory is fair game
+    const projectState = path.join(this.cwd, ".xminal");
+    if (abs === projectState || abs.startsWith(projectState + path.sep)) return false;
+    return true;
   }
 
   isProtected(file: string): string | undefined {

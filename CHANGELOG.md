@@ -4,6 +4,44 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-11-11
+
+**Every slash command works in the TUI, the security model got teeth, and the npm package went from 62 MB to 3.5 MB.**
+
+### Fixed
+
+- **The vendored OpenCode engine could never start** — the launcher looked for `vendor/opencode/packages/...` while the checkout lives at `vendor/packages/...`. Engine discovery is now resolution-based (`$XMINAL_OPENCODE_ENGINE` → `<pkg>/vendor` → `<pkg>/../opencode`) and a missing checkout produces a clear message with the three ways to fix it, instead of a silent failure.
+- **Most slash commands were swallowed by the TUI palette** — `/skills`, `/memory`, `/tasks`, `/config`, `/audit` and friends were listed in the palette but did nothing. They now run *inside* the TUI (output rendered into the transcript, no alternate-screen exit).
+- **`--platform` / `--tail` were not parsed as value flags** — `xminal mcp search pdf --platform mobile` silently ignored the filter. `platform`, `tail`, `limit` and `max-cost` now take a value.
+- **`/mcp search` dropped the first word of the query** — an off-by-one in the filter removed the term next to the flag.
+- **The wheel scrolled the chat instead of the overlay** — with `/mcp` or `/sessions` open, scrolling moved the transcript. Now the wheel always moves the selection inside an overlay.
+- **`/mode` was not native** — it now opens a mode picker (build / plan / compose / review / yolo) inside the TUI.
+- **The global config was not owner-only** — `~/.xminal/config.json` holds provider API keys. It is written `0600` and re-hardened on every start.
+- **`prepare.cjs` claimed a "committed dist/"** — `dist/` is gitignored, so a checkout without devDependencies had no way to build. It now fails with an actionable message instead of pretending.
+- **`XMINAL_LOG` did nothing** — it now writes a redacted log to `~/.xminal/xminal.log` (provider failures, tool errors, permission denials).
+
+### Added
+
+- **Native TUI commands**: `/rename`, `/branch`, `/rewind`, `/checkpoints`, `/undo`, `/compact`, `/cost`, `/audit`, `/status`, `/permissions`, `/docs` — all inside the TUI, all without leaving the alternate screen.
+- **Security hardening**:
+  - writes **outside the workspace** are `dangerous` (denied unless approved) — an agent can no longer edit `~/.bashrc` or `/etc`;
+  - **reads of protected paths** (`.env`, `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config/gh`) are `dangerous` too — they used to be auto-approved in `auto` mode and would leak into the model context;
+  - shell commands that clearly write outside the workspace are flagged;
+  - tool output and error lines are **redacted** before they reach the screen.
+- **`npm run verify:package`** — packs the tarball, installs it into a throwaway prefix and runs the CLI. Added to CI on all three operating systems: this is what catches packaging breakage (a broken `prepare`, a missing file, a wrong `bin`).
+- **`npm run verify:secrets`** — a secret scan over every tracked file, wired into CI as its own job.
+- **Documentation**: `docs/INSTALL.md`, `docs/FRONTENDS.md`, `docs/MCP.md`, `docs/TROUBLESHOOTING.md`, `docs/SECURITY.md`.
+- **`Session.setTitle()`** — session rename is now a first-class API.
+
+### Changed
+
+- **The npm tarball no longer ships `vendor/`** — 62 MB unpacked / 5,443 files → **3.5 MB / 179 files**. The package is now small enough to install anywhere. The vendored engine still works from a git checkout or an external checkout via `XMINAL_OPENCODE_ENGINE`; the built-in TUI (default) and the Ink engine cover every device.
+- The MCP overlay now renders the config snippet from `mcpConfigSnippet()` — one source of truth instead of a hand-rolled copy.
+
+### Notes
+
+- 88/88 tests green (7 new security tests). CI: Ubuntu/macOS/Windows × Node 20/22, plus package-smoke and secret-scan jobs.
+
 ## [0.14.0] — 2026-11-11
 
 **Sessions work in the TUI: `/new`, `/sessions`, `/resume` — with search.**

@@ -1,10 +1,15 @@
+import fs from "node:fs";
+import path from "node:path";
 import { Runtime } from "../runtime";
+import { verifyAudit } from "../cli/audit";
 import { loadConfig, resolveModel } from "../config/config";
 import { listEffectiveAliases, refreshModelsCatalog, effectiveModelMap, catalogMeta } from "../config/models-catalog";
-import { loadMcpCatalog, searchMcpServers } from "../mcp/catalog";
+import { loadMcpCatalog, searchMcpServers, mcpConfigSnippet } from "../mcp/catalog";
 import { visibleWidth, graphemeSlice, stripAnsi as stripAnsiW, splitGraphemes, wrapAnsi } from "./width";
 import { formatAssistantText, isLikelyDiff, tintDiffRow } from "./format";
 import { renderMarkdown } from "./markdown";
+import { redactSecrets } from "../util/redact";
+import { logEvent } from "../util/log";
 import type { ProviderConfig, ModelConfig } from "../config/types";
 import { Renderer } from "../cli/render";
 import { handleCommand } from "../cli/commands";
@@ -291,7 +296,8 @@ type Overlay =
   | { kind: "model"; query: string; index: number }
   | { kind: "variant"; index: number }
   | { kind: "mcp"; query: string; index: number }
-  | { kind: "sessions"; query: string; index: number };
+  | { kind: "sessions"; query: string; index: number }
+  | { kind: "mode"; index: number };
 
 const EFFORTS = ["low", "medium", "high", "max"];
 const modelAliases = (): Array<{ alias: string; provider: string; model: string; free: boolean }> => {
@@ -510,7 +516,7 @@ const sessionRows = (query: string): SessionRow[] => {
         }
         if (a.extraPreviewLines) out.push(`   ${fgMuted(`… ${a.extraPreviewLines} more diff lines`)}`);
       } else if (a.status === "err" && a.detail) {
-        out.push(`   ${fgMuted(a.detail)}`);
+        out.push(`   ${fgMuted(redactSecrets(a.detail).text)}`);
       }
       return out;
     }
@@ -541,8 +547,9 @@ const sessionRows = (query: string): SessionRow[] => {
     }
     // ── everything else (ok/err/system) — quiet, indented
     const color = line.kind === "err" ? fgRed : line.kind === "ok" ? fgGreen : fgMuted;
+    const safe = redactSecrets(line.text).text;
     const out: string[] = [];
-    for (const part of wrap(line.text, Math.max(4, w - 3))) {
+    for (const part of wrap(safe, Math.max(4, w - 3))) {
       out.push(`   ${color(part)}`);
     }
     if ((line.kind === "ok" || line.kind === "err") && likelyDiff(line.text)) {
@@ -983,6 +990,31 @@ const sessionRows = (query: string): SessionRow[] => {
       return;
     }
 
+    if (ov.kind === "mode") {
+      const modes: AgentMode[] = ["build", "plan", "compose", "review", "yolo"];
+      const height = modes.length + 4;
+      const { width, top, left } = centerPanel(r, w, height);
+      const innerW = width - 2;
+      const lines = [
+        panelBorder("Agent mode", innerW),
+        panelSide(`${fgMuted("Pick the agent mode for this session:")}`, innerW, C.panel),
+      ];
+      modes.forEach((mode, i) => {
+        const selected = i === ov.index;
+        const current = mode === runtime.agent.mode;
+        const label = current ? `${mode}  (current)` : mode;
+        const marker = selected ? `${bgRgb(C.panel3)}${fgAccent(BOLD + " › " + label.padEnd(18))}${RESET}` : `   ${fgText(label)}`;
+        lines.push(panelSide(marker, innerW, C.panel));
+      });
+      lines.push(panelSide("", innerW, C.panel));
+      lines.push(panelSide(`${fgMuted("↑↓ select  ·  Enter set  ·  Esc cancel  ·  Tab cycles")}`, innerW, C.panel));
+      lines.push(panelBottom(width));
+      for (let i = 0; i < lines.length; i++) {
+        frame[top + i] = overlayDim(lines[i], top + i, r, left, width, ov);
+      }
+      return;
+    }
+
     if (ov.kind === "variant") {
       const height = EFFORTS.length + 4;
       const { width, top, left } = centerPanel(r, w, height);
@@ -1037,6 +1069,7 @@ const sessionRows = (query: string): SessionRow[] => {
     lineVersion++;
     lines.push({ kind, text });
     scroll = 0;
+    if (kind === "err") logEvent("error", stripAnsiW(text));
     render();
   };
   const appendAssistant = (text: string) => {
@@ -1141,6 +1174,51 @@ const sessionRows = (query: string): SessionRow[] => {
     previous.close();
   };
 
+  // ─── classic commands, rendered into the TUI transcript ──────────
+  const tuiRenderer = {
+    banner: () => undefined,
+    userPrompt: () => undefined,
+    assistantStart: () => undefined,
+    text: (chunk: string) => pushLine("system", chunk),
+    reasoning: (chunk: string) => pushLine("reasoning", chunk),
+    toolCall: (call: { name: string; arguments: string }) => pushLine("system", `${fgMuted(`→ ${call.name}`)}`),
+    toolResult: (name: string, result: { isError?: boolean; content?: string }) =>
+      pushLine(result.isError ? "err" : "ok", `${name}: ${firstLine(String(result.content ?? ""))}`),
+    usage: () => undefined,
+    status: (message: string) => pushLine("system", fgMuted(message)),
+    info: (message: string) => pushLine("system", message),
+    success: (message: string) => pushLine("ok", message),
+    warn: (message: string) => pushLine("system", fgAmber(message)),
+    error: (message: string) => pushLine("err", message),
+    costLine: () => "",
+    flush: () => undefined,
+  } as unknown as Renderer;
+
+  /** Run a classic slash command inside the TUI (no alternate-screen exit). */
+  const runClassicInTui = async (cmdLine: string): Promise<void> => {
+    try {
+      await handleCommand(cmdLine, {
+        runtime,
+        renderer: tuiRenderer,
+        cwd,
+        exit: () => close(),
+        restart: (options) => {
+          switchSession(options ?? {});
+          lines.length = 0;
+          pushLine("system", `${fgGreen("session switched")} ${fgMuted(`· ${shortId}`)}`);
+          render();
+        },
+        ask: async (question: string) => {
+          pushLine("system", fgMuted(`? ${question}`));
+          return "";
+        },
+      });
+    } catch (error) {
+      pushLine("err", (error as Error).message);
+    }
+    render();
+  };
+
   // ─── command execution ───────────────────────────────────────────
   const runCommandLine = (cmdLine: string): boolean => {
     const parts = cmdLine.trim().split(/\s+/);
@@ -1156,12 +1234,107 @@ const sessionRows = (query: string): SessionRow[] => {
     if (name === "/help" || name === "/?") { overlay = { kind: "palette", index: 0 }; paletteIndex = 0; input = ""; cursor = 0; render(); return true; }
     if (name === "/model") { modelScope = modelScopeOfSpec(runtime.agent.modelSpec); overlay = { kind: "model", query: "", index: 0 }; paletteIndex = 0; input = ""; cursor = 0; render(); return true; }
     if (name === "/provider" || name === "/connect" || name === "/set-key") { overlay = { kind: "provider", index: 0 }; input = ""; cursor = 0; render(); return true; }
-    if (name === "/variant" || name === "/effort" || name === "/reasoning") { overlay = { kind: "variant", index: 3 }; input = ""; cursor = 0; render(); return true; }
+    if (name === "/mode") {
+      const modes: AgentMode[] = ["build", "plan", "compose", "review", "yolo"];
+      const current = modes.indexOf(runtime.agent.mode);
+      overlay = { kind: "mode", index: current < 0 ? 0 : current };
+      paletteIndex = overlay.index;
+      input = "";
+      cursor = 0;
+      render();
+      return true;
+    }
+    if (name === "/variant" || name == "/effort" || name === "/reasoning") { overlay = { kind: "variant", index: 3 }; input = ""; cursor = 0; render(); return true; }
     if (name === "/mcp") { overlay = { kind: "mcp", query: "", index: 0 }; input = ""; cursor = 0; render(); return true; }
     if (name === "/new") {
       switchSession({ newSession: true });
       lines.length = 0;
       pushLine("system", `${fgGreen("new session")} ${fgMuted(`· ${shortId.slice(-6)}`)}`);
+      render();
+      return true;
+    }
+    if (name === "/rename") {
+      const title = parts.slice(1).join(" ").trim();
+      if (!title) { pushLine("system", fgMuted("usage: /rename <new title>")); render(); return true; }
+      runtime.session.setTitle(title);
+      sessionTitle = title;
+      pushLine("system", `${fgGreen("renamed")} ${fgMuted(`· ${title}`)}`);
+      render();
+      return true;
+    }
+    if (name === "/undo") {
+      const undone = runtime.session.undoLast();
+      pushLine("system", undone ? `${fgGreen("undone")} ${fgMuted(`${undone.id} · ${undone.restored} file(s) restored`)}` : fgMuted("no checkpoints to undo"));
+      render();
+      return true;
+    }
+    if (name === "/checkpoints") {
+      const points = runtime.session.listCheckpoints();
+      if (points.length === 0) pushLine("system", fgMuted("no checkpoints"));
+      else for (const point of points.slice(-8)) {
+        pushLine("system", `${fgAccent(point.id)} ${fgMuted(`· ${point.ts.slice(0, 19)} · ${point.label} · ${point.files.length} file(s)`)}`);
+      }
+      render();
+      return true;
+    }
+    if (name === "/rewind") {
+      const target = parts.slice(1).join(" ").trim();
+      if (!target) { pushLine("system", fgMuted("usage: /rewind <checkpoint-id>")); render(); return true; }
+      try {
+        const restored = runtime.session.restoreCheckpoint(target);
+        pushLine("system", `${fgGreen("restored")} ${fgMuted(`${target} · ${restored} file(s)`)}`);
+      } catch (error) {
+        pushLine("err", (error as Error).message);
+      }
+      render();
+      return true;
+    }
+    if (name === "/compact") {
+      const removed = runtime.agent.compactHistory();
+      pushLine("system", removed ? `${fgGreen("compacted")} ${fgMuted(`${removed} message(s)`)}` : fgMuted("nothing to compact"));
+      render();
+      return true;
+    }
+    if (name === "/branch") {
+      const title = parts.slice(1).join(" ").trim() || undefined;
+      const branched = runtime.session.branch(title);
+      switchSession({ sessionId: branched.id });
+      lines.length = 0;
+      pushLine("system", `${fgGreen("branched")} ${fgMuted(`· ${branched.id.slice(-6)} · ${branched.meta.title}`)}`);
+      render();
+      return true;
+    }
+    if (name === "/docs") {
+      try {
+        const doc = fs.readFileSync(path.join(cwd, "docs", "ROADMAP.md"), "utf8");
+        for (const line of doc.split("\n").slice(0, 40)) pushLine("system", fgMuted(line));
+      } catch {
+        pushLine("system", fgMuted("docs/ROADMAP.md not found (run from a checkout)"));
+      }
+      render();
+      return true;
+    }
+    if (name === "/cost") {
+      const cost = runtime.agent.getCost();
+      pushLine("system", `${fgAccent("cost")} ${fgMuted(`· ${cost.inputTokens} in / ${cost.outputTokens} out · $${cost.costUsd.toFixed(4)}`)}`);
+      render();
+      return true;
+    }
+    if (name === "/audit") {
+      const result = verifyAudit(cwd);
+      pushLine("system", result.valid ? `${fgGreen("audit ok")} ${fgMuted(`${result.entries} entries · chain verified`)}` : fgRed(`audit failed: ${result.reason ?? "chain mismatch"}`));
+      render();
+      return true;
+    }
+    if (name === "/permissions") {
+      pushLine("system", `${fgAccent("permissions")} ${fgMuted(`· ${runtime.config.permissions.mode} · protected ${runtime.config.permissions.protectedPaths.join(", ")}`)}`);
+      render();
+      return true;
+    }
+    if (name === "/status") {
+      const cost = runtime.agent.getCost();
+      pushLine("system", `${fgAccent(runtime.agent.mode)} ${fgMuted(`· ${runtime.agent.modelSpec} · ${cost.turns} turns · ${cost.inputTokens} in / ${cost.outputTokens} out`)}`);
+      pushLine("system", fgMuted(`· ${cwd}`));
       render();
       return true;
     }
@@ -1307,8 +1480,12 @@ const sessionRows = (query: string): SessionRow[] => {
     render();
   };
 
-  const overlayUp = () => { if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "mcp" || overlay.kind === "sessions") { paletteIndex = Math.max(0, paletteIndex - 1); } else if (overlay.kind === "provider") { overlay.index = Math.max(0, overlay.index - 1); } else if (overlay.kind === "variant") { overlay.index = Math.max(0, overlay.index - 1); } };
+  const overlayUp = () => { if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "mcp" || overlay.kind === "sessions" || overlay.kind === "mode") { paletteIndex = Math.max(0, paletteIndex - 1); } else if (overlay.kind === "provider") { overlay.index = Math.max(0, overlay.index - 1); } else if (overlay.kind === "variant") { overlay.index = Math.max(0, overlay.index - 1); } };
   const overlayDown = () => {
+    if (overlay.kind === "mode") {
+      paletteIndex = Math.min(4, paletteIndex + 1);
+      return;
+    }
     if (overlay.kind === "sessions") {
       const count = sessionRows(overlay.query).length;
       paletteIndex = Math.min(Math.max(0, count - 1), paletteIndex + 1);
@@ -1341,7 +1518,10 @@ const sessionRows = (query: string): SessionRow[] => {
       if (overlay.kind === "palette") {
         const cmd = item as (typeof COMMANDS)[number];
         if (cmd.action === "provider") { overlay = { kind: "provider", index: 0 }; render(); return true; }
-        runCommandLine(cmd.name);
+        overlay = { kind: "none" };
+        if (runCommandLine(cmd.name)) { render(); return true; }
+        // not native in the TUI — run the classic command here, inside the TUI
+        void runClassicInTui(cmd.name);
         return true;
       }
       // model picked — apply it as the new default model for this session
@@ -1400,6 +1580,15 @@ const sessionRows = (query: string): SessionRow[] => {
       render();
       return true;
     }
+    if (overlay.kind === "mode") {
+      const modes: AgentMode[] = ["build", "plan", "compose", "review", "yolo"];
+      const mode = modes[Math.min(overlay.index, modes.length - 1)];
+      runtime.setMode(mode);
+      pushLine("system", `${fgGreen("mode")} ${fgMuted(`→ ${mode}`)}`);
+      overlay = { kind: "none" };
+      render();
+      return true;
+    }
     if (overlay.kind === "variant") {
       const effort = EFFORTS[overlay.index];
       setEffort(effort);
@@ -1432,11 +1621,10 @@ const sessionRows = (query: string): SessionRow[] => {
       const entry = hits[Math.min(paletteIndex, Math.max(0, hits.length - 1))];
       overlay = { kind: "none" };
       if (entry) {
-        const key = entry.id.replace(/[^a-zA-Z0-9_-]/g, "-");
         pushLine("system", `${fgAccent(entry.name)} — ${fgMuted(entry.work)}`);
         pushLine("system", `${fgMuted(`${entry.id} · ${entry.platforms.join("/").toUpperCase()}${entry.remote ? " · HOSTED" : ""} · ${entry.url}`)}`);
         pushLine("system", fgMuted("add to ~/.xminal/config.json →"));
-        pushLine("system", fgMuted(`  "mcpServers": { "${key}": { "command": ["npx", "-y", "@modelcontextprotocol/server-${key}"] } }`));
+        for (const row of mcpConfigSnippet(entry).split("\n")) pushLine("system", fgMuted(row));
       }
       render();
       return true;
@@ -1482,7 +1670,8 @@ const sessionRows = (query: string): SessionRow[] => {
     const wheel = (s.match(MOUSE_RE) ?? []).map((m) => Number(/\[<(\d+)/.exec(m)?.[1] ?? -1));
     s = s.replace(MOUSE_RE, "");
     for (const button of wheel) {
-      if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "provider" || overlay.kind === "variant") {
+      if (overlay.kind !== "none") {
+        // inside any overlay the wheel moves the selection, never the chat
         if (button === 64) overlayUp();
         else if (button === 65) overlayDown();
       } else {

@@ -1,5 +1,5 @@
 import path from "node:path";
-import { exists, readJson, writeJson, ensureDir } from "../util/fs";
+import { exists, readJson, writeJson, ensureDir, chmodPrivate } from "../util/fs";
 import { globalConfigPath, projectConfigPath } from "./paths";
 import { DEFAULT_MODELS } from "./default-models";
 import { PROVIDER_DEFAULT_MODELS } from "./provider-defaults";
@@ -139,7 +139,17 @@ export function loadConfig(cwd: string): LoadedConfig {
 }
 
 export function saveGlobalConfig(config: XminalConfig): void {
-  writeJson(globalConfigPath(), config);
+  // the global config holds provider API keys → owner-read/write only
+  writeJson(globalConfigPath(), config, 0o600);
+}
+
+/**
+ * Make sure the global config is not world/group readable.
+ * Called at startup so a config written by an older version gets hardened.
+ */
+export function hardenConfigPermissions(): void {
+  const file = globalConfigPath();
+  if (exists(file)) chmodPrivate(file);
 }
 
 export function saveProjectConfig(cwd: string, config: XminalConfig): void {

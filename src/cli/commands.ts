@@ -475,7 +475,7 @@ export async function handleCommand(input: string, ctx: CommandContext): Promise
         const platform = platformFlag >= 0 ? parts[platformFlag + 1] : undefined;
         const query = parts
           .slice(1)
-          .filter((p, i) => !(i === 0 && platformFlag === 1) && !(platformFlag >= 0 && i === platformFlag) && !(platformFlag >= 0 && i === platformFlag + 1))
+          .filter((_, i) => !(platformFlag >= 0 && (i === platformFlag - 1 || i === platformFlag)))
           .join(" ");
         const hits = searchMcpServers(query, { platform, limit: 40 });
         const catalog = loadMcpCatalog();

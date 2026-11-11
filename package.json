@@ -1,6 +1,6 @@
 {
   "name": "xminal",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "XMINAL — Every coding agent. One terminal. Provider-agnostic fullscreen TUI (pure Node), agent runtime, 46 built-in providers, sessions, MCP, memory, worktrees, Ralph loops.",
   "license": "MIT",
   "author": "XMINAL contributors",
@@ -18,8 +18,7 @@
     "scripts",
     "SECURITY.md",
     "AGENTS.md",
-    "site",
-    "vendor"
+    "site"
   ],
   "scripts": {
     "build": "npm run build:tsc && npm run build:ink && node scripts/copy-data.cjs",
@@ -27,11 +26,13 @@
     "pretest": "npm run build",
     "test": "node scripts/run-tests.cjs",
     "dev": "node dist/index.js",
-    "verify": "npm run build && npm test",
+    "verify": "npm run build && npm test && npm run verify:secrets",
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build:tsc": "tsc -p tsconfig.json",
     "build:ink": "node scripts/build-ink.mjs",
-    "typecheck:ink": "tsc -p tsconfig.ink.json --noEmit"
+    "typecheck:ink": "tsc -p tsconfig.ink.json --noEmit",
+    "verify:package": "bash scripts/package-smoke.sh",
+    "verify:secrets": "node scripts/secret-scan.cjs"
   },
   "engines": {
     "node": ">=18"

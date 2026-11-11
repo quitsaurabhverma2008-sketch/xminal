@@ -9,3 +9,5 @@ coverage/
 .DS_Store
 *.tgz
 .agents/
+__pycache__/
+*.pyc

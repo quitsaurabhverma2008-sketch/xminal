@@ -9,7 +9,7 @@
 
 ## Conventions
 
-- Language: TypeScript strict, CommonJS output, Node >= 18, zero runtime dependencies.
+- Language: TypeScript strict, CommonJS output, Node >= 18. The core CLI + built-in TUI have zero runtime dependencies; the optional Ink engine (`XMINAL_TUI_ENGINE=ink`) adds 4 (ink, react, react-reconciler, @inkjs/ui).
 - Never commit secrets or `.xminal/` runtime state (gitignored). `dist/` is gitignored; rebuild with `npm run build` (the `prepare` script builds it for git-URL installs).
 - Sessions/checkpoints/usage live under `.xminal/` (gitignored).
 - Keep the CLI honest: no fabricated features, no invented URLs, and no silent behavior — surface errors, never swallow them.

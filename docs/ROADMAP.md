@@ -8,7 +8,7 @@
 
 One engine, one terminal, one professional experience — an opencode-class,
 provider-agnostic coding agent distributed as an npm CLI. Local/phone-first,
-free-tier-first, zero runtime dependencies.
+free-tier-first, zero runtime dependencies in the core (the optional Ink engine adds 4).
 
 **Deliberately not built:** GUI/Electron app, SaaS, hosted telemetry/sign-in,
 Windows-native package, single-binary builds, OAuth device-code for GitHub Models,

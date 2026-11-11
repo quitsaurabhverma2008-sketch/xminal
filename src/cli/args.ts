@@ -18,6 +18,11 @@ const VALUE_FLAGS = new Set([
   "host",
   "token",
   "cwd",
+  // value-taking flags (space form: --platform mobile, --tail 20)
+  "platform",
+  "tail",
+  "limit",
+  "max-cost",
   "p",
 ]);
 

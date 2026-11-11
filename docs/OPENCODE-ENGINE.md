@@ -42,9 +42,19 @@ Requires Node ≥ 22 (ink 8 engines). No Bun. No native builds. Falls back to th
 
 ```bash
 # desktop only (macOS / Linux / Windows). Requires Bun: https://bun.sh
-npm install -g xminal
-XMINAL_TUI_ENGINE=opencode xminal
+# from a git checkout (the npm tarball does NOT ship vendor/ — see below)
+git clone https://github.com/quitsaurabhverma2008-sketch/xminal.git
+cd xminal && npm install && npm run build
+XMINAL_TUI_ENGINE=opencode node dist/index.js
 ```
+
+Already have an opencode checkout? Point XMINAL at it:
+
+```bash
+XMINAL_OPENCODE_ENGINE=/path/to/opencode XMINAL_TUI_ENGINE=opencode xminal
+```
+
+XMINAL looks for the engine in this order: `$XMINAL_OPENCODE_ENGINE` → `<package>/vendor` → `<package>/../opencode`. When it finds nothing it says so plainly and names the three options — it never pretends to start the engine.
 
 On Android/Termux the engine cannot run: there is no public prebuilt `@opentui/core-android-arm64` native renderer (upstream ships darwin/linux/win32 targets only). XMINAL detects this and falls back to the built-in TUI with a clear warning — never silently.
 
@@ -53,7 +63,8 @@ On Android/Termux the engine cannot run: there is no public prebuilt `@opentui/c
 - **Bridge coverage is the happy path** — create session, prompt, streamed reply, tool calls, interactive permissions, model/provider/agent/command lists, usage accounting. Unimplemented: fork, revert, compact, session delete/rename, command execution over the bridge, MCP actions from the palette, form flows. Those return honest `501`s — never fake success.
 - The vendored tree currently carries 3 pre-existing typecheck diagnostics (`@types/node` `zlib.zstdCompressSync`, `module.registerHooks` drift). They do not affect the Bun runtime.
 - Engine requires Bun on `PATH` (`XMINAL_BUN` overrides the binary lookup).
-- npm tarball carries `vendor/` (~70 MB). This is deliberate so desktop installs work out of the box; Android pays the download cost but cannot use the engine (built-in TUI remains default there).
+- **The npm tarball does not ship `vendor/`** (~70 MB of source). Since v0.15.0 the published package is 3.5 MB / 179 files — small enough to install anywhere, and the vendored engine runs from a git checkout or an external checkout via `XMINAL_OPENCODE_ENGINE`. The built-in TUI (default) and the Ink engine cover every device.
+- The built-in TUI and the Ink engine are the supported frontends on Android/Termux; see `docs/FRONTENDS.md`.
 
 ## Updating the vendored copy
 

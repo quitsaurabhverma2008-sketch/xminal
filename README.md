@@ -8,7 +8,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.14.0` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.15.0` · MIT · Node ≥ 18 · zero deps for the core (the Ink engine adds 4)
 
 </div>
 
@@ -291,14 +291,16 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.14.0** — live on npm, 69/69 tests, CI green on Ubuntu/macOS/Windows × Node 20/22. Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.15.0** — live on npm, 88/88 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 
 ```bash
-npm run build     # tsc → dist/
-npm test          # 37 tests (node:test, offline)
-npm run verify    # build + test (required before push)
+npm run build            # tsc → dist/
+npm test                 # 88 tests (node:test, offline)
+npm run verify           # build + test + secret scan (required before push)
+npm run verify:package   # pack → install into a temp prefix → run the CLI
+npm run verify:secrets   # fail if a credential-shaped string is committed
 ```
 
 Layout: `src/core/` (agent loop, sessions, permissions, cost) · `src/providers/` (OpenAI/Anthropic/Gemini adapters + router) · `src/tools/` (20+ tools) · `src/cli/` (REPL, commands, renderer) · `src/tui/` (fullscreen TUI) · `src/mcp/` (MCP client + server) · `src/orchestration/` (Ralph loop) · `src/skills/` · `src/memory/`

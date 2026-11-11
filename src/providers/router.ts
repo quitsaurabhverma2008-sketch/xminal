@@ -6,6 +6,7 @@ import { ProviderError } from "./types";
 import { OpenAiAdapter } from "./openai";
 import { AnthropicAdapter } from "./anthropic";
 import { GeminiAdapter } from "./gemini";
+import { logEvent } from "../util/log";
 
 export { ProviderError } from "./types";
 
@@ -127,16 +128,16 @@ export class ProviderRouter {
         lastError = error as Error;
         if (index === 0) firstError = lastError;
         const message = (error as Error)?.message ?? "";
+        logEvent("warn", `provider failed: ${model.provider}/${model.model}`, { message });
         const retryable =
           (error instanceof ProviderError ? error.retryable : true) || MODEL_LEVEL.test(message);
         const exhausted = index === candidates.length - 1;
         if (emitted || !retryable || exhausted) {
           const primary = firstError ?? lastError;
           const suffix = exhausted && candidates.length > 1 ? ` (all ${candidates.length} candidate providers failed)` : "";
-          yield {
-            type: "error",
-            message: (primary?.message ?? "provider request failed") + suffix + hint(primary?.message ?? ""),
-          };
+          const finalMessage = (primary?.message ?? "provider request failed") + suffix + hint(primary?.message ?? "");
+          logEvent("error", `all providers failed: ${finalMessage}`);
+          yield { type: "error", message: finalMessage };
           return;
         }
       }
