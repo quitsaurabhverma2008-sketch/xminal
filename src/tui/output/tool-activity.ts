@@ -81,14 +81,29 @@ export function toolTarget(name: string, argsRaw: string, width = 80): string {
   }
 }
 
+// opencode's own glyph set (vendor/packages/tui/src/routes/session/index.tsx)
 const TOOL_GLYPH: Record<string, string> = {
-  read: "→", write: "←", edit: "~", multi_edit: "~",
+  read: "→", write: "←", edit: "✎", multi_edit: "✎",
   bash: "$", glob: "✱", grep: "✱", list: "≡",
-  verify: "◎", git: "±", worktree: "±", stash: "±",
-  web_fetch: "◈", web_search: "◈",
-  task: "◇", mcp_call: "▣", mcp_list: "▣",
-  memory: "◆", todo: "○", skill: "✦", skills: "✦",
+  verify: "✓", git: "±", worktree: "±", stash: "±",
+  web_fetch: "%", web_search: "◈",
+  task: "↳", mcp_call: "▣", mcp_list: "▣",
+  memory: "◆", todo: "○", skill: "→", skills: "→",
   checkpoint: "◷", diagnostics: "±", think: "∴",
+};
+
+// opencode's pending labels
+const TOOL_PENDING: Record<string, string> = {
+  read: "Reading file…",
+  write: "Preparing write…",
+  edit: "Writing…",
+  multi_edit: "Writing…",
+  glob: "Finding files…",
+  grep: "Searching content…",
+  web_fetch: "Fetching from the web…",
+  web_search: "Searching web…",
+  bash: "Running…",
+  task: "Delegating…",
 };
 export function toolGlyph(name: string): string {
   return TOOL_GLYPH[name] ?? "·";
@@ -180,34 +195,34 @@ export function completeActivity(
 
 /** Render one activity as styled ANSI lines — long commands wrap across rows. */
 export function renderActivity(a: ActivityLine, width: number, now = Date.now()): string[] {
-  const glyph = toolGlyph(a.name);
   const wrapNames = a.name === "bash" || a.name === "git" || a.name === "worktree";
   const budget = Math.max(16, width - 6);
   const target = toolTarget(a.name, a.argsRaw, wrapNames ? Number.MAX_SAFE_INTEGER : budget);
   const wrapTarget = wrapNames ? wrapAnsi(target, Math.max(8, width - 6)) : [target];
-  const suffixFor = (): string[] => {
-    if (a.status === "pending") return [];
-    const ok = a.status === "ok";
-    const bits: string[] = [];
-    if (a.added !== undefined || a.removed !== undefined) {
-      bits.push(`${fgGreen(`+${a.added ?? 0}`)} ${fgRed(`−${a.removed ?? 0}`)}`);
-    }
-    if (a.durationMs !== undefined) bits.push(fgMuted(formatDuration(a.durationMs)));
-    return bits;
-  };
+  const glyph = toolGlyph(a.name);
+
   if (a.status === "pending") {
-    const out = wrapTarget.map((chunk, i) =>
-      i === 0 ? `${fgCyan(spinnerFrame(now))} ${fgText(glyph)} ${chunk}` : `    ${chunk}`,
+    // opencode shows a spinner + a pending label while the tool runs
+    const pending = TOOL_PENDING[a.name] ?? a.name;
+    return wrapTarget.map((chunk, i) =>
+      i === 0 ? `${fgCyan(spinnerFrame(now))} ${fgMuted(pending)}` : `    ${fgMuted(chunk)}`,
     );
-    return out;
   }
-  const ok = a.status === "ok";
-  const status = ok ? fgGreen("✓") : fgRed("✗");
-  const bits = suffixFor();
-  const out = wrapTarget.map((chunk, i) => {
-    const head = i === 0 ? `${status} ${ok ? fgText(glyph) : fgRed(glyph)} ${ok ? fgText(chunk) : fgRed(chunk)}` : `    ${ok ? fgText(chunk) : fgRed(chunk)}`;
-    return head;
-  });
+
+  const failed = a.status === "err";
+  // opencode: the tool glyph for known tools, ✓/✗ for the generic case
+  const generic = a.name in ["verify", "diagnostics", "git", "worktree", "stash", "checkpoint"];
+  const icon = generic ? (failed ? fgRed("✗") : fgGreen("✓")) : failed ? fgRed(glyph) : fgMuted(glyph);
+  const label = failed ? fgRed(target) : fgText(target);
+  const bits: string[] = [];
+  // opencode shows a diff for writes — we surface the counts, but only when there is something to show
+  if ((a.added ?? 0) + (a.removed ?? 0) > 0) {
+    bits.push(`${fgGreen(`+${a.added ?? 0}`)} ${fgRed(`−${a.removed ?? 0}`)}`);
+  }
+  const out = wrapTarget.map((chunk, i) =>
+    i === 0 ? `${icon} ${label}` : `    ${failed ? fgRed(chunk) : fgText(chunk)}`,
+  );
   if (bits.length && out.length) out[out.length - 1] += `  ${bits.join(" ")}`;
   return out;
 }
+

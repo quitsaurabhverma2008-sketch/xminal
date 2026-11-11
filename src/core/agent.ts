@@ -389,6 +389,8 @@ export class Agent {
 
     return `You are XMINAL (xminal), an expert terminal coding agent and orchestration platform.
 
+Language: reply in English (Hinglish is fine for casual chat). Use another language only when the user explicitly asks for it in that language — never switch languages on your own.
+
 Working directory: ${this.options.cwd}
 Platform: ${os.platform()} ${os.arch()} · Node ${process.version}
 Date: ${new Date().toISOString()}

@@ -53,7 +53,7 @@ const clip = (s: string, w: number): string => {
   return out + RESET;
 };
 
-type LineKind = "user" | "assistant" | "tool" | "ok" | "err" | "system";
+type LineKind = "user" | "assistant" | "reasoning" | "tool" | "ok" | "err" | "system";
 interface Line {
   kind: LineKind;
   text: string;
@@ -456,7 +456,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
     // ── tool activity — opencode-style single line + tinted diff preview
     if (line.kind === "tool" && line.activity) {
       const a = line.activity;
-      const out: string[] = renderActivity(a, Math.max(8, w - 1)).map((row) => ` ${row}`);
+      const out: string[] = renderActivity(a, Math.max(8, w - 3)).map((row) => `   ${row}`);
       if (a.preview && a.preview.length) {
         for (const row of a.preview) {
           out.push(`   ${tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed)}`);
@@ -464,18 +464,19 @@ export async function startTui(runtime: Runtime): Promise<void> {
         if (a.extraPreviewLines) out.push(`   ${fgMuted(`… ${a.extraPreviewLines} more diff lines`)}`);
       } else if (a.status === "err" && a.detail) {
         out.push(`   ${fgMuted(a.detail)}`);
-      } else if (a.status === "ok" && (a.extraLines ?? 0) > 0) {
-        out.push(`   ${fgMuted(`${a.extraLines} more line(s)`)}`);
       }
       return out;
     }
     // ── user — opencode: raised-bg box, left border in the mode/agent color
     if (line.kind === "user") {
+      // opencode: outer box = SplitBorder left "┃" in the agent colour,
+      // inner box = raised background with 1 row / 2 col padding
       const bar = modeColor(runtime.agent.mode);
-      const textW = Math.max(4, w - 4);
-      const padRow = `${bgRgb(T.panel)} ${bar}▍${" ".repeat(w - 2)}${RESET}`;
+      const inner = Math.max(4, w - 1);
+      const textW = Math.max(4, inner - 4);
+      const padRow = `${bar}┃${bgRgb(T.panel)}${" ".repeat(inner)}${RESET}`;
       const bodyRows = wrap(line.text, textW).map(
-        (part) => `${bgRgb(T.panel)} ${bar}▍ ${rgb(T.text)}${part}${" ".repeat(Math.max(0, w - 4 - visible(part)))}${RESET}`,
+        (part) => `${bar}┃${bgRgb(T.panel)}  ${rgb(T.text)}${part}${" ".repeat(Math.max(0, inner - 4 - visible(part)))}${RESET}`,
       );
       return [padRow, ...bodyRows, padRow];
     }
@@ -484,6 +485,12 @@ export async function startTui(runtime: Runtime): Promise<void> {
       const clean = formatMemo(line.text);
       const body = mdMemo(clean, Math.max(4, w - 3));
       return body.map((row) => `   ${row}`);
+    }
+    // ── reasoning — opencode: dim block behind a muted SplitBorder left bar
+    if (line.kind === "reasoning") {
+      const inner = Math.max(4, w - 4);
+      const rows = wrap(line.text, Math.max(4, inner - 2));
+      return rows.map((part) => `   ${fgMuted("┃")} ${fgMuted(part)}`);
     }
     // ── everything else (ok/err/system) — quiet, indented
     const color = line.kind === "err" ? fgRed : line.kind === "ok" ? fgGreen : fgMuted;
@@ -597,14 +604,14 @@ export async function startTui(runtime: Runtime): Promise<void> {
     // ── composer — opencode box: pad row, text rows (metadata row is separate)
     if (row >= top && row < mRow) {
       const compLine = (body: string, bodyVisible: number) =>
-        `${bgRgb(T.composer)}${bar}▍ ${body}${" ".repeat(Math.max(0, cw - 2 - bodyVisible))}${RESET}`;
+        `${bgRgb(T.composer)}${bar}┃ ${body}${" ".repeat(Math.max(0, cw - 2 - bodyVisible))}${RESET}`;
       if (row === top) {
-        return withSide(`${bgRgb(T.composer)}${bar}▍${" ".repeat(cw - 1)}${RESET}`);
+        return withSide(`${bgRgb(T.composer)}${bar}┃${" ".repeat(cw - 1)}${RESET}`);
       }
       if (pendingPermission && row === mRow - 1) {
         const p = pendingPermission;
         const text = ` ${fgAmber("?")} allow ${p.tool}${p.reason ? fgMuted(" · " + p.reason) : ""} ${fgAccent("[y/N]")}`;
-        return withSide(`${bgRgb(T.composer)}${bar}▍ ${padRight(text, cw - 3)}${RESET}`);
+        return withSide(`${bgRgb(T.composer)}${bar}┃ ${padRight(text, cw - 3)}${RESET}`);
       }
       if (input === "" && !pendingPermission) {
         if (row === top + 1) {
@@ -616,7 +623,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
           const placeholder = fgMuted(PLACEHOLDERS[placeholderIdx]);
           return withSide(compLine(placeholder, visible(placeholder)));
         }
-        return withSide(`${bgRgb(T.composer)}${bar}▍${" ".repeat(cw - 1)}${RESET}`);
+        return withSide(`${bgRgb(T.composer)}${bar}┃${" ".repeat(cw - 1)}${RESET}`);
       }
       const vis = inputVisualLines();
       const shown = vis.slice(Math.max(0, vis.length - iH));
@@ -634,7 +641,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
         : `${modeColor(mode)}${BOLD}${mode}${RESET}${fgMuted(" · ")}${fgText(model)}`;
       const right = queue.length > 0 ? fgAmber(`⇧${queue.length} queued`) : fgMuted(getEffort());
       const gap = Math.max(1, cw - 2 - visible(left) - visible(right));
-      return withSide(`${bgRgb(T.composer)}${bar}▍ ${left}${" ".repeat(gap)}${right}${RESET}`);
+      return withSide(`${bgRgb(T.composer)}${bar}┃ ${left}${" ".repeat(gap)}${right}${RESET}`);
     }
     if (row === nRow) {
       return withSide(`${bgRgb(T.bg)}${bar}╹${rgb(T.composer)}${"▀".repeat(Math.max(0, cw - 2))}${RESET}`);
@@ -915,6 +922,16 @@ export async function startTui(runtime: Runtime): Promise<void> {
 
   const callbacks: AgentCallbacks = {
     onText: (t) => appendAssistant(t),
+    onReasoning: (t) => {
+      const last = lines[lines.length - 1];
+      if (last && last.kind === "reasoning") {
+        lines[lines.length - 1] = { ...last, text: last.text + t };
+        lineVersion++;
+        requestRender();
+        return;
+      }
+      pushLine("reasoning", t);
+    },
     onToolCall: (call) => {
       const activity = makeActivity(call.name, call.arguments);
       lineVersion++;

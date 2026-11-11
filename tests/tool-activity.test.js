@@ -65,23 +65,23 @@ test("completeActivity marks failures honestly", () => {
   assert.equal(done.status, "err");
 });
 
-test("renderActivity shows a spinner + target before the result lands", () => {
+test("renderActivity shows opencode's spinner + pending label before the result", () => {
   const a = makeActivity("read", JSON.stringify({ path: "x.ts" }));
   const line = stripAnsi(renderActivity(a, 60, a.startedAt).join("\n"));
-  assert.ok(line.includes("→"));   // opencode read glyph
-  assert.ok(line.includes("x.ts"));
+  assert.ok(line.includes("Reading file…")); // opencode's pending label
+  assert.ok(!line.includes("x.ts"));           // the path only appears when it completes
   assert.ok(!line.includes("ms"));
 });
 
-test("renderActivity shows duration + counts after completion", () => {
+test("renderActivity shows counts after completion (opencode style)", () => {
   const a = makeActivity("edit", JSON.stringify({ path: "foo.ts" }));
   const done = completeActivity(a, false, "Edited foo.ts (+2 −1)", a.startedAt + 150);
   const line = stripAnsi(renderActivity(done, 60, a.startedAt + 150).join("\n"));
-  assert.ok(line.includes("~"));   // opencode edit glyph
+  assert.ok(line.includes("✎"));   // opencode edit glyph
   assert.ok(line.includes("foo.ts"));
   assert.ok(line.includes("+2"));
   assert.ok(line.includes("−1"));
-  assert.ok(line.includes("150ms"));
+  assert.ok(!line.includes("150ms"), "opencode keeps timing out of the tool row");
 });
 
 test("renderActivity wraps long bash commands across rows", () => {

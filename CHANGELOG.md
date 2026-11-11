@@ -4,6 +4,25 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.12.6] — 2026-11-11
+
+**Opencode-exact message boxes + agent language rule.**
+
+### Changed
+
+- **The built-in TUI now uses opencode's own box rules**, taken from the vendored source (`vendor/packages/tui/src/routes/session/index.tsx`):
+  - user messages: SplitBorder `┃` in the agent colour, raised background, 1 row / 2 column inner padding (was a thick `▍` bar glued to the text)
+  - composer: the same `┃` border instead of `▍`
+  - tool rows: 3-column indent with a 2-column icon slot, opencode's glyphs (`→` read, `←` write, `✱` glob/grep, `%` web_fetch, `◈` web_search, `↳` subagent) and opencode's pending labels ("Reading file…", "Preparing write…", "Finding files…")
+  - reasoning now has its own opencode-style dim block behind a muted `┃` bar (previously dropped entirely)
+  - tool output stays collapsed silently — the "N more line(s)" helper line is gone
+- **Agent language rule** — the system prompt now says: reply in English (Hinglish is fine for casual chat) and switch languages only when the user explicitly asks. Previously a Hindi prompt produced a Hindi answer with no guard.
+
+### Notes
+
+- Verified side by side against opencode's vendored markup rendered through Ink (`assets/opencode-parity.png`).
+- The Ink engine (`XMINAL_TUI_ENGINE=ink`) and the vendored OpenCode engine (`XMINAL_TUI_ENGINE=opencode`) are unchanged; this release aligns the default, Android-safe TUI with the same visual language.
+
 ## [0.12.5] — 2026-11-11
 
 **Respin of 0.12.4 — identical code.** npm accepted the 0.12.4 publish but never replicated

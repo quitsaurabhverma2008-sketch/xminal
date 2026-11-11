@@ -8,7 +8,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.12.5` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.12.6` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
@@ -73,6 +73,10 @@ canvas renderer, so the animation above is a real render of the page, not a mock
 **Provider wizard** — pick → paste key (masked) → live validation → save:
 
 <img src="assets/screenshot-provider-wizard.png" width="900" alt="XMINAL provider connect wizard" />
+
+**Opencode parity** — the built-in TUI now follows opencode's own box rules (SplitBorder `┃` + raised background + 1 row / 2 col padding, 3-column indents, opencode's tool glyphs and pending labels). Left: XMINAL on Android. Right: opencode's vendored markup rendered through Ink:
+
+<img src="assets/opencode-parity.png" width="900" alt="XMINAL built-in TUI next to opencode's own markup" />
 
 **On a phone** (42 columns) — the same UI, reflowed:
 
@@ -276,7 +280,7 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.12.5** — live on npm, 69/69 tests, CI green on Ubuntu/macOS/Windows × Node 20/22. Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.12.6** — live on npm, 69/69 tests, CI green on Ubuntu/macOS/Windows × Node 20/22. Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 
