@@ -184,6 +184,10 @@ def feed(scr: Screen, data: bytes):
         if tok.startswith(ESC + "]"):
             continue  # OSC, ignore
         if tok.startswith(ESC):
+            # an incomplete escape at the end of the stream (the process was
+            # killed mid-write) must not be printed as text
+            if len(tok) > 1 and tok[1] == "[" and not re.match(r"\x1b\[[0-9;?]*[a-zA-Z@]", tok):
+                continue
             continue  # single-char escape, ignore
         scr.print(tok)
 

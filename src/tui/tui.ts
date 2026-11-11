@@ -526,13 +526,22 @@ const sessionRows = (query: string): SessionRow[] => {
         }
         return rows;
       }
-      const out: string[] = renderActivity(a, Math.max(8, w - 5)).map((row) => `   ${row}`);
+      // opencode: an edit/write diff is a block card (rule + raised panel)
       if (a.preview && a.preview.length) {
+        const cardW = Math.max(8, w);
+        const rule = `${rgb(T.bg)}┃${RESET}`;
+        const rows: string[] = [];
         for (const row of a.preview) {
-          out.push(`    ${tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed)}`);
+          const tinted = tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed);
+          rows.push(`${rule}${bgRgb(T.panel)} ${tinted}${" ".repeat(Math.max(0, cardW - 2 - visible(tinted)))}${RESET}`);
         }
-        if (a.extraPreviewLines) out.push(`    ${fgMuted(`… ${a.extraPreviewLines} more diff lines`)}`);
-      } else if (a.status === "err" && a.detail) {
+        if (a.extraPreviewLines) {
+          rows.push(`${rule}${bgRgb(T.panel)} ${fgMuted(`… ${a.extraPreviewLines} more diff lines`)}${" ".repeat(Math.max(0, cardW - 2 - 30))}${RESET}`);
+        }
+        return rows;
+      }
+      const out: string[] = renderActivity(a, Math.max(8, w - 5)).map((row) => `   ${row}`);
+      if (a.status === "err" && a.detail) {
         out.push(`     ${fgMuted(redactSecrets(a.detail).text)}`);
       }
       return out;
@@ -558,7 +567,8 @@ const sessionRows = (query: string): SessionRow[] => {
     if (line.kind === "reasoning") {
       const inner = Math.max(4, w - 6);
       const rows = wrap(line.text, Math.max(4, inner));
-      return rows.map((part) => `   ${fgMuted("┃")} ${fgMuted(part)}`);
+      // opencode: the reasoning rule uses the warning colour
+      return rows.map((part) => `   ${fgAmber("┃")} ${fgMuted(part)}`);
     }
     // ── everything else (ok/err/system) — quiet, indented at col 3
     const color = line.kind === "err" ? fgRed : line.kind === "ok" ? fgGreen : fgMuted;
