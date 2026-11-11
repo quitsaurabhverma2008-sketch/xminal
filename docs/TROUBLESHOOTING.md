@@ -259,8 +259,25 @@ session transcript:
 | `<project>/.xminal/receipts/tool-usage.jsonl` | per-tool call/token metering (`/tools`) |
 | `<project>/.xminal/todos.json` | the task list |
 
-`XMINAL_LOG=debug` does **not** open a log file — the logging helper in
-`src/util/log.ts` is not wired into the current code paths.
+### Turning on logging
+
+`XMINAL_LOG` takes a level name, or a file destination:
+
+| Value | Effect |
+|---|---|
+| `XMINAL_LOG=debug` (or `info`/`warn`/`error`/`silent`) | console log level (stderr) |
+| `XMINAL_LOG=1` | console logging **and** a file at `~/.xminal/xminal.log` |
+| `XMINAL_LOG=/tmp/xminal.log` | console logging **and** that file |
+| `XMINAL_LOG_FILE=/tmp/xminal.log` | that file (wins over `XMINAL_LOG`) |
+
+The file log records provider failures, tool errors and permission denials.
+Secrets are redacted before anything is written, and the file is created with
+mode `600`.
+
+```bash
+XMINAL_LOG=1 xminal run "fix the failing test"
+tail -n 40 ~/.xminal/xminal.log
+```
 
 ---
 

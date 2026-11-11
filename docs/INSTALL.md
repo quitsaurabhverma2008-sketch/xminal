@@ -122,7 +122,7 @@ cd my-project && xminal
 unreachable. The URL is version-pinned in that script:
 
 ```bash
-npm install -g https://github.com/quitsaurabhverma2008-sketch/xminal/releases/download/v0.14.0/xminal-0.14.0.tgz
+npm install -g https://github.com/quitsaurabhverma2008-sketch/xminal/releases/download/v0.15.0/xminal-0.15.0.tgz
 ```
 
 Check the current tag before using it — the pinned version in the script is not

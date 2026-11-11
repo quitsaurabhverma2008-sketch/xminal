@@ -18,7 +18,7 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 - **`/mode` was not native** — it now opens a mode picker (build / plan / compose / review / yolo) inside the TUI.
 - **The global config was not owner-only** — `~/.xminal/config.json` holds provider API keys. It is written `0600` and re-hardened on every start.
 - **`prepare.cjs` claimed a "committed dist/"** — `dist/` is gitignored, so a checkout without devDependencies had no way to build. It now fails with an actionable message instead of pretending.
-- **`XMINAL_LOG` did nothing** — it now writes a redacted log to `~/.xminal/xminal.log` (provider failures, tool errors, permission denials).
+- **`XMINAL_LOG` was a console level only** — `XMINAL_LOG=1` (or a path) now also writes a redacted log file: `~/.xminal/xminal.log` by default, mode `600`, with provider failures, tool errors and permission denials.
 - **`xminal config` printed the raw provider API keys** — the whole config was dumped to stdout, ready to be pasted into a bug report. Every secret-looking value is now masked (`gsk_…dU (56 chars)`), and `xminal config global|project` prints masked JSON.
 
 ### Added
@@ -44,7 +44,7 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ### Notes
 
-- 88/88 tests green (7 new security tests). CI: Ubuntu/macOS/Windows × Node 20/22, plus package-smoke and secret-scan jobs.
+- 94/94 tests green (security, config-write and end-to-end TUI tests). CI: Ubuntu/macOS/Windows × Node 20/22, plus package-smoke and secret-scan jobs.
 
 ## [0.14.0] — 2026-11-11
 
