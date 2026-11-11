@@ -101,7 +101,7 @@ canvas renderer, so the animation above is a real render of the page, not a mock
 - **Search 3,832 public MCP servers without touching the network** — the catalog ships inside the package (`data/mcp-catalog.json`, built from the Smithery registry + GitHub by `scripts/fetch-mcp-catalog.py`)
 - Search by **name**, by **what the server does** ("work"), or by **where it runs**
 - Every entry carries platform availability: `LINUX` · `WINDOWS` · `MOBILE` (Termux/Android counts as mobile)
-- In the TUI: `/mcp` opens the searchable catalog, `Enter` shows the details plus the `mcpServers` snippet to paste
+- In the TUI: `/mcp` opens the searchable catalog, `Enter` shows the details plus the `mcpServers` snippet, `Ctrl+A` writes the entry into `~/.xminal/config.json` (disabled, with a backup)
 - From the shell: `xminal mcp search pdf --platform mobile`
 
 ### Sessions

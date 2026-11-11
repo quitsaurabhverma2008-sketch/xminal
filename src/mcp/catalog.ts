@@ -133,20 +133,42 @@ export function searchMcpServers(query: string, options: McpSearchOptions = {}):
 }
 
 /** Config snippet that adds the server to ~/.xminal/config.json */
+/**
+ * A config snippet for a catalog entry.
+ *
+ * The catalog is a *directory*: it knows the server, what it does, where it
+ * runs and where its docs live — but not the command that starts it. Inventing
+ * an npm package name would be a lie, so the snippet ships a visible
+ * placeholder, keeps the entry disabled and points at the docs.
+ */
 export function mcpConfigSnippet(entry: McpCatalogEntry): string {
   const name = entry.id.replace(/[^a-zA-Z0-9_-]/g, "-");
-  if (entry.remote) {
-    return JSON.stringify(
-      { mcpServers: { [name]: { command: ["npx", "-y", "@modelcontextprotocol/server-${name}"] } } },
-      null,
-      2,
-    );
-  }
+  const hint =
+    entry.source === "smithery"
+      ? `npx -y @smithery/cli install ${entry.id} --client <client>`
+      : "npx -y <npm-package-from-the-readme>";
   return JSON.stringify(
-    { mcpServers: { [name]: { command: ["npx", "-y", "@modelcontextprotocol/server-${name}"] } } },
+    {
+      mcpServers: {
+        [name]: {
+          command: [hint],
+          enabled: false,
+          url: entry.url,
+        },
+      },
+    },
     null,
     2,
   );
+}
+
+/** The `mcpServers` entry for a catalog entry (used by the "add" action). */
+export function mcpServerConfig(entry: McpCatalogEntry): { command: string[]; enabled: boolean; url: string } {
+  const hint =
+    entry.source === "smithery"
+      ? `npx -y @smithery/cli install ${entry.id} --client <client>`
+      : "npx -y <npm-package-from-the-readme>";
+  return { command: [hint], enabled: false, url: entry.url };
 }
 
 export function platformTags(entry: McpCatalogEntry): string {

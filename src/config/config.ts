@@ -1,10 +1,11 @@
+import fs from "node:fs";
 import path from "node:path";
 import { exists, readJson, writeJson, ensureDir, chmodPrivate } from "../util/fs";
 import { globalConfigPath, projectConfigPath } from "./paths";
 import { DEFAULT_MODELS } from "./default-models";
 import { PROVIDER_DEFAULT_MODELS } from "./provider-defaults";
 import { effectiveModelMap, isFreeModel, lookupModelAlias } from "./models-catalog";
-import type { ProviderConfig, ResolvedModel, XminalConfig } from "./types";
+import type { McpServerConfig, ProviderConfig, ResolvedModel, XminalConfig } from "./types";
 
 export function defaultConfig(): XminalConfig {
   const providers: Record<string, ProviderConfig> = {
@@ -150,6 +151,30 @@ export function saveGlobalConfig(config: XminalConfig): void {
 export function hardenConfigPermissions(): void {
   const file = globalConfigPath();
   if (exists(file)) chmodPrivate(file);
+}
+
+/**
+ * Add (or replace) an MCP server in the global config.
+ *
+ * The existing file is backed up first — this writes to the user's config, so
+ * it must never be able to lose data. The new entry stays `enabled: false`
+ * until the user has filled in the real run command.
+ */
+export function addGlobalMcpServer(name: string, server: McpServerConfig): { path: string; backup?: string } {
+  const file = globalConfigPath();
+  const current = exists(file) ? readJson<Partial<XminalConfig>>(file, {}) : {};
+  let backup: string | undefined;
+  if (exists(file)) {
+    backup = `${file}.bak`;
+    try {
+      fs.copyFileSync(file, backup);
+    } catch {
+      backup = undefined;
+    }
+  }
+  const mcpServers = { ...(current.mcpServers ?? {}), [name]: server };
+  writeJson(file, { ...current, mcpServers }, 0o600);
+  return { path: file, backup };
 }
 
 export function saveProjectConfig(cwd: string, config: XminalConfig): void {

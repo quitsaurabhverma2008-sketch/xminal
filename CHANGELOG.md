@@ -30,6 +30,7 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
   - tool output and error lines are **redacted** before they reach the screen.
 - **`npm run verify:package`** — packs the tarball, installs it into a throwaway prefix and runs the CLI. Added to CI on all three operating systems: this is what catches packaging breakage (a broken `prepare`, a missing file, a wrong `bin`).
 - **`npm run verify:secrets`** — a secret scan over every tracked file, wired into CI as its own job.
+- **`Ctrl+A` in the `/mcp` overlay adds the selected server to the config** — it writes a **disabled** entry into `~/.xminal/config.json` (previous file kept as `config.json.bak`) with a visible placeholder for the run command and the docs URL. XMINAL refuses to invent an npm package name that may not exist.
 - **Documentation**: `docs/INSTALL.md`, `docs/FRONTENDS.md`, `docs/MCP.md`, `docs/TROUBLESHOOTING.md`, `docs/SECURITY.md`.
 - **`Session.setTitle()`** — session rename is now a first-class API.
 
@@ -37,6 +38,7 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 - **The npm tarball no longer ships `vendor/`** — 62 MB unpacked / 5,443 files → **3.5 MB / 179 files**. The package is now small enough to install anywhere. The vendored engine still works from a git checkout or an external checkout via `XMINAL_OPENCODE_ENGINE`; the built-in TUI (default) and the Ink engine cover every device.
 - The MCP overlay now renders the config snippet from `mcpConfigSnippet()` — one source of truth instead of a hand-rolled copy.
+- **End-to-end TUI tests** (`tests/tui-e2e.test.js`) boot the real TUI over a pipe and assert the frame, the in-TUI slash commands and that the alternate screen is never left.
 
 ### Notes
 

@@ -2,9 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { Runtime } from "../runtime";
 import { verifyAudit } from "../cli/audit";
-import { loadConfig, resolveModel } from "../config/config";
+import { loadConfig, resolveModel, addGlobalMcpServer } from "../config/config";
 import { listEffectiveAliases, refreshModelsCatalog, effectiveModelMap, catalogMeta } from "../config/models-catalog";
-import { loadMcpCatalog, searchMcpServers, mcpConfigSnippet } from "../mcp/catalog";
+import { loadMcpCatalog, searchMcpServers, mcpConfigSnippet, mcpServerConfig, type McpCatalogEntry } from "../mcp/catalog";
 import { visibleWidth, graphemeSlice, stripAnsi as stripAnsiW, splitGraphemes, wrapAnsi } from "./width";
 import { formatAssistantText, isLikelyDiff, tintDiffRow } from "./format";
 import { renderMarkdown } from "./markdown";
@@ -936,7 +936,7 @@ const sessionRows = (query: string): SessionRow[] => {
         }
         if (hits.length === 0) lines.push(panelSide(`${fgMuted("no matches")}`, innerW, C.panel));
       }
-      lines.push(panelSide(`${fgMuted("↑↓ select · type to filter · Enter details · Esc close")}`, innerW, C.panel));
+      lines.push(panelSide(`${fgMuted("↑↓ select · type to filter · Enter details · Ctrl+A add to config · Esc close")}`, innerW, C.panel));
       lines.push(panelBottom(width));
       for (let i = 0; i < lines.length; i++) {
         const y = top + i;
@@ -1733,6 +1733,22 @@ const sessionRows = (query: string): SessionRow[] => {
       return;
     }
     if (s === "\x10") { overlay = overlay.kind === "palette" ? { kind: "none" } : { kind: "palette", index: 0 }; render(); return; } // Ctrl+P
+    if (s === "\x01" && overlay.kind === "mcp") {
+      // Ctrl+A: add the highlighted catalog entry to ~/.xminal/config.json
+      const hits = searchMcpServers(overlay.query, { limit: 300 });
+      const entry = hits[Math.min(paletteIndex, Math.max(0, hits.length - 1))];
+      if (!entry) { pushLine("system", fgMuted("nothing to add")); render(); return; }
+      const key = entry.id.replace(/[^a-zA-Z0-9_-]/g, "-");
+      try {
+        const saved = addGlobalMcpServer(key, mcpServerConfig(entry));
+        pushLine("system", `${fgGreen("added")} ${fgMuted(`${key} → ${saved.path}${saved.backup ? ` (backup: ${saved.backup})` : ""}`)}`);
+        pushLine("system", fgMuted("disabled on purpose — copy the run command from the README, then set \"enabled\": true"));
+      } catch (error) {
+        pushLine("err", (error as Error).message);
+      }
+      render();
+      return;
+    }
 
     // split embedded newlines and dispatch each segment
     let rest = s;

@@ -25,6 +25,8 @@ export interface McpServerConfig {
   env?: Record<string, string>;
   enabled?: boolean;
   timeoutMs?: number;
+  /** docs / homepage — XMINAL never dials it, it is there for humans */
+  url?: string;
 }
 
 export interface XminalConfig {

@@ -86,13 +86,14 @@ result line. The upstream fix belongs in `src/cli/args.ts` (add `platform` to
 | type | filter by name or by what the server does |
 | `↑` / `↓` | move the selection |
 | `Enter` | show the entry: name, description, id, platform tags, URL, and the `mcpServers` snippet to paste |
+| `Ctrl+A` | add the highlighted entry to `~/.xminal/config.json` (disabled, with a backup) |
 | `Esc` | close the overlay |
 
 The overlay shows up to 300 matches and displays the platform tags per row. It
 has no platform filter of its own — the tags are shown so you can decide.
 
-Note: the mouse wheel scrolls the chat behind the `/mcp` and `/sessions`
-overlays instead of moving the selection; use `↑` / `↓` there.
+The mouse wheel moves the selection inside every overlay (including `/mcp` and
+`/sessions`); it never scrolls the chat behind them.
 
 ## Adding a server to your config
 
@@ -137,17 +138,32 @@ the configured servers and their tools. The agent can call them through the
 
 ### The catalog does not install anything
 
-The snippet the catalog prints is a **guess**:
+The catalog stores **no launch command** — only a name, a description, the
+platforms and a URL. XMINAL will not invent an npm package name, so the
+snippet it prints carries a visible placeholder instead:
 
 ```json
-"mcpServers": { "brave-search": { "command": ["npx", "-y", "@modelcontextprotocol/server-brave-search"] } }
+{
+  "mcpServers": {
+    "brave-search": {
+      "command": ["npx -y <npm-package-from-the-readme>"],
+      "enabled": false,
+      "url": "https://github.com/…"
+    }
+  }
+}
 ```
 
-The catalog stores no launch command — only a name, a description and a URL —
-so the generated package name often does not exist on npm. Always open the
-entry's URL, read how that server is launched, and put **that** command in
-`command`. XMINAL will not install a server for you, and it will not fetch a
-server's source at runtime.
+`Ctrl+A` in the `/mcp` overlay writes exactly this into
+`~/.xminal/config.json` (a backup of the previous file is kept next to it, as
+`config.json.bak`) — **disabled**, so nothing starts until you are ready.
+
+To finish the entry: open the entry's URL, read how that server is launched,
+put **that** command in `command` and set `"enabled": true`. XMINAL will not
+install a server for you, and it will not fetch a server's source at runtime.
+
+Entries marked `HOSTED` are HTTP services; XMINAL speaks MCP over stdio, so
+they need a stdio bridge (for example `mcp-remote`) in `command`.
 
 ## Rebuilding the catalog
 
