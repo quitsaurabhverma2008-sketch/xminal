@@ -4,6 +4,26 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.12.4] — 2026-11-11
+
+**Model fallback fixed, agent text limit removed, second dogfood demo (SAURABH).**
+
+### Fixed
+
+- **"Model is unavailable" now falls back instead of dying.** The router treated a model-level failure (model retired / quota exhausted) as *non-retryable*, so it stopped at the first candidate and reported the misleading `all 13 candidate providers failed` while never trying a second model. Model-level errors are now retried on the next candidate, and the suffix only claims the whole chain was exhausted when it really was.
+- **Fallback chain is meaningful again**: one candidate per *provider* (deduped by provider identity, not by adapter type — every OpenAI-compatible provider used to collapse into the first one), local servers that are not running are skipped, and each provider contributes a model that actually exists in the catalog (the static default-model table had stale aliases such as `nvidia/nemotron-…` while the catalog ships `nvidia/nvidia/nemotron-…`).
+- Picking a dead model now still answers: XMINAL transparently switches to a working model, reports which model answered, and prints an actionable hint instead of a stack of provider errors.
+
+### Changed
+
+- **Agent text limit removed**: `limits.maxTokensPerTurn` now defaults to `0` = unlimited (the model's own output limit governs). `effort` still acts as an explicit cap when you want one (`low` 1024 / `medium` 4096 / `high` 16384 / `max` unlimited).
+- Quota errors now explain the opencode free tier (~1M tokens/day, tracked server-side by opencode — XMINAL cannot reset it) and point at providers you hold a key for.
+
+### Added
+
+- **Second dogfood demo** — [quitsaurabhverma2008-sketch/saurabh](https://github.com/quitsaurabhverma2008-sketch/saurabh): the word SAURABH as 1,400 dust particles that scatter on the wind and swirl back, written by XMINAL in 3 turns / ~23k tokens / $0. The README animation is a real headless render of the page's own script.
+- `scripts/media/` — the capture pipeline (PTY capture → ANSI rasterizer → PNG/GIF, plus the headless canvas page renderer) so every demo asset in this repo is reproducible.
+
 ## [0.12.3] — 2026-11-10
 
 **Docs & media: XMINAL builds a project — README with the demo, screenshots and the build log.**

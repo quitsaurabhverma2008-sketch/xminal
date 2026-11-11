@@ -40,6 +40,20 @@ XMINAL was given a one-paragraph spec and did the rest — **on an Android phone
 
 The animation above is **a real terminal capture**, not a mockup: XMINAL's PTY capture pipeline renders the ANSI stream frame by frame into PNGs and stitches them into a GIF.
 
+### 🌀 SAURABH — dust in the wind
+
+<div align="center">
+
+<img src="assets/saurabh-demo.gif" width="720" alt="SAURABH - dust particles scattering like wind, built by XMINAL" />
+
+**[quitsaurabhverma2008-sketch/saurabh](https://github.com/quitsaurabhverma2008-sketch/saurabh)** - one page, zero dependencies: the word *SAURABH* is 1,400 dust particles; tap scatters them on the wind, tap again swirls them back.
+
+</div>
+
+Also written by XMINAL itself - **3 agent turns, ~23k tokens, $0** - and shipped with a headless
+canvas renderer, so the animation above is a real render of the page, not a mockup.
+
+
 ---
 
 ## Screenshots
@@ -262,7 +276,7 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.12.3** — live on npm, 69/69 tests, CI green on Ubuntu/macOS/Windows × Node 20/22. Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.12.4** — live on npm, 69/69 tests, CI green on Ubuntu/macOS/Windows × Node 20/22. Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 

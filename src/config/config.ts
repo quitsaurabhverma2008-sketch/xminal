@@ -83,7 +83,7 @@ export function defaultConfig(): XminalConfig {
     defaultModel: "opencode/inkling-2-small-free",
     fallbackModels: [],
     router: { policy: ["failover", "quota", "cost", "capability"] },
-    limits: { maxTurns: 40, maxTokensPerTurn: 32000, maxCostPerSession: 5 },
+    limits: { maxTurns: 40, maxTokensPerTurn: 0, maxCostPerSession: 5 }, // 0 = unlimited per-turn output
     permissions: {
       mode: "auto",
       protectedPaths: ["~/.ssh", "~/.aws", "~/.gnupg", "~/.config/gh", ".env", ".env.local"],

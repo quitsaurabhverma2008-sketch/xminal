@@ -87,6 +87,19 @@ export class Agent {
     this.effort = effort;
   }
 
+  /** last model that actually answered — used to fall back when a model is unavailable */
+  private lastWorkingModel?: string;
+  /** model that produced the reply (may be a fallback, not the requested one) */
+  private answeredBy?: string;
+
+  markModelWorking(): void {
+    this.lastWorkingModel = this.modelSpec;
+  }
+
+  get fallbackModel(): string | undefined {
+    return this.lastWorkingModel && this.lastWorkingModel !== this.modelSpec ? this.lastWorkingModel : undefined;
+  }
+
   setMode(mode: AgentMode): void {
     this.mode = mode;
     this.options.session.appendEvent("mode", { agentMode: mode });
@@ -184,6 +197,7 @@ export class Agent {
         })) {
           if (event.type === "text") {
             text += event.text;
+            this.markModelWorking();
             this.callbacks.onText?.(event.text);
           } else if (event.type === "reasoning") {
             this.callbacks.onReasoning?.(event.text);
@@ -192,11 +206,22 @@ export class Agent {
           } else if (event.type === "usage") {
             const actualModel = event.model ?? model;
             this.cost.add(event.usage, actualModel);
+            this.answeredBy = actualModel.alias;
             this.callbacks.onUsage?.(event.usage, actualModel);
           } else if (event.type === "error") {
             let message = event.message;
-            if (/rate limit|rate_limit|429|TPM|tokens per minute|Too Many Requests/i.test(message)) {
-              message += "\n→ free-tier limit hit. Try: `/new` a fresh session, `/compact`, or switch provider with `/model` (opencode free, openrouter `:free` models, zai/zhipuai `glm-4.7-flash`).";
+            if (/rate limit|rate_limit|429|TPM|tokens per minute|Too Many Requests|quota/i.test(message)) {
+              message +=
+                "\n→ free-tier quota hit. opencode's free models allow ~1M tokens/day (the quota is tracked server-side by opencode and refills on their daily window — XMINAL cannot reset it; a new session only clears the local context). " +
+                "Switch provider with `/model` to something you hold a key for (groq, nvidia, openrouter `:free`, zai/glm-4.7-flash), or `/compact` to shrink the context and burn fewer tokens.";
+            }
+            const unavailable = /model is unavailable|not available|no longer available/i.test(message);
+            if (unavailable && this.fallbackModel) {
+              const fallback = this.fallbackModel;
+              this.setModel(fallback);
+              this.markModelWorking();
+              message += `\n→ switched back to ${fallback} (the selected model is unavailable).`;
+              this.callbacks.onStatus?.(`Model unavailable — reverted to ${fallback}`);
             }
             this.callbacks.onStatus?.(`Provider error: ${message}`);
             this.history.push({ role: "assistant", content: `Provider error: ${event.message}` });
@@ -205,7 +230,7 @@ export class Agent {
               text: finalText + text,
               turns,
               cost: this.cost.summary(),
-              model: model.alias,
+              model: this.answeredBy ?? model.alias,
               stoppedReason: "error",
               error: event.message,
             };
@@ -219,7 +244,7 @@ export class Agent {
           text: finalText + text,
           turns,
           cost: this.cost.summary(),
-          model: model.alias,
+          model: this.answeredBy ?? model.alias,
           stoppedReason: "error",
           error: message,
         };
@@ -410,7 +435,9 @@ const EFFORT_CAP: Record<AgentEffort, number> = { low: 1024, medium: 4096, high:
 
 /** Cap the per-turn output budget by the configured effort level. */
 export function effortCap(effort: AgentEffort, modelMax: number, configMax: number): number {
-  return Math.floor(Math.min(modelMax, configMax, EFFORT_CAP[effort]));
+  // configMax <= 0 means "no per-turn cap" — the model's own limit governs
+  const limit = configMax > 0 ? configMax : Number.POSITIVE_INFINITY;
+  return Math.floor(Math.min(modelMax, limit, EFFORT_CAP[effort]));
 }
 
 function normalizeToolArguments(raw: string): string {
