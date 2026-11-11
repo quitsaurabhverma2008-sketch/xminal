@@ -33,7 +33,7 @@ node dist/index.js run "ping" # headless
 
 ## Conventions
 
-- TypeScript strict, CommonJS output, Node ≥ 18. The core CLI + built-in TUI have **zero runtime dependencies**; the optional Ink engine adds 4 (ink, react, react-reconciler, @inkjs/ui)
+- TypeScript strict, CommonJS output, Node ≥ 18. The core CLI + built-in TUI have **zero runtime dependencies**; the optional Ink engine adds 3 (ink, react, react-reconciler)
 - Never commit secrets or `.xminal/` runtime state (gitignored)
 - When the tool schema changes, update the command catalog in `src/cli/commands.ts`
   and the TUI palette in `src/tui/clone-tui.ts`

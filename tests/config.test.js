@@ -28,7 +28,10 @@ test("resolveModel(auto) fails clearly when no provider is available", () => {
 test("addGlobalMcpServer writes the entry disabled, keeps a backup and stays owner-only", () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "xminal-cfg-"));
   const previousHome = process.env.HOME;
+  const previousProfile = process.env.USERPROFILE;
+  // os.homedir() reads HOME on posix and USERPROFILE on windows
   process.env.HOME = home;
+  process.env.USERPROFILE = home;
   try {
     const first = addGlobalMcpServer("demo-server", {
       command: ["npx", "-y", "demo"],
@@ -53,6 +56,8 @@ test("addGlobalMcpServer writes the entry disabled, keeps a backup and stays own
   } finally {
     if (previousHome === undefined) delete process.env.HOME;
     else process.env.HOME = previousHome;
+    if (previousProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = previousProfile;
     fs.rmSync(home, { recursive: true, force: true });
   }
 });

@@ -67,7 +67,7 @@ Notes:
 
 ## 2. Ink engine (`XMINAL_TUI_ENGINE=ink`)
 
-The same UI rebuilt on Ink 8 (React for the terminal) + `@inkjs/ui`, with
+The same UI rebuilt on Ink 8 (React for the terminal), with
 yoga-layout's WebAssembly flexbox engine — no native modules to compile.
 
 ```bash

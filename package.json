@@ -65,7 +65,6 @@
   "homepage": "https://github.com/quitsaurabhverma2008-sketch/xminal",
   "bugs": "https://github.com/quitsaurabhverma2008-sketch/xminal/issues",
   "dependencies": {
-    "@inkjs/ui": "^2.0.0",
     "ink": "^8.0.0",
     "react": "^19.3.1",
     "react-reconciler": "^0.34.0"

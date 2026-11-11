@@ -5,7 +5,7 @@ XMINAL ships three frontends — pick the one that fits your terminal:
 | Engine | Env var | Status | Stack |
 |---|---|---|---|
 | Built-in TUI (default) | — | everywhere | pure Node, zero native deps |
-| **Ink engine** | `XMINAL_TUI_ENGINE=ink` | everywhere Node ≥ 22 (Android/Termux included) | [Ink 8](https://github.com/vadimdemedes/ink) + @inkjs/ui + yoga **WASM** |
+| **Ink engine** | `XMINAL_TUI_ENGINE=ink` | everywhere Node ≥ 22 (Android/Termux included) | [Ink 8](https://github.com/vadimdemedes/ink) + React + yoga **WASM** |
 | OpenCode vendored engine | `XMINAL_TUI_ENGINE=opencode` | macOS/Linux/Windows only | verbatim opencode v2.2.7 (Bun required) |
 
 The **Ink engine** is the closest path to a true opencode experience on every device — it is a real framework, not a hand-rolled ANSI painter: React components, hooked state, Flexbox layout via yoga (WebAssembly — no native modules to install or build). Same opencode visual language: gradient boot logo, raised user box with mode-colored left border, fenced markdown, tool activity rows, sidebar, working row, queue, permission bar.

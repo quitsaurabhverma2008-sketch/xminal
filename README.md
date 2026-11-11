@@ -8,7 +8,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.15.0` · MIT · Node ≥ 18 · zero deps for the core (the Ink engine adds 4)
+`v0.15.0` · MIT · Node ≥ 18 · zero deps for the core (the Ink engine adds 3)
 
 </div>
 

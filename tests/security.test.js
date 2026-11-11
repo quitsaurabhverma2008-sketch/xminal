@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { PermissionManager } = require("../dist/core/permissions");
-const { redactSecrets } = require("../dist/util/redact");
+const { redactSecrets, maskConfigSecrets, maskSecretValue } = require("../dist/util/redact");
 
 const fs = require("node:fs");
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "xminal-sec-"));
@@ -66,4 +66,41 @@ test("secrets are redacted before they reach the screen", () => {
   assert.ok(!result.text.includes(fakeKey));
   assert.ok(!result.text.includes(fakePat));
   assert.ok(result.count >= 2);
+});
+
+test("config output masks provider keys", () => {
+  const masked = maskConfigSecrets({
+    providers: { openai: { apiKey: "sk-live-abcdefghijklmnop" }, groq: { apiKey: "gsk_abcdefghijklmnopqrstuvwxyz" } },
+    nested: { deep: { token: "abcdefghijklmnopqrst" } },
+    keep: "visible",
+  });
+  assert.ok(!masked.providers.openai.apiKey.includes("abcdefghijklmnop"));
+  assert.ok(!masked.providers.groq.apiKey.includes("abcdefghijklmnopqrstuvwxyz"));
+  assert.ok(!masked.nested.deep.token.includes("abcdefghijklmnopqrst"));
+  assert.equal(masked.keep, "visible");
+  assert.equal(maskSecretValue("short"), "*****");
+  assert.ok(maskSecretValue("a".repeat(40)).startsWith("aaaa"));
+});
+
+test("`xminal config` never prints a raw provider key", () => {
+  const { spawnSync } = require("node:child_process");
+  const fsx = require("node:fs");
+  const home = fsx.mkdtempSync(path.join(os.tmpdir(), "xminal-cfgout-"));
+  try {
+    fsx.mkdirSync(path.join(home, ".xminal"), { recursive: true });
+    fsx.writeFileSync(
+      path.join(home, ".xminal", "config.json"),
+      JSON.stringify({ version: 1, providers: { demo: { type: "openai", baseUrl: "https://example.invalid", apiKey: "sk-live-THISISFAKEKEY1234567890" } } }),
+    );
+    const entry = path.join(__dirname, "..", "dist", "index.js");
+    const result = spawnSync(process.execPath, [entry, "config"], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: home, USERPROFILE: home },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(!result.stdout.includes("THISISFAKEKEY1234567890"), "the raw key leaked into `xminal config`");
+    assert.ok(result.stdout.includes("sk-l"), "the masked key should still be recognisable");
+  } finally {
+    fsx.rmSync(home, { recursive: true, force: true });
+  }
 });

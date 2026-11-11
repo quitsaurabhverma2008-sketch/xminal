@@ -29,6 +29,7 @@ import { VERSION, TAGLINE } from "./version";
 import { refreshModelsCatalog, catalogMeta, MODEL_DEV_URL } from "./config/models-catalog";
 import type { AgentCallbacks, AgentMode } from "./core/agent";
 import type { PermissionMode } from "./config/types";
+import { maskConfigSecrets } from "./util/redact";
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
@@ -400,12 +401,23 @@ async function commandMcp(
 
 function commandConfig(cwd: string, positionals: string[]): void {
   const which = positionals[0];
+  // the config holds provider keys — never print them in full
   if (which === "global") {
-    console.log(fs.existsSync(globalConfigPath()) ? fs.readFileSync(globalConfigPath(), "utf8") : "(missing)");
+    const file = globalConfigPath();
+    console.log(
+      fs.existsSync(file)
+        ? JSON.stringify(maskConfigSecrets(JSON.parse(fs.readFileSync(file, "utf8"))), null, 2)
+        : "(missing)",
+    );
     return;
   }
   if (which === "project") {
-    console.log(fs.existsSync(projectConfigPath(cwd)) ? fs.readFileSync(projectConfigPath(cwd), "utf8") : "(missing)");
+    const file = projectConfigPath(cwd);
+    console.log(
+      fs.existsSync(file)
+        ? JSON.stringify(maskConfigSecrets(JSON.parse(fs.readFileSync(file, "utf8"))), null, 2)
+        : "(missing)",
+    );
     return;
   }
   const loaded = loadConfig(cwd);
@@ -417,7 +429,7 @@ function commandConfig(cwd: string, positionals: string[]): void {
         globalConfig: globalConfigPath(),
         projectConfig: projectConfigPath(cwd),
         projectConfigExists: loaded.projectExists,
-        config: loaded.config,
+        config: maskConfigSecrets(loaded.config),
       },
       null,
       2,

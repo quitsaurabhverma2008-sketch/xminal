@@ -19,6 +19,7 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 - **The global config was not owner-only** — `~/.xminal/config.json` holds provider API keys. It is written `0600` and re-hardened on every start.
 - **`prepare.cjs` claimed a "committed dist/"** — `dist/` is gitignored, so a checkout without devDependencies had no way to build. It now fails with an actionable message instead of pretending.
 - **`XMINAL_LOG` did nothing** — it now writes a redacted log to `~/.xminal/xminal.log` (provider failures, tool errors, permission denials).
+- **`xminal config` printed the raw provider API keys** — the whole config was dumped to stdout, ready to be pasted into a bug report. Every secret-looking value is now masked (`gsk_…dU (56 chars)`), and `xminal config global|project` prints masked JSON.
 
 ### Added
 
@@ -39,6 +40,7 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 - **The npm tarball no longer ships `vendor/`** — 62 MB unpacked / 5,443 files → **3.5 MB / 179 files**. The package is now small enough to install anywhere. The vendored engine still works from a git checkout or an external checkout via `XMINAL_OPENCODE_ENGINE`; the built-in TUI (default) and the Ink engine cover every device.
 - The MCP overlay now renders the config snippet from `mcpConfigSnippet()` — one source of truth instead of a hand-rolled copy.
 - **End-to-end TUI tests** (`tests/tui-e2e.test.js`) boot the real TUI over a pipe and assert the frame, the in-TUI slash commands and that the alternate screen is never left.
+- **`@inkjs/ui` is gone** — it was only used for the spinner, and it pulls in `deepmerge` with an open prototype-pollution advisory. The spinner is now a local component: 3 runtime dependencies instead of 4, `npm audit` clean.
 
 ### Notes
 

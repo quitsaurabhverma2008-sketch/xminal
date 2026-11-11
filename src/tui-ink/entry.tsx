@@ -9,7 +9,6 @@
  */
 import React, { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Box, Text, useApp, useInput, useWindowSize, Spacer } from "ink";
-import { Spinner } from "@inkjs/ui";
 import type { Runtime } from "../runtime";
 import type { AgentMode } from "../core/agent";
 import { createStore, type Line, type ActivityLine } from "./store";
@@ -275,11 +274,26 @@ function WorkingRow({ s }: { s: TState }) {
   if (!s.busy) return null;
   return (
     <Box paddingLeft={2} marginTop={0}>
-      <Spinner type="dots" />
+      <Dots />
       <Text color={C.cyan}> working</Text>
       <Text color={C.muted}> — esc to interrupt</Text>
     </Box>
   );
+}
+
+/**
+ * A local spinner — the same "dots" animation @inkjs/ui ships, without the
+ * dependency (and its prototype-pollution advisory).
+ */
+const DOT_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+function Dots() {
+  const [frame, setFrame] = React.useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setFrame((n) => (n + 1) % DOT_FRAMES.length), 80);
+    return () => clearInterval(timer);
+  }, []);
+  return <Text color={C.cyan}>{DOT_FRAMES[frame]}</Text>;
 }
 
 function QueueRow({ s }: { s: TState }) {

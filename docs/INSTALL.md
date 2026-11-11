@@ -12,7 +12,7 @@
 
 The core has **no native dependencies** — the built-in TUI is pure Node, so there is
 nothing to compile and no toolchain to install. The Ink engine adds 4 pure-JS
-dependencies (`ink`, `@inkjs/ui`, `react`, `react-reconciler`).
+dependencies (`ink`, `react`, `react-reconciler`).
 
 See [FRONTENDS.md](FRONTENDS.md) for what each frontend really needs.
 
