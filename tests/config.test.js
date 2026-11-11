@@ -41,8 +41,11 @@ test("addGlobalMcpServer writes the entry disabled, keeps a backup and stays own
     assert.equal(first.backup, undefined, "there was no config to back up yet");
 
     const configPath = path.join(home, ".xminal", "config.json");
-    const mode = fs.statSync(configPath).mode & 0o777;
-    assert.equal(mode, 0o600, "the config with server entries must be owner-only");
+    if (process.platform !== "win32") {
+      // windows has no POSIX bits — chmod only toggles the read-only flag there
+      const mode = fs.statSync(configPath).mode & 0o777;
+      assert.equal(mode, 0o600, "the config with server entries must be owner-only");
+    }
 
     const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
     assert.equal(parsed.mcpServers["demo-server"].enabled, false);
