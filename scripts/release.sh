@@ -41,9 +41,11 @@ if [ -z "${NPM_TOKEN:-}" ]; then
   exit 1
 fi
 
-NPMRC="$(mktemp -d)/npmrc"
+NPMRC_DIR="$(mktemp -d)"
+NPMRC="$NPMRC_DIR/npmrc"
+touch "$NPMRC"
 chmod 600 "$NPMRC"
-cleanup() { rm -rf "$(dirname "$NPMRC")"; }
+cleanup() { rm -rf "$NPMRC_DIR"; }
 trap cleanup EXIT
 
 cat > "$NPMRC" <<EOF
