@@ -290,7 +290,8 @@ type Overlay =
   | { kind: "provider-test"; entry: ProviderEntry; status: "working" | "ok" | "fail"; message: string }
   | { kind: "model"; query: string; index: number }
   | { kind: "variant"; index: number }
-  | { kind: "mcp"; query: string; index: number };
+  | { kind: "mcp"; query: string; index: number }
+  | { kind: "sessions"; query: string; index: number };
 
 const EFFORTS = ["low", "medium", "high", "max"];
 const modelAliases = (): Array<{ alias: string; provider: string; model: string; free: boolean }> => {
@@ -386,12 +387,55 @@ const warn = (t: string) => fgAmber(t);
 const err = (t: string) => fgRed(t);
 
 // ─── main entry ─────────────────────────────────────────────────────
-export async function startTui(runtime: Runtime): Promise<void> {
+export async function startTui(initialRuntime: Runtime): Promise<void> {
+  let runtime = initialRuntime;
   const cwd = runtime.cwd;
-  const sessionTitle = runtime.session.meta.title === "untitled" ? "new session" : runtime.session.meta.title;
-  const shortId = runtime.session.id.slice(0, 8);
-  const todos = loadTodos(cwd);
+  let sessionTitle = runtime.session.meta.title === "untitled" ? "new session" : runtime.session.meta.title;
+  let shortId = runtime.session.id.slice(0, 8);
+  let todos = loadTodos(cwd);
   const branch = detectGitBranch(cwd);
+
+interface SessionRow {
+  id: string;
+  title: string;
+  updated: string;
+  count: number;
+  isNew?: boolean;
+}
+
+/** "just now" / "5m ago" / "3d ago" — friendlier than a raw timestamp */
+function relativeTime(when?: Date): string {
+  if (!when) return "";
+  const seconds = Math.max(0, Math.round((Date.now() - when.getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+/** Session list for the /sessions overlay — searchable by title, id or date. */
+const sessionRows = (query: string): SessionRow[] => {
+  const metas = runtime.sessionSummaries();
+  const q = query.trim().toLowerCase();
+  const rows: SessionRow[] = [];
+  for (const meta of metas) {
+    const title = meta.title === "untitled" ? "new session" : meta.title;
+    const updated = meta.updatedAt ? new Date(meta.updatedAt) : undefined;
+    if (q) {
+      const haystack = `${title} ${meta.id} ${updated ? updated.toISOString() : ""}`.toLowerCase();
+      if (!haystack.includes(q)) continue;
+    }
+    rows.push({
+      id: meta.id,
+      title,
+      updated: relativeTime(updated),
+      count: meta.messageCount ?? 0,
+    });
+  }
+  rows.sort((a, b) => (b.updated ?? "").localeCompare(a.updated ?? ""));
+  return [{ id: "", title: "new session", updated: "", count: 0, isNew: true }, ...rows];
+};
+
 
   const mouseMode = !/^(0|off|false)$/i.test(process.env.XMINAL_MOUSE ?? "");
   const PLACEHOLDERS = [
@@ -825,6 +869,38 @@ export async function startTui(runtime: Runtime): Promise<void> {
       return;
     }
 
+    if (ov.kind === "sessions") {
+      const rows = sessionRows(ov.query);
+      const { width, top, left } = centerPanel(r, w, Math.min(r - 4, 18));
+      const innerW = width - 2;
+      const lines: string[] = [];
+      lines.push(panelBorder(`Sessions${ov.query ? ` — ${ov.query}` : ""}`, innerW));
+      lines.push(panelSide(`${fgMuted(`${Math.max(0, rows.length - 1)} saved · type to search · Enter to switch`)}`, innerW, C.panel));
+      const visible = Math.max(1, Math.min(12, r - 8));
+      const maxIndex = Math.max(0, rows.length - 1);
+      const index = Math.min(paletteIndex, maxIndex);
+      ov.index = index;
+      const start = Math.max(0, Math.min(Math.max(0, rows.length - visible), index - Math.floor(visible / 2)));
+      for (let i = start; i < Math.min(rows.length, start + visible); i++) {
+        const row = rows[i];
+        const selected = i === index;
+        const title = row.title.length > 28 ? row.title.slice(0, 27) + "…" : row.title;
+        const line = row.isNew
+          ? `${fgGreen("+")}  ${fgAccent("new session")}`
+          : `${fgText(title.padEnd(28))}${fgMuted(row.id.slice(-6))}  ${fgMuted(row.updated.padEnd(9))}${fgMuted(`  ${row.count} msg`)}`;
+        lines.push(panelSide(selected ? `${bgRgb(C.panel3)}${line}${RESET}` : line, innerW, C.panel));
+      }
+      if (rows.length <= 1) lines.push(panelSide(`${fgMuted("no sessions yet")}`, innerW, C.panel));
+      lines.push(panelSide(`${fgMuted("↑↓ select · type to search · Enter open · Esc close")}`, innerW, C.panel));
+      lines.push(panelBottom(width));
+      for (let i = 0; i < lines.length; i++) {
+        const y = top + i;
+        if (y < 0 || y >= r) continue;
+        frame[y] = lines[i];
+      }
+      return;
+    }
+
     if (ov.kind === "mcp") {
       const catalog = loadMcpCatalog();
       const hits = searchMcpServers(ov.query, { limit: 300 });
@@ -838,7 +914,8 @@ export async function startTui(runtime: Runtime): Promise<void> {
         lines.push(panelSide(`${fgMuted(`${catalog.count} servers · search by name, work or platform`)}`, innerW, C.panel));
         const visible = Math.max(1, Math.min(12, r - 8));
         const maxIndex = Math.max(0, hits.length - 1);
-        const index = Math.min(ov.index, maxIndex);
+        const index = Math.min(paletteIndex, maxIndex);
+        ov.index = index;
         const start = Math.max(0, Math.min(Math.max(0, hits.length - visible), index - Math.floor(visible / 2)));
         const workW = Math.max(10, innerW - 44);
         for (let i = start; i < Math.min(hits.length, start + visible); i++) {
@@ -1042,6 +1119,28 @@ export async function startTui(runtime: Runtime): Promise<void> {
     pushLine("ok", `effort → ${effort} (max ${["1024","4096","16384","∞"][["low","medium","high","max"].indexOf(effort)] ?? ""} output tokens this turn)`);
   };
 
+  // ─── session switching ────────────────────────────────────────────
+  const switchSession = (options: { sessionId?: string; newSession?: boolean }): void => {
+    const previous = runtime;
+    const next = new Runtime(
+      previous.cwd,
+      {
+        mode: previous.agent.mode,
+        model: previous.agent.modelSpec,
+        sessionId: options.sessionId,
+        newSession: options.newSession,
+        callbacks,
+        askHandler: undefined,
+      },
+    );
+    next.setAskHandler(askPermission);
+    runtime = next;
+    sessionTitle = next.session.meta.title === "untitled" ? "new session" : next.session.meta.title;
+    shortId = next.session.id.slice(0, 8);
+    todos = loadTodos(cwd);
+    previous.close();
+  };
+
   // ─── command execution ───────────────────────────────────────────
   const runCommandLine = (cmdLine: string): boolean => {
     const parts = cmdLine.trim().split(/\s+/);
@@ -1059,6 +1158,21 @@ export async function startTui(runtime: Runtime): Promise<void> {
     if (name === "/provider" || name === "/connect" || name === "/set-key") { overlay = { kind: "provider", index: 0 }; input = ""; cursor = 0; render(); return true; }
     if (name === "/variant" || name === "/effort" || name === "/reasoning") { overlay = { kind: "variant", index: 3 }; input = ""; cursor = 0; render(); return true; }
     if (name === "/mcp") { overlay = { kind: "mcp", query: "", index: 0 }; input = ""; cursor = 0; render(); return true; }
+    if (name === "/new") {
+      switchSession({ newSession: true });
+      lines.length = 0;
+      pushLine("system", `${fgGreen("new session")} ${fgMuted(`· ${shortId.slice(-6)}`)}`);
+      render();
+      return true;
+    }
+    if (name === "/sessions" || name === "/resume") {
+      overlay = { kind: "sessions", query: "", index: 0 };
+      paletteIndex = 0;
+      input = "";
+      cursor = 0;
+      render();
+      return true;
+    }
     return false;
   };
 
@@ -1193,8 +1307,13 @@ export async function startTui(runtime: Runtime): Promise<void> {
     render();
   };
 
-  const overlayUp = () => { if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "mcp") { paletteIndex = Math.max(0, paletteIndex - 1); } else if (overlay.kind === "provider") { overlay.index = Math.max(0, overlay.index - 1); } else if (overlay.kind === "variant") { overlay.index = Math.max(0, overlay.index - 1); } };
+  const overlayUp = () => { if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "mcp" || overlay.kind === "sessions") { paletteIndex = Math.max(0, paletteIndex - 1); } else if (overlay.kind === "provider") { overlay.index = Math.max(0, overlay.index - 1); } else if (overlay.kind === "variant") { overlay.index = Math.max(0, overlay.index - 1); } };
   const overlayDown = () => {
+    if (overlay.kind === "sessions") {
+      const count = sessionRows(overlay.query).length;
+      paletteIndex = Math.min(Math.max(0, count - 1), paletteIndex + 1);
+      return;
+    }
     if (overlay.kind === "mcp") {
       const count = searchMcpServers(overlay.query, { limit: 300 }).length;
       paletteIndex = Math.min(Math.max(0, count - 1), paletteIndex + 1);
@@ -1288,9 +1407,29 @@ export async function startTui(runtime: Runtime): Promise<void> {
       render();
       return true;
     }
+    if (overlay.kind === "sessions") {
+      const rows = sessionRows(overlay.query);
+      const row = rows[Math.min(paletteIndex, Math.max(0, rows.length - 1))];
+      overlay = { kind: "none" };
+      if (row?.isNew) {
+        switchSession({ newSession: true });
+        lines.length = 0;
+        pushLine("system", `${fgGreen("new session")} ${fgMuted(`· ${shortId}`)}`);
+      } else if (row) {
+        try {
+          switchSession({ sessionId: row.id });
+          lines.length = 0;
+          pushLine("system", `${fgGreen("resumed")} ${fgMuted(`${row.id.slice(-6)} · ${row.title}`)}`);
+        } catch (error) {
+          pushLine("err", (error as Error).message);
+        }
+      }
+      render();
+      return true;
+    }
     if (overlay.kind === "mcp") {
       const hits = searchMcpServers(overlay.query, { limit: 300 });
-      const entry = hits[Math.min(overlay.index, Math.max(0, hits.length - 1))];
+      const entry = hits[Math.min(paletteIndex, Math.max(0, hits.length - 1))];
       overlay = { kind: "none" };
       if (entry) {
         const key = entry.id.replace(/[^a-zA-Z0-9_-]/g, "-");
@@ -1396,6 +1535,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
         if (overlay.kind === "provider-key") { overlay.input = overlay.input.slice(0, overlay.input.length - 1); render(); return; }
         if (overlay.kind === "model") { overlay.query = overlay.query.slice(0, overlay.query.length - 1); paletteIndex = 0; render(); return; }
         if (overlay.kind === "mcp") { overlay.query = overlay.query.slice(0, overlay.query.length - 1); paletteIndex = 0; render(); return; }
+        if (overlay.kind === "sessions") { overlay.query = overlay.query.slice(0, overlay.query.length - 1); paletteIndex = 0; render(); return; }
         input = input.slice(0, cursor - 1) + input.slice(cursor);
         cursor -= 1;
         if (overlay.kind === "palette" && !input.startsWith("/")) overlay = { kind: "none" };
@@ -1422,6 +1562,11 @@ export async function startTui(runtime: Runtime): Promise<void> {
             return;
           }
           if (overlay.kind === "mcp") {
+            for (const ch of rest) if (ch >= " " && ch !== "\x7f") { overlay.query += ch; paletteIndex = 0; }
+            render();
+            return;
+          }
+          if (overlay.kind === "sessions") {
             for (const ch of rest) if (ch >= " " && ch !== "\x7f") { overlay.query += ch; paletteIndex = 0; }
             render();
             return;

@@ -4,6 +4,25 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-11-11
+
+**Sessions work in the TUI: `/new`, `/sessions`, `/resume` — with search.**
+
+### Fixed
+
+- **`/new` and `/sessions` did nothing in the TUI** — they were not handled natively and fell through to the classic REPL, which leaves the alternate screen and waits for a keypress. Both now work inside the TUI: `/new` creates a session and switches to it, `/sessions` and `/resume` open the session picker.
+- **Overlay selection counter was out of sync** — the sessions/MCP overlays drew from `overlay.index` while ↑/↓ moved `paletteIndex`, so the selection never moved and Enter always picked the first row.
+
+### Added
+
+- **Searchable session picker** (`/sessions`, `/resume`) — search by title, id or date; each row shows title, short id, relative time ("20h ago") and message count; the first row is `+ new session`.
+- **Session switching inside the TUI** — picking a session rebuilds the runtime against that session (mode/model carried over, permissions re-wired) and clears the transcript, exactly like the REPL's restart path.
+- `/new` now switches to a fresh session in-place instead of dropping to the classic REPL.
+
+### Notes
+
+- 79/79 tests green.
+
 ## [0.13.0] — 2026-11-11
 
 **Model list fixes + a 3,832-server MCP catalog + first-run model update.**
