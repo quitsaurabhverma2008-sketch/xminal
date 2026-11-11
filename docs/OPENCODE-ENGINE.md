@@ -56,6 +56,16 @@ XMINAL_OPENCODE_ENGINE=/path/to/opencode XMINAL_TUI_ENGINE=opencode xminal
 
 XMINAL looks for the engine in this order: `$XMINAL_OPENCODE_ENGINE` → `<package>/vendor` → `<package>/../opencode`. When it finds nothing it says so plainly and names the three options — it never pretends to start the engine.
 
+The vendored tree ships **without** `node_modules` (it is ~70 MB of source; the
+dependencies are another few hundred MB). Install them once, inside `vendor/`:
+
+```bash
+cd vendor && bun install
+```
+
+Without that step the engine cannot start even on a desktop — the launcher
+reports the missing checkout instead of failing halfway.
+
 On Android/Termux the engine cannot run: there is no public prebuilt `@opentui/core-android-arm64` native renderer (upstream ships darwin/linux/win32 targets only). XMINAL detects this and falls back to the built-in TUI with a clear warning — never silently.
 
 ## Honest limitations
