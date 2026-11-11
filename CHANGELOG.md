@@ -14,6 +14,7 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 - **The screen vibrated.** Every frame ended with a newline on the bottom row, which makes the terminal scroll by one line — the whole UI then jumped up on each repaint (very visible while the spinner was running). The frame is now exactly screen-height with no trailing newline, so the UI is locked to the viewport.
 - The composer closes with a blank row, like opencode: its `╹`/`▀` notch only appears with a translucent prompt background, and the default theme is opaque.
 - The Ink engine got the same treatment (no notch).
+- **The frame now uses the real terminal size.** The old code clamped the width to 40 and the height to 16 columns/rows, so on a smaller screen (a phone in landscape, a split pane) the frame was drawn larger than the viewport — the terminal wrapped and scrolled, which is the second half of the "vibration". The frame is now exactly the terminal's size, and the layout adapts (narrow mode below 44 columns).
 
 ### Added
 

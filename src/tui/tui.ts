@@ -472,8 +472,12 @@ const sessionRows = (query: string): SessionRow[] => {
   let pendingPermission: { tool: string; reason: string; resolve: (allow: boolean) => void } | null = null;
   const lines: Line[] = [];
 
-  const cols = () => Math.max(40, process.stdout.columns ?? (Number(process.env.COLUMNS) || 80));
-  const rows = () => Math.max(16, process.stdout.rows ?? (Number(process.env.LINES) || 24));
+  // The frame is drawn exactly once per terminal row/column, so the size we
+  // use must be the real one: drawing more lines than the screen has makes
+  // the terminal scroll (the UI then vibrates). The minimums only guard
+  // against a 0/undefined size when stdout is not a terminal.
+  const cols = () => Math.max(20, process.stdout.columns || Number(process.env.COLUMNS) || 80);
+  const rows = () => Math.max(8, process.stdout.rows || Number(process.env.LINES) || 24);
   const sidebarWidth = () => (cols() > 120 ? 42 : 0); // opencode SESSION_SIDEBAR_WIDTH, auto >120 cols
   const contentWidth = () => cols() - sidebarWidth();
   let ctxWindowMemo: { spec: string; value: number } | null = null;
