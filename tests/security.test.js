@@ -59,8 +59,11 @@ test("the project's own .xminal state directory stays writable", () => {
 });
 
 test("secrets are redacted before they reach the screen", () => {
-  const result = redactSecrets("key sk-abcdefghijklmnopqrstuvwxyz123456 and ghp_abcdefghijklmnopqrstuvwxyz1234");
-  assert.ok(!result.text.includes("sk-abcdefghijklmnopqrstuvwxyz123456"));
-  assert.ok(!result.text.includes("ghp_abcdefghijklmnopqrstuvwxyz1234"));
+  // built at runtime so this file never contains a token-shaped literal
+  const fakeKey = `sk-${"abcdefghijklmnopqrstuvwxyz".repeat(2)}`;
+  const fakePat = `ghp_${"abcdefghijklmnopqrstuvwxyz".repeat(2)}`;
+  const result = redactSecrets(`key ${fakeKey} and ${fakePat}`);
+  assert.ok(!result.text.includes(fakeKey));
+  assert.ok(!result.text.includes(fakePat));
   assert.ok(result.count >= 2);
 });

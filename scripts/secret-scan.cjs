@@ -78,6 +78,8 @@ function main() {
         // the rule definitions themselves contain the patterns — ignore them
         if (file === path.join("scripts", "secret-scan.cjs")) continue;
         if (FIXTURES.has(match[0])) continue;
+        // obvious placeholders ("abcdefghijklmnopqrstuvwxyz…") are test fixtures, not keys
+        if (/abcdefghijklmnopqrstuvwxyz/i.test(match[0])) continue;
         findings.push({ file, line, rule: rule.name, sample: match[0].slice(0, 12) + "…" });
       }
     }

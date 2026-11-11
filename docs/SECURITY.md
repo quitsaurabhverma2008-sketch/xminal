@@ -56,9 +56,11 @@ Default list: `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config/gh`, `.env`,
 - A **write** to a protected path is **denied in every mode**, including
   `full`. There is no override.
 - A **read** of a protected path is not treated as safe: it is classified
-  `risky` (reason: `protected path read: …`). In `ask` mode that prompts; in
-  `auto` and `full` it is allowed. The file content is still redacted for
-  known key formats before it reaches the model.
+  `dangerous` (reason: `protected path read: …`), so `ask` and `auto` prompt
+  (or deny without an approver) and only `full` allows it. Reading a key
+  file puts its content into the model context — that needs an explicit
+  decision. The content is redacted for known key formats before it reaches
+  the model regardless.
 - Configure your own list in `~/.xminal/config.json`; glob patterns are
   supported:
 
