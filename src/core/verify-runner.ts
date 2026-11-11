@@ -50,7 +50,9 @@ export function runVerify(cwd: string, command: string, options: VerifyOptions =
   }
   const started = Date.now();
   try {
-    const result = spawnSync("/system/bin/sh", ["-c", command], {
+    // "sh" from PATH — /system/bin/sh is Termux-only, /bin/sh is not universal
+    const shell = process.env.SHELL && /sh$/.test(process.env.SHELL) ? process.env.SHELL : "sh";
+    const result = spawnSync(shell, ["-c", command], {
       cwd,
       encoding: "utf8",
       timeout: timeoutMs,
