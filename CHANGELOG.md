@@ -4,6 +4,29 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-11-11
+
+**Model list fixes + a 3,832-server MCP catalog + first-run model update.**
+
+### Fixed
+
+- **Non-free models showed a FREE badge.** The catalog builder defaulted a *missing* price to `0`, so every model whose price models.dev does not publish was marked free. Unknown pricing is now unknown (shown as `—`), and only an explicit `0/0` counts as free — the live catalog reports ~316 genuinely free models instead of ~1,900.
+- **Model names were truncated** in the picker (`alias.slice(0, 26)`). The alias now gets the room it needs; the optional columns (context window, price, provider) drop from the right instead of cutting the name.
+- Price column shows the real `$input/$output` per Mtok (previously the whole row was clipped).
+
+### Added
+
+- **MCP catalog** — 3,832 public MCP servers shipped offline with the package (`data/mcp-catalog.json`), built from the Smithery registry + GitHub by `scripts/fetch-mcp-catalog.py`.
+  - search by **name**, by **what it does** ("work"), or by **platform** (`LINUX` / `WINDOWS` / `MOBILE`)
+  - TUI: `/mcp` opens the searchable overlay, `Enter` shows details + the `mcpServers` snippet to paste into `~/.xminal/config.json`
+  - shell: `xminal mcp search pdf --platform mobile`
+- **First-run model update** — on a fresh install the catalog is stale, so XMINAL now says so before the wait ("updating model catalog — first run downloads the live models.dev list…") and confirms afterwards ("model catalog updated · N models · M free"). Same in the TUI and in headless `xminal run`.
+
+### Notes
+
+- 79/79 tests green (10 new: catalog search/filter/limits + free-detection).
+- The catalog is a data file, not a network call — searching works offline.
+
 ## [0.12.6] — 2026-11-11
 
 **Opencode-exact message boxes + agent language rule.**

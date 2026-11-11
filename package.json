@@ -1,6 +1,6 @@
 {
   "name": "xminal",
-  "version": "0.12.6",
+  "version": "0.13.0",
   "description": "XMINAL — Every coding agent. One terminal. Provider-agnostic fullscreen TUI (pure Node), agent runtime, 46 built-in providers, sessions, MCP, memory, worktrees, Ralph loops.",
   "license": "MIT",
   "author": "XMINAL contributors",
@@ -22,7 +22,7 @@
     "vendor"
   ],
   "scripts": {
-    "build": "npm run build:tsc && npm run build:ink",
+    "build": "npm run build:tsc && npm run build:ink && node scripts/copy-data.cjs",
     "prepare": "node scripts/prepare.cjs",
     "pretest": "npm run build",
     "test": "node scripts/run-tests.cjs",

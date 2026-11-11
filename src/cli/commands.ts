@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { loadMcpCatalog, searchMcpServers } from "../mcp/catalog";
 import fs from "node:fs";
 import path from "node:path";
 import { initProject, listModelAliases, providerReady, resolveModel } from "../config/config";
@@ -467,6 +468,31 @@ export async function handleCommand(input: string, ctx: CommandContext): Promise
     }
 
     case "mcp": {
+      // catalogue mode: `xminal mcp search <query> [--platform mobile]`
+      const parts = rest.trim().split(/\s+/).filter(Boolean);
+      if (parts[0] === "search" || parts[0] === "catalog" || parts[0] === "find") {
+        const platformFlag = parts.findIndex((p) => p === "--platform" || p === "-p");
+        const platform = platformFlag >= 0 ? parts[platformFlag + 1] : undefined;
+        const query = parts
+          .slice(1)
+          .filter((p, i) => !(i === 0 && platformFlag === 1) && !(platformFlag >= 0 && i === platformFlag) && !(platformFlag >= 0 && i === platformFlag + 1))
+          .join(" ");
+        const hits = searchMcpServers(query, { platform, limit: 40 });
+        const catalog = loadMcpCatalog();
+        if (!catalog) {
+          renderer.warn("MCP catalog not found — run scripts/fetch-mcp-catalog.py to build data/mcp-catalog.json");
+          return true;
+        }
+        renderer.info(
+          `MCP catalog: ${catalog.count} servers (${catalog.source}) — showing ${hits.length} for "${query || "*"}"${platform ? ` · platform ${platform}` : ""}`,
+        );
+        for (const entry of hits) {
+          renderer.status(`${entry.name}  ·  ${entry.work}`);
+          renderer.info(`   ${entry.id}  ·  ${entry.platforms.join("/").toUpperCase()}${entry.remote ? " · HOSTED" : ""}  ·  ${entry.url}`);
+        }
+        if (hits.length === 0) renderer.info("(no matches)");
+        return true;
+      }
       const servers = runtime.mcp.listServerNames();
       if (servers.length === 0) {
         renderer.info("(no MCP servers configured — add mcpServers to ~/.xminal/config.json)");

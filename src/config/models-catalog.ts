@@ -59,7 +59,11 @@ export interface RefreshResult extends CatalogMeta {
 }
 
 function isZeroCost(input: unknown, output: unknown): boolean {
-  return Number(input ?? -1) === 0 && Number(output ?? -1) === 0;
+  // an explicit 0/0 means free; missing or unparsable pricing is NOT free
+  const a = Number(input);
+  const b = Number(output);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+  return a === 0 && b === 0;
 }
 
 export function isFreeModel(m: ModelConfig): boolean {
@@ -78,6 +82,12 @@ export function buildAliasesFromSnapshot(snapshot: unknown): Record<string, Mode
       const modalities = (raw.modalities ?? {}) as { input?: string[] };
       if (Array.isArray(modalities.input) && !modalities.input.includes("text")) continue;
       const cost = (raw.cost ?? {}) as { input?: number; output?: number };
+      // unknown price must stay unknown — defaulting to 0 wrongly marks paid models as FREE
+      const price = (value: unknown): number | undefined => {
+        if (value === undefined || value === null || value === "") return undefined;
+        const n = Number(value);
+        return Number.isFinite(n) ? n : undefined;
+      };
       const capabilities = [
         ...(raw.tool_call ? ["tools"] : []),
         "streaming",
@@ -88,8 +98,8 @@ export function buildAliasesFromSnapshot(snapshot: unknown): Record<string, Mode
         model: modelId,
         contextWindow: raw.limit ? Number((raw.limit as Record<string, unknown>).context ?? 0) || undefined : undefined,
         maxOutput: raw.limit ? Number((raw.limit as Record<string, unknown>).output ?? 0) || undefined : undefined,
-        inputPricePerMTok: Number(cost.input ?? 0),
-        outputPricePerMTok: Number(cost.output ?? 0),
+        inputPricePerMTok: price(cost.input),
+        outputPricePerMTok: price(cost.output),
         capabilities,
       };
     }

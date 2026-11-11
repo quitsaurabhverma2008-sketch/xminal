@@ -1,6 +1,7 @@
 import { Runtime } from "../runtime";
 import { loadConfig, resolveModel } from "../config/config";
-import { listEffectiveAliases, refreshModelsCatalog, effectiveModelMap } from "../config/models-catalog";
+import { listEffectiveAliases, refreshModelsCatalog, effectiveModelMap, catalogMeta } from "../config/models-catalog";
+import { loadMcpCatalog, searchMcpServers } from "../mcp/catalog";
 import { visibleWidth, graphemeSlice, stripAnsi as stripAnsiW, splitGraphemes, wrapAnsi } from "./width";
 import { formatAssistantText, isLikelyDiff, tintDiffRow } from "./format";
 import { renderMarkdown } from "./markdown";
@@ -104,6 +105,7 @@ const COMMANDS: Cmd[] = [
   { name: "/mcp", desc: "list MCP servers + tools", group: "MCP" },
   { name: "/mcp-tools", desc: "list all MCP tool names", group: "MCP" },
   { name: "/mcp-call", desc: "call a tool on an MCP server", group: "MCP" },
+  { name: "/mcp-catalog", desc: "search 3800+ MCP servers by name, work, platform", group: "MCP" },
 
   { name: "/verify", desc: "run project tests/lint/typecheck", group: "Dev" },
   { name: "/test", desc: "alias for /verify", group: "Dev" },
@@ -287,7 +289,8 @@ type Overlay =
   | { kind: "provider-key"; entry: ProviderEntry; input: string }
   | { kind: "provider-test"; entry: ProviderEntry; status: "working" | "ok" | "fail"; message: string }
   | { kind: "model"; query: string; index: number }
-  | { kind: "variant"; index: number };
+  | { kind: "variant"; index: number }
+  | { kind: "mcp"; query: string; index: number };
 
 const EFFORTS = ["low", "medium", "high", "max"];
 const modelAliases = (): Array<{ alias: string; provider: string; model: string; free: boolean }> => {
@@ -323,9 +326,9 @@ const ctxLabel = (n?: number): string => {
 const priceLabel = (cfg?: ModelConfig): string => {
   if (!cfg) return "";
   const inP = cfg.inputPricePerMTok, outP = cfg.outputPricePerMTok;
-  if (inP === 0 && outP === 0) return "free";
-  if (inP === undefined || outP === undefined) return "";
-  return `$${inP}/${outP}`;
+  if (inP === undefined || outP === undefined) return "—"; // price unknown — never claim "free"
+  if (inP === 0 && outP === 0) return "";
+  return `$${inP}/$${outP}`;
 };
 const filteredModels = (query = ""): ModelAliasItem[] => {
   const aliases = modelAliases();
@@ -760,14 +763,27 @@ export async function startTui(runtime: Runtime): Promise<void> {
             : ov.kind === "model"
             ? (() => {
                 const q = (ov.query ?? "").toLowerCase();
-                const wide = cols() >= 96;
-                const narrow = cols() < 72;
-                const aliasW = narrow ? 14 : 26;
                 const map = modelMap();
+                const inner = Math.max(20, Math.min(cols() - 6, 82) - 2);
                 return filteredModels(q).map((m) => {
                   const cfg = map[`${m.provider}/${m.model}`] ?? map[m.alias];
-                  const left = `${fgAccent(m.alias.slice(0, aliasW).padEnd(aliasW + 1))}${m.free ? fgGreen("FREE ") : fgMuted("     ")}${wide && !narrow ? fgMuted(ctxLabel(cfg?.contextWindow).padEnd(6)) : ""}`;
-                  const right = fgMuted(wide ? [priceLabel(cfg).padEnd(11), m.provider].join("").trim() : priceLabel(cfg));
+                  // the alias always gets the room it needs — optional tags drop
+                  // from the right (provider → context → price) before it is cut
+                  const freeTag = m.free ? " FREE" : "";
+                  const ctxTag = ctxLabel(cfg?.contextWindow) ? ` ${ctxLabel(cfg?.contextWindow)}` : "";
+                  const priceTag = priceLabel(cfg) ? ` ${priceLabel(cfg)}` : "";
+                  const provTag = ` ${m.provider}`;
+                  let alias = m.alias;
+                  let tail = ctxTag + priceTag + provTag;
+                  if (alias.length + freeTag.length + tail.length > inner) tail = ctxTag + priceTag;
+                  if (alias.length + freeTag.length + tail.length > inner) tail = priceTag;
+                  if (alias.length + freeTag.length + tail.length > inner) tail = "";
+                  if (alias.length + freeTag.length + tail.length > inner) {
+                    const room = Math.max(10, inner - freeTag.length - 1);
+                    if (alias.length > room) alias = alias.slice(0, room - 1) + "…";
+                  }
+                  const left = `${fgAccent(alias)}${m.free ? fgGreen(freeTag) : ""}`;
+                  const right = fgMuted(tail);
                   return { a: left, b: right };
                 });
               })()
@@ -805,6 +821,43 @@ export async function startTui(runtime: Runtime): Promise<void> {
       for (let i = 0; i < lines.length; i++) {
         const y = top + i;
         frame[y] = overlayDim(lines[i], y, r, left, width, ov);
+      }
+      return;
+    }
+
+    if (ov.kind === "mcp") {
+      const catalog = loadMcpCatalog();
+      const hits = searchMcpServers(ov.query, { limit: 300 });
+      const { width, top, left } = centerPanel(r, w, Math.min(r - 4, 18));
+      const innerW = width - 2;
+      const lines: string[] = [];
+      lines.push(panelBorder(`MCP catalog${ov.query ? ` — ${ov.query}` : ""}`, innerW));
+      if (!catalog) {
+        lines.push(panelSide(`${fgMuted("catalog missing — run scripts/fetch-mcp-catalog.py")}`, innerW, C.panel));
+      } else {
+        lines.push(panelSide(`${fgMuted(`${catalog.count} servers · search by name, work or platform`)}`, innerW, C.panel));
+        const visible = Math.max(1, Math.min(12, r - 8));
+        const maxIndex = Math.max(0, hits.length - 1);
+        const index = Math.min(ov.index, maxIndex);
+        const start = Math.max(0, Math.min(Math.max(0, hits.length - visible), index - Math.floor(visible / 2)));
+        const workW = Math.max(10, innerW - 44);
+        for (let i = start; i < Math.min(hits.length, start + visible); i++) {
+          const entry = hits[i];
+          const selected = i === index;
+          const name = entry.name.length > 26 ? entry.name.slice(0, 25) + "…" : entry.name;
+          const platforms = entry.platforms.map((p) => p.toUpperCase()).join("/");
+          const work = entry.work.length > workW ? entry.work.slice(0, workW - 1) + "…" : entry.work;
+          const row = `${fgAccent(name.padEnd(26))}${fgMuted(work.padEnd(workW))}  ${fgCyan(platforms)}`;
+          lines.push(panelSide(selected ? `${bgRgb(C.panel3)}${row}${RESET}` : row, innerW, C.panel));
+        }
+        if (hits.length === 0) lines.push(panelSide(`${fgMuted("no matches")}`, innerW, C.panel));
+      }
+      lines.push(panelSide(`${fgMuted("↑↓ select · type to filter · Enter details · Esc close")}`, innerW, C.panel));
+      lines.push(panelBottom(width));
+      for (let i = 0; i < lines.length; i++) {
+        const y = top + i;
+        if (y < 0 || y >= r) continue;
+        frame[y] = lines[i];
       }
       return;
     }
@@ -1005,6 +1058,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
     if (name === "/model") { modelScope = modelScopeOfSpec(runtime.agent.modelSpec); overlay = { kind: "model", query: "", index: 0 }; paletteIndex = 0; input = ""; cursor = 0; render(); return true; }
     if (name === "/provider" || name === "/connect" || name === "/set-key") { overlay = { kind: "provider", index: 0 }; input = ""; cursor = 0; render(); return true; }
     if (name === "/variant" || name === "/effort" || name === "/reasoning") { overlay = { kind: "variant", index: 3 }; input = ""; cursor = 0; render(); return true; }
+    if (name === "/mcp") { overlay = { kind: "mcp", query: "", index: 0 }; input = ""; cursor = 0; render(); return true; }
     return false;
   };
 
@@ -1139,8 +1193,13 @@ export async function startTui(runtime: Runtime): Promise<void> {
     render();
   };
 
-  const overlayUp = () => { if (overlay.kind === "palette" || overlay.kind === "model") { paletteIndex = Math.max(0, paletteIndex - 1); } else if (overlay.kind === "provider") { overlay.index = Math.max(0, overlay.index - 1); } else if (overlay.kind === "variant") { overlay.index = Math.max(0, overlay.index - 1); } };
+  const overlayUp = () => { if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "mcp") { paletteIndex = Math.max(0, paletteIndex - 1); } else if (overlay.kind === "provider") { overlay.index = Math.max(0, overlay.index - 1); } else if (overlay.kind === "variant") { overlay.index = Math.max(0, overlay.index - 1); } };
   const overlayDown = () => {
+    if (overlay.kind === "mcp") {
+      const count = searchMcpServers(overlay.query, { limit: 300 }).length;
+      paletteIndex = Math.min(Math.max(0, count - 1), paletteIndex + 1);
+      return;
+    }
     if (overlay.kind === "palette" || overlay.kind === "model") {
       const count = overlay.kind === "palette"
         ? COMMANDS.filter((c) => c.name.startsWith(input.toLowerCase())).length
@@ -1226,6 +1285,20 @@ export async function startTui(runtime: Runtime): Promise<void> {
       const effort = EFFORTS[overlay.index];
       setEffort(effort);
       overlay = { kind: "none" };
+      render();
+      return true;
+    }
+    if (overlay.kind === "mcp") {
+      const hits = searchMcpServers(overlay.query, { limit: 300 });
+      const entry = hits[Math.min(overlay.index, Math.max(0, hits.length - 1))];
+      overlay = { kind: "none" };
+      if (entry) {
+        const key = entry.id.replace(/[^a-zA-Z0-9_-]/g, "-");
+        pushLine("system", `${fgAccent(entry.name)} — ${fgMuted(entry.work)}`);
+        pushLine("system", `${fgMuted(`${entry.id} · ${entry.platforms.join("/").toUpperCase()}${entry.remote ? " · HOSTED" : ""} · ${entry.url}`)}`);
+        pushLine("system", fgMuted("add to ~/.xminal/config.json →"));
+        pushLine("system", fgMuted(`  "mcpServers": { "${key}": { "command": ["npx", "-y", "@modelcontextprotocol/server-${key}"] } }`));
+      }
       render();
       return true;
     }
@@ -1322,6 +1395,7 @@ export async function startTui(runtime: Runtime): Promise<void> {
       if (cursor > 0) {
         if (overlay.kind === "provider-key") { overlay.input = overlay.input.slice(0, overlay.input.length - 1); render(); return; }
         if (overlay.kind === "model") { overlay.query = overlay.query.slice(0, overlay.query.length - 1); paletteIndex = 0; render(); return; }
+        if (overlay.kind === "mcp") { overlay.query = overlay.query.slice(0, overlay.query.length - 1); paletteIndex = 0; render(); return; }
         input = input.slice(0, cursor - 1) + input.slice(cursor);
         cursor -= 1;
         if (overlay.kind === "palette" && !input.startsWith("/")) overlay = { kind: "none" };
@@ -1343,6 +1417,11 @@ export async function startTui(runtime: Runtime): Promise<void> {
             return;
           }
           if (overlay.kind === "model") {
+            for (const ch of rest) if (ch >= " " && ch !== "\x7f") { overlay.query += ch; paletteIndex = 0; }
+            render();
+            return;
+          }
+          if (overlay.kind === "mcp") {
             for (const ch of rest) if (ch >= " " && ch !== "\x7f") { overlay.query += ch; paletteIndex = 0; }
             render();
             return;
@@ -1407,14 +1486,23 @@ export async function startTui(runtime: Runtime): Promise<void> {
   }
 
   if (!process.env.XMINAL_MODELS_OFFLINE) { // refresh catalog from models.dev in the background when stale
+    const meta = catalogMeta();
+    const fetchedAt = meta.fetchedAt ? Date.parse(meta.fetchedAt) : 0;
+    const ttlHours = Number(process.env.XMINAL_MODELS_TTL_HOURS ?? "24");
+    const stale = !fetchedAt || Date.now() - fetchedAt > Math.max(0, ttlHours) * 3600_000;
+    if (stale) {
+      // first run / stale catalog — say so, the user should know we are working
+      pushLine("system", fgMuted("updating model catalog — first run downloads the live models.dev list…"));
+      render();
+    }
     void (async () => {
       try {
         const result = await refreshModelsCatalog({ force: false });
         if (result.source === "fresh" && !closed) {
-          pushLine("system", fgMuted(`model catalog refreshed · ${result.modelCount} models · ${result.freeCount} free`));
+          pushLine("system", fgMuted(`model catalog updated · ${result.modelCount} models · ${result.freeCount} free`));
           render();
         } else if (!result.ok && !closed) {
-          pushLine("system", fgMuted(`model catalog refresh failed (${result.error ?? "unknown"}) — using bundled/cached catalog`));
+          pushLine("system", fgMuted(`model catalog update failed (${result.error ?? "unknown"}) — using bundled/cached catalog`));
           render();
         }
       } catch { /* best effort */ }

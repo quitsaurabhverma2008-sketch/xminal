@@ -8,7 +8,7 @@
 
 **XMINAL** — Every coding agent. One terminal.
 
-`v0.12.6` · MIT · Node ≥ 18 · zero runtime dependencies
+`v0.13.0` · MIT · Node ≥ 18 · zero runtime dependencies
 
 </div>
 
@@ -74,6 +74,10 @@ canvas renderer, so the animation above is a real render of the page, not a mock
 
 <img src="assets/screenshot-provider-wizard.png" width="900" alt="XMINAL provider connect wizard" />
 
+**MCP catalog** — 3,832 servers, searchable by name, by what they do, and by platform:
+
+<img src="assets/screenshot-mcp-catalog.png" width="900" alt="XMINAL MCP catalog overlay" />
+
 **Opencode parity** — the built-in TUI now follows opencode's own box rules (SplitBorder `┃` + raised background + 1 row / 2 col padding, 3-column indents, opencode's tool glyphs and pending labels). Left: XMINAL on Android. Right: opencode's vendored markup rendered through Ink:
 
 <img src="assets/opencode-parity.png" width="900" alt="XMINAL built-in TUI next to opencode's own markup" />
@@ -92,6 +96,13 @@ canvas renderer, so the animation above is a real render of the page, not a mock
 - **Streaming** token-by-token output, real-time cost tracking, budget caps
 - **Modes**: `plan` (read-only + analysis) · `build` (implement end-to-end) · `compose` (plan→implement→verify→review) · `review` (read-only code review) · `yolo` (autonomous)
 - **Tool-use**: read · write · edit · multi_edit · glob · grep · list · bash · todo · memory · skill · checkpoint · git · worktree · verify · web_fetch · web_search · diagnostics · mcp_list · mcp_call · task · think
+
+### MCP catalog (offline, 3800+ servers)
+- **Search 3,832 public MCP servers without touching the network** — the catalog ships inside the package (`data/mcp-catalog.json`, built from the Smithery registry + GitHub by `scripts/fetch-mcp-catalog.py`)
+- Search by **name**, by **what the server does** ("work"), or by **where it runs**
+- Every entry carries platform availability: `LINUX` · `WINDOWS` · `MOBILE` (Termux/Android counts as mobile)
+- In the TUI: `/mcp` opens the searchable catalog, `Enter` shows the details plus the `mcpServers` snippet to paste
+- From the shell: `xminal mcp search pdf --platform mobile`
 
 ### Sessions
 - Start / resume / branch / rewind any session
@@ -280,7 +291,7 @@ Or directly: **[github.com/quitsaurabhverma2008-sketch/xminal/issues/new](https:
 
 ## Status (honest)
 
-**v0.12.6** — live on npm, 69/69 tests, CI green on Ubuntu/macOS/Windows × Node 20/22. Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.13.0** — live on npm, 69/69 tests, CI green on Ubuntu/macOS/Windows × Node 20/22. Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 

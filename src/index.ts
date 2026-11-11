@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import { loadMcpCatalog, searchMcpServers } from "./mcp/catalog";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { parseArgs, parseNumberFlag, CLI_HELP } from "./cli/args";
@@ -126,7 +127,7 @@ async function main(): Promise<void> {
         await startMcpStdioServer(cwd);
         return;
       }
-      await commandMcp(cwd, renderer);
+      await commandMcp(cwd, renderer, args.positionals);
       return;
 
     case "audit": {
@@ -174,6 +175,25 @@ async function main(): Promise<void> {
       return;
 
     case "run":
+      // first run on a new machine: pull the live model catalog before the
+      // first prompt, and say so — the user should see the few seconds wait
+      if (!process.env.XMINAL_MODELS_OFFLINE) {
+        const meta = catalogMeta();
+        const fetchedAt = meta.fetchedAt ? Date.parse(meta.fetchedAt) : 0;
+        const ttlHours = Number(process.env.XMINAL_MODELS_TTL_HOURS ?? "24");
+        const stale = !fetchedAt || Date.now() - fetchedAt > Math.max(0, ttlHours) * 3600_000;
+        if (stale) {
+          renderer.info("updating model catalog — first run downloads the live models.dev list…");
+          try {
+            const result = await refreshModelsCatalog({ force: false });
+            if (result.source === "fresh") {
+              renderer.info(`model catalog updated · ${result.modelCount} models · ${result.freeCount} free`);
+            }
+          } catch {
+            renderer.warn("model catalog update failed — using the bundled catalog");
+          }
+        }
+      }
       await commandRun(cwd, args, renderer);
       return;
 
@@ -322,7 +342,32 @@ function commandSessions(cwd: string, renderer: Renderer): void {
   );
 }
 
-async function commandMcp(cwd: string, renderer: Renderer): Promise<void> {
+async function commandMcp(cwd: string, renderer: Renderer, positionals: string[] = []): Promise<void> {
+  // catalogue search: `xminal mcp search <query> [--platform mobile]`
+  const parts = positionals.map((p) => String(p)).filter(Boolean);
+  if (parts[0] === "search" || parts[0] === "catalog" || parts[0] === "find") {
+    const platformIndex = parts.findIndex((p) => p === "--platform" || p === "-p");
+    const platform = platformIndex >= 0 ? parts[platformIndex + 1] : undefined;
+    const query = parts
+      .slice(1)
+      .filter((_, i) => !(platformIndex >= 0 && (i === platformIndex - 1 || i === platformIndex)))
+      .join(" ");
+    const catalog = loadMcpCatalog();
+    if (!catalog) {
+      renderer.warn("MCP catalog missing — run scripts/fetch-mcp-catalog.py to build data/mcp-catalog.json");
+      return;
+    }
+    const hits = searchMcpServers(query, { platform, limit: 40 });
+    renderer.info(
+      `MCP catalog: ${catalog.count} servers (${catalog.source}) — ${hits.length} match "${query || "*"}"${platform ? ` · ${platform}` : ""}`,
+    );
+    for (const entry of hits) {
+      renderer.status(`${entry.name} · ${entry.work}`);
+      renderer.info(`   ${entry.id} · ${entry.platforms.join("/").toUpperCase()}${entry.remote ? " · HOSTED" : ""} · ${entry.url}`);
+    }
+    if (hits.length === 0) renderer.info("(no matches)");
+    return;
+  }
   const { config } = loadConfig(cwd);
   const servers = Object.keys(config.mcpServers);
   if (servers.length === 0) {
