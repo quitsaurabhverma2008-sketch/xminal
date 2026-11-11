@@ -42,6 +42,15 @@ const bold = (t: string) => `${BOLD}${t}${RESET}`;
 const stripAnsi = stripAnsiW;
 const visible = visibleWidth;
 const padRight = (s: string, w: number) => (visible(s) >= w ? s : s + " ".repeat(w - visible(s)));
+/**
+ * Re-apply a background after every reset.
+ *
+ * A bare ESC[0m clears the background too, so any styled text inside a
+ * painted row (a panel, the composer, the sidebar) punched a hole in it.
+ * This keeps the fill continuous.
+ */
+const keepBg = (bg: string, content: string): string =>
+  content.includes(RESET) ? content.split(RESET).join(RESET + bg) : content;
 const clip = (s: string, w: number): string => {
   if (visible(s) <= w) return s;
   let out = "";
@@ -514,10 +523,11 @@ const sessionRows = (query: string): SessionRow[] => {
         const cardW = Math.max(8, w);
         const cmd = toolTarget(a.name, a.argsRaw, cardW - 4);
         const rule = `${rgb(T.bg)}┃${RESET}`;
+        const fill = bgRgb(T.panel);
         const card = (body: string) =>
-          `${rule}${bgRgb(T.panel)}  ${body}${" ".repeat(Math.max(0, cardW - 4 - visible(body)))}${RESET}`;
+          `${rule}${fill}  ${keepBg(fill, body)}${" ".repeat(Math.max(0, cardW - 4 - visible(body)))}${RESET}`;
         const rows: string[] = [];
-        rows.push(`${rule}${bgRgb(T.panel)}  ${fgText("$")} ${fgText(cmd)}${" ".repeat(Math.max(0, cardW - 4 - visible(cmd) - 2))}${RESET}`);
+        rows.push(`${rule}${fill}  ${fgText("$")} ${fgText(cmd)}${" ".repeat(Math.max(0, cardW - 4 - visible(cmd) - 2))}${RESET}`);
         for (const outLine of a.output.slice(0, 10)) {
           rows.push(card(a.status === "err" ? fgRed(outLine) : fgMuted(outLine)));
         }
@@ -530,13 +540,14 @@ const sessionRows = (query: string): SessionRow[] => {
       if (a.preview && a.preview.length) {
         const cardW = Math.max(8, w);
         const rule = `${rgb(T.bg)}┃${RESET}`;
+        const fill = bgRgb(T.panel);
         const rows: string[] = [];
         for (const row of a.preview) {
           const tinted = tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed);
-          rows.push(`${rule}${bgRgb(T.panel)} ${tinted}${" ".repeat(Math.max(0, cardW - 2 - visible(tinted)))}${RESET}`);
+          rows.push(`${rule}${fill} ${keepBg(fill, tinted)}${" ".repeat(Math.max(0, cardW - 2 - visible(tinted)))}${RESET}`);
         }
         if (a.extraPreviewLines) {
-          rows.push(`${rule}${bgRgb(T.panel)} ${fgMuted(`… ${a.extraPreviewLines} more diff lines`)}${" ".repeat(Math.max(0, cardW - 2 - 30))}${RESET}`);
+          rows.push(`${rule}${fill} ${fgMuted(`… ${a.extraPreviewLines} more diff lines`)}${" ".repeat(Math.max(0, cardW - 2 - 30))}${RESET}`);
         }
         return rows;
       }
@@ -551,9 +562,10 @@ const sessionRows = (query: string): SessionRow[] => {
       const bar = modeColor(runtime.agent.mode);
       const inner = Math.max(4, w - 1);
       const textW = Math.max(4, inner - 4);
-      const padRow = `${bar}┃${bgRgb(T.panel)}${" ".repeat(inner)}${RESET}`;
+      const fill = bgRgb(T.panel);
+      const padRow = `${bar}┃${fill}${" ".repeat(inner)}${RESET}`;
       const bodyRows = wrap(line.text, textW).map(
-        (part) => `${bar}┃${bgRgb(T.panel)}  ${rgb(T.text)}${part}${" ".repeat(Math.max(0, inner - 4 - visible(part)))}${RESET}`,
+        (part) => `${bar}┃${fill}  ${rgb(T.text)}${part}${" ".repeat(Math.max(0, inner - 4 - visible(part)))}${RESET}`,
       );
       return [padRow, ...bodyRows, padRow];
     }
@@ -708,9 +720,10 @@ const sessionRows = (query: string): SessionRow[] => {
     if (row >= top && row < top + cH) {
       const rel = row - top;
       const rule = `${agent}┃${RESET}`;
-      const blank = `${rule}${bgRgb(T.composer)}${" ".repeat(inner)}${RESET}`;
+      const fill = bgRgb(T.composer);
+      const blank = `${rule}${fill}${" ".repeat(inner)}${RESET}`;
       const compLine = (body: string) =>
-        `${rule}${bgRgb(T.composer)}  ${body}${" ".repeat(Math.max(0, inner - 2 - visible(body)))}${RESET}`;
+        `${rule}${fill}  ${keepBg(fill, body)}${" ".repeat(Math.max(0, inner - 2 - visible(body)))}${RESET}`;
       if (rel === 0) return withSide(blank);                      // paddingTop
       if (rel === cH - 1) {
         // metadata row — agent · model · provider · variant (opencode order)
@@ -726,7 +739,7 @@ const sessionRows = (query: string): SessionRow[] => {
         ].join("");
         const right = queue.length > 0 ? fgAmber(`⇧${queue.length} queued`) : "";
         const gap = Math.max(1, inner - 2 - visible(tokens) - visible(right));
-        return withSide(`${rule}${bgRgb(T.composer)}  ${tokens}${" ".repeat(gap)}${right}${RESET}`);
+        return withSide(`${rule}${fill}  ${keepBg(fill, tokens)}${" ".repeat(gap)}${keepBg(fill, right)}${RESET}`);
       }
       if (pendingPermission && rel === cH - 2) {
         const p = pendingPermission;
@@ -751,9 +764,10 @@ const sessionRows = (query: string): SessionRow[] => {
       const visLine = (shown[r] ?? "") + (isLastLine ? fgAccent("▌") : "");
       return withSide(compLine(`${rgb(T.text)}${visLine}`));
     }
-    // ── the ╹ / ▀ strip that closes the composer (opencode)
+    // ── the row that closes the composer — opencode draws a blank row here
+    //    (its ╹/▀ notch only appears with a translucent prompt background)
     if (row === stripRow()) {
-      return withSide(`${agent}╹${rgb(T.composer)}${"▀".repeat(Math.max(0, mw - 1))}${RESET}`);
+      return withSide(`${bgRgb(T.bg)}${" ".repeat(mw)}${RESET}`);
     }
     // ── footer — opencode: workspace + branch left, usage + hints right
     if (row === footerRow()) {
@@ -789,7 +803,7 @@ const sessionRows = (query: string): SessionRow[] => {
 
   const renderSidebarRow = (row: number): string => {
     const w = sidebarWidth();
-    const line = (t: string) => `${bgRgb(T.panel)}${padRight(" " + t, w)}${RESET}`;
+    const line = (t: string) => `${bgRgb(T.panel)}${keepBg(bgRgb(T.panel), padRight(" " + t, w))}${RESET}`;
     const heading = (t: string) => line(`${BOLD}${fgText(t)}${RESET}`);
     switch (row) {
       case 0: return line(`${BOLD}${fgText(sessionTitle.slice(0, Math.max(4, w - 2)))}${RESET}`);
@@ -830,10 +844,18 @@ const sessionRows = (query: string): SessionRow[] => {
     const frame: string[] = [];
     for (let row = 0; row < r; row++) frame.push(renderRow(row));
     if (overlay.kind !== "none") drawOverlay(frame, overlay);
-    process.stdout.write("\x1b[H");
+    // One write, and no newline after the last row.
+    //
+    // A frame that ends with a newline on the bottom row makes the terminal
+    // scroll by one line — the whole screen then shifts up on every repaint,
+    // which reads as a vibration/flicker. Ending the frame on the last row
+    // keeps it exactly screen-height: the UI is locked to the viewport.
+    let out = "\x1b[H";
     for (let i = 0; i < frame.length; i++) {
-      process.stdout.write(clip(frame[i], w) + "\x1b[K\r\n");
+      out += clip(frame[i], w) + "\x1b[K";
+      if (i < frame.length - 1) out += "\r\n";
     }
+    process.stdout.write(out);
   };
 
   // coalesce a burst of streaming tokens into a single frame — avoids repaint storms on slow terminals

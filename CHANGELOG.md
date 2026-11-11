@@ -4,6 +4,26 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-11-11
+
+**Two rendering bugs that made the UI look broken: the composer had holes in its background, and the whole screen vibrated.**
+
+### Fixed
+
+- **The composer panel had "silver" gaps in it.** Every styled fragment ends with a reset, and a reset also clears the background — so the moment the metadata row printed the model name, the panel fill stopped and the terminal's own colour showed through the middle of the box. Now the fill is re-applied after every reset (`keepBg`), and the composer, the user-message box, the tool cards, the diff cards and the sidebar all keep one continuous background.
+- **The screen vibrated.** Every frame ended with a newline on the bottom row, which makes the terminal scroll by one line — the whole UI then jumped up on each repaint (very visible while the spinner was running). The frame is now exactly screen-height with no trailing newline, so the UI is locked to the viewport.
+- The composer closes with a blank row, like opencode: its `╹`/`▀` notch only appears with a translucent prompt background, and the default theme is opaque.
+- The Ink engine got the same treatment (no notch).
+
+### Added
+
+- Two regression tests: the frame must be exactly screen-height and must not end with a newline, and the composer band must not contain a reset that breaks its fill.
+
+### Notes
+
+- 96/96 tests green. The README screenshots were regenerated from the fixed UI.
+
+
 ## [0.16.0] — 2026-11-11
 
 **The TUI is now pixel-ported from opencode's own source — theme, geometry and glyphs.**

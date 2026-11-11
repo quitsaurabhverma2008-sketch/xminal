@@ -272,15 +272,9 @@ function Composer({
           </Box>
         </Box>
       </Box>
-      {/* the ╹ / ▀ strip that closes the composer */}
-      <Box flexDirection="row">
-        <Box width={1} flexShrink={0}>
-          <Text color={modeColor(s.mode)}>{"╹"}</Text>
-        </Box>
-        <Box flexGrow={1}>
-          <Text color={C.panel2}>{"▀".repeat(Math.max(1, width - 1))}</Text>
-        </Box>
-      </Box>
+      {/* the blank row that closes the composer — opencode only draws the
+          ╹/▀ notch with a translucent prompt background */}
+      <Box height={1} />
     </Box>
   );
 }

@@ -15,8 +15,8 @@ function stripAnsi(text) {
   return text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\x1b\][^\x07]*\x07/g, "");
 }
 
-/** Boot the TUI, run `script`, and return everything it printed. */
-function runTui(script, { timeout = 20000 } = {}) {
+/** Boot the TUI, run `script`, and return everything it printed (ANSI kept). */
+function runTuiRaw(script, { timeout = 20000 } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [ENTRY], {
       cwd: ROOT,
@@ -45,7 +45,7 @@ function runTui(script, { timeout = 20000 } = {}) {
     child.on("error", reject);
     child.on("exit", () => {
       clearTimeout(timer);
-      resolve(stripAnsi(out));
+      resolve(out);
     });
     // let the first frame render, then feed the script
     setTimeout(() => {
@@ -53,6 +53,46 @@ function runTui(script, { timeout = 20000 } = {}) {
     }, 900);
   });
 }
+
+/** Same as runTui, but with the ANSI sequences stripped. */
+function runTui(script, options) {
+  return runTuiRaw(script, options).then(stripAnsi);
+}
+
+/** The last complete frame, without the exit sequence that follows it. */
+function lastFrame(raw) {
+  const frames = raw.split("\x1b[H").filter((f) => f.includes("\x1b[K"));
+  assert.ok(frames.length > 0, "no frame was drawn");
+  return frames[frames.length - 1].split("\x1b[?1049l")[0];
+}
+
+test("the frame is exactly screen-height and never scrolls the terminal", async () => {
+  const raw = await runTuiRaw(["/exit\r"]);
+  const frame = lastFrame(raw);
+  const rows = frame.split("\r\n").length;
+  // LINES=28 in the test env: the frame must be exactly the screen height
+  assert.equal(rows, 28, `the frame must be exactly screen-height, got ${rows} rows`);
+  // a newline after the bottom row scrolls the terminal by one line — that
+  // shifts the whole UI on every repaint (the "vibration" users reported)
+  assert.ok(!frame.replace(/\x1b\[K/g, "").endsWith("\n"), "the frame must not end with a newline");
+});
+
+test("the composer panel keeps one continuous background", async () => {
+  const raw = await runTuiRaw(["/exit\r"]);
+  const frame = lastFrame(raw);
+  const allRows = frame.split("\r\n");
+  // the composer band sits above the footer; the footer is the last row
+  const composerRows = allRows.slice(-6, -1);
+  assert.ok(composerRows.length >= 3, "the composer band should have several rows");
+  for (const row of composerRows) {
+    if (!row.includes("48;2;30;30;30")) continue; // the closing blank row
+    // a reset in the middle of the band punches a hole in the panel fill;
+    // the trailing reset at the very end of the row is fine
+    const body = row.replace(/\x1b\[K$/, "").replace(/(\x1b\[0m)+$/, "");
+    const hole = body.match(/\x1b\[0m(?![\x1b]\[48;2;(?:30;30;30|10;10;10)m)/);
+    assert.equal(hole, null, "a reset inside the composer band breaks its background");
+  }
+});
 
 test("the TUI boots and renders the opencode-style frame", async () => {
   const out = await runTui(["/exit\r"]);
