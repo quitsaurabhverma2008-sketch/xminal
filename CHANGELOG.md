@@ -4,6 +4,12 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.12.5] — 2026-11-11
+
+**Respin of 0.12.4 — identical code.** npm accepted the 0.12.4 publish but never replicated
+its 18 MB tarball to the public registry (the same stall that hit 0.12.0). 0.12.5 is the
+installable release; the GitHub release asset works either way.
+
 ## [0.12.4] — 2026-11-11
 
 **Model fallback fixed, agent text limit removed, second dogfood demo (SAURABH).**
