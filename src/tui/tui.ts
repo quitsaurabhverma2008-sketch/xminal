@@ -392,9 +392,9 @@ const panelBorder = (title: string, width: number) => {
 };
 const panelBottom = (width: number) => `${rgb(C.border)}+${"-".repeat(width - 2)}+${RESET}`;
 const panelRow = (content: string, width: number, bg: readonly [number, number, number] = C.panel) =>
-  `${bgRgb(bg)}${padRight(" " + content, width - 1)}${RESET}${rgb(C.border)}│${RESET}`;
+  `${bgRgb(bg)}${keepBg(bgRgb(bg), padRight(" " + content, width - 1))}${RESET}${rgb(C.border)}│${RESET}`;
 const panelSide = (content: string, width: number, bg: readonly [number, number, number] = C.panel) =>
-  `${rgb(C.border)}│${RESET}${bgRgb(bg)}${padRight(" " + content, width - 1)}${RESET}${rgb(C.border)}│${RESET}`;
+  `${rgb(C.border)}│${RESET}${bgRgb(bg)}${keepBg(bgRgb(bg), padRight(" " + content, width - 1))}${RESET}${rgb(C.border)}│${RESET}`;
 
 const sectionLabel = (t: string) => fgMuted(t.toUpperCase());
 const ok = (t: string) => fgGreen(t);
