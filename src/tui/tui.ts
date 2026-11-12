@@ -6,11 +6,10 @@ import { loadConfig, resolveModel, addGlobalMcpServer } from "../config/config";
 import { listEffectiveAliases, refreshModelsCatalog, effectiveModelMap, catalogMeta } from "../config/models-catalog";
 import { loadMcpCatalog, searchMcpServers, mcpConfigSnippet, mcpServerConfig, type McpCatalogEntry } from "../mcp/catalog";
 import { visibleWidth, graphemeSlice, stripAnsi as stripAnsiW, splitGraphemes, wrapAnsi } from "./width";
-import { formatAssistantText, isLikelyDiff, tintDiffRow } from "./format";
-import { renderMarkdown } from "./markdown";
 import { redactSecrets } from "../util/redact";
 import { openExternal } from "../util/open-external";
 import { logEvent } from "../util/log";
+import { renderStyledLine, type Line, type LineKind } from "./chat-lines";
 import { renderRepoMap, repoMapSummary, buildRepoMap } from "../core/repo-map";
 import { renderFindings, reviewSummary } from "../core/review";
 import { runVerify, renderVerifyResult } from "../core/verify-runner";
@@ -19,7 +18,7 @@ import { WORDMARK } from "../util/ansi";
 import { Renderer } from "../cli/render";
 import { handleCommand } from "../cli/commands";
 import { spawnSync } from "node:child_process";
-import { T, rgb, bgRgb, RESET, BOLD, fgMuted, fgText, fgAccent, fgAmber, fgGreen, fgRed, fgCyan, fgYellow, modeColor } from "./theme";
+import { T, rgb, bgRgb, RESET, BOLD, fgMuted, fgText, fgAccent, fgAmber, fgGreen, fgRed, fgCyan, fgYellow, modeColor, keepBg } from "./theme";
 import { makeActivity, completeActivity, renderActivity, spinnerFrame, toolTarget, SPINNER_FRAMES, type ActivityLine } from "./output/tool-activity";
 
 import { loadTodos, detectGitBranch } from "./state";
@@ -31,15 +30,6 @@ const bold = (t: string) => `${BOLD}${t}${RESET}`;
 const stripAnsi = stripAnsiW;
 const visible = visibleWidth;
 const padRight = (s: string, w: number) => (visible(s) >= w ? s : s + " ".repeat(w - visible(s)));
-/**
- * Re-apply a background after every reset.
- *
- * A bare ESC[0m clears the background too, so any styled text inside a
- * painted row (a panel, the composer, the sidebar) punched a hole in it.
- * This keeps the fill continuous.
- */
-const keepBg = (bg: string, content: string): string =>
-  content.includes(RESET) ? content.split(RESET).join(RESET + bg) : content;
 const clip = (s: string, w: number): string => {
   if (visible(s) <= w) return s;
   let out = "";
@@ -57,15 +47,6 @@ const clip = (s: string, w: number): string => {
   return out + RESET;
 };
 
-type LineKind = "user" | "assistant" | "reasoning" | "tool" | "ok" | "err" | "system";
-interface Line {
-  kind: LineKind;
-  text: string;
-  /** present when kind === "tool" — merged onToolCall → onToolResult */
-  activity?: ActivityLine;
-  /** memoized render rows per width/mode — the object itself is mutated in place, so cache by content below */
-  rows?: Map<string, string[]>;
-}
 
 // ─── full command catalog (categories + fuzzy filter) ─────────────
 interface Cmd {
@@ -440,128 +421,16 @@ const sessionRows = (query: string): SessionRow[] => {
 
   const wrap = (text: string, width: number): string[] => wrapAnsi(text, width);
 
-  const formatCache = new Map<string, string>();
-  const formatMemo = (text: string): string => {
-    const hit = formatCache.get(text);
-    if (hit !== undefined) return hit;
-    const out = formatAssistantText(text);
-    if (formatCache.size > 512) formatCache.clear();
-    formatCache.set(text, out);
-    return out;
-  };
-  const mdCache = new Map<string, string[]>();
-  const mdMemo = (text: string, width: number): string[] => {
-    const key = `${width}:${text}`;
-    const hit = mdCache.get(key);
-    if (hit) return hit;
-    const out = renderMarkdown(text, { width: Math.max(4, width) });
-    if (mdCache.size > 512) mdCache.clear();
-    mdCache.set(key, out);
-    return out;
-  };
-  const diffTint = (rows: string[]): string[] =>
-    rows.map((row) => tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed));
-  const likelyDiff = isLikelyDiff;
-
   const styledLineFast = (line: Line): string[] => {
     const w = Math.max(8, contentWidth() - 2);
     const key = `${w}:${runtime.agent.mode}:${line.text}:${line.activity ? JSON.stringify(line.activity) : ""}`;
     const cached = line.rows?.get(key);
     if (cached) return cached;
-    const out = renderStyledLine(line, w);
+    const out = renderStyledLine(line, w, { mode: runtime.agent.mode });
     (line.rows ??= new Map()).set(key, out);
     return out;
   };
 
-  const renderStyledLine = (line: Line, w: number): string[] => {
-    // ── tool activity — opencode: inline row (glyph col 3, label col 5) or a block card
-    if (line.kind === "tool" && line.activity) {
-      const a = line.activity;
-      const block = a.name === "bash" || a.name === "git" || a.name === "worktree";
-      if (block && a.status !== "pending" && a.output && a.output.length) {
-        // opencode block tool: ┃ rule at content col 0, raised panel, text at col 3
-        const cardW = Math.max(8, w);
-        const cmd = toolTarget(a.name, a.argsRaw, cardW - 4);
-        const rule = `${rgb(T.bg)}┃${RESET}`;
-        const fill = bgRgb(T.panel);
-        const card = (body: string) =>
-          `${rule}${fill}  ${keepBg(fill, body)}${" ".repeat(Math.max(0, cardW - 4 - visible(body)))}${RESET}`;
-        const rows: string[] = [];
-        rows.push(`${rule}${fill}  ${fgText("$")} ${fgText(cmd)}${" ".repeat(Math.max(0, cardW - 4 - visible(cmd) - 2))}${RESET}`);
-        for (const outLine of a.output.slice(0, 10)) {
-          rows.push(card(a.status === "err" ? fgRed(outLine) : fgMuted(outLine)));
-        }
-        if (a.extraLines && a.extraLines > a.output.length - 1) {
-          rows.push(card(fgMuted(`… ${a.extraLines - (a.output.length - 1)} more lines`)));
-        }
-        return rows;
-      }
-      // opencode: an edit/write diff is a block card — ┃ rule, raised panel,
-      // and ± rows get the diff background bands (#20303b / #37222c)
-      if (a.preview && a.preview.length) {
-        const cardW = Math.max(8, w);
-        const rule = `${rgb(T.bg)}┃${RESET}`;
-        const panel = bgRgb(T.panel);
-        const addBg = bgRgb(T.diffAddedBg);
-        const remBg = bgRgb(T.diffRemovedBg);
-        const rows: string[] = [];
-        for (const row of a.preview) {
-          const bare = stripAnsiW(row).trimStart();
-          const isAdd = bare.startsWith("+") && !bare.startsWith("+++");
-          const isRem = bare.startsWith("-") && !bare.startsWith("---");
-          const fill = isAdd ? addBg : isRem ? remBg : panel;
-          const tinted = tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed);
-          rows.push(`${rule}${fill} ${keepBg(fill, tinted)}${" ".repeat(Math.max(0, cardW - 2 - visible(tinted)))}${RESET}`);
-        }
-        if (a.extraPreviewLines) {
-          const more = fgMuted(`… ${a.extraPreviewLines} more diff lines`);
-          rows.push(`${rule}${panel} ${keepBg(panel, more)}${" ".repeat(Math.max(0, cardW - 2 - visible(more)))}${RESET}`);
-        }
-        return rows;
-      }
-      const out: string[] = renderActivity(a, Math.max(8, w - 5)).map((row) => `   ${row}`);
-      if (a.status === "err" && a.detail) {
-        out.push(`     ${fgMuted(redactSecrets(a.detail).text)}`);
-      }
-      return out;
-    }
-    // ── user — opencode: ┃ rule in the agent colour, raised fill, 2 col padding
-    if (line.kind === "user") {
-      const bar = modeColor(runtime.agent.mode);
-      const inner = Math.max(4, w - 1);
-      const textW = Math.max(4, inner - 4);
-      const fill = bgRgb(T.panel);
-      const padRow = `${bar}┃${fill}${" ".repeat(inner)}${RESET}`;
-      const bodyRows = wrap(line.text, textW).map(
-        (part) => `${bar}┃${fill}  ${rgb(T.text)}${part}${" ".repeat(Math.max(0, inner - 4 - visible(part)))}${RESET}`,
-      );
-      return [padRow, ...bodyRows, padRow];
-    }
-    // ── assistant — opencode: plain text at content col 3, markdown
-    if (line.kind === "assistant") {
-      const clean = formatMemo(line.text);
-      const body = mdMemo(clean, Math.max(4, w - 3));
-      return body.map((row) => `   ${row}`);
-    }
-    // ── reasoning — opencode: ┃ rule at col 3, body at col 5
-    if (line.kind === "reasoning") {
-      const inner = Math.max(4, w - 6);
-      const rows = wrap(line.text, Math.max(4, inner));
-      // opencode: the reasoning rule uses the warning colour
-      return rows.map((part) => `   ${fgAmber("┃")} ${fgMuted(part)}`);
-    }
-    // ── everything else (ok/err/system) — quiet, indented at col 3
-    const color = line.kind === "err" ? fgRed : line.kind === "ok" ? fgGreen : fgMuted;
-    const safe = redactSecrets(line.text).text;
-    const out: string[] = [];
-    for (const part of wrap(safe, Math.max(4, w - 3))) {
-      out.push(`   ${color(part)}`);
-    }
-    if ((line.kind === "ok" || line.kind === "err") && likelyDiff(line.text)) {
-      return diffTint(out);
-    }
-    return out;
-  };
 
   // ─── dynamic bottom layout — the input grows upward (max 4 lines) ───
   const inputBudget = () => Math.max(8, contentWidth() - 4);

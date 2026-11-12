@@ -69,4 +69,15 @@ function decrease(c: readonly [number, number, number], amount = 18): [number, n
   return [Math.max(0, c[0] - amount), Math.max(0, c[1] - amount), Math.max(0, c[2] - amount)];
 }
 
+/**
+ * Re-apply a background after every reset.
+ *
+ * A bare ESC[0m clears the background too, so any styled text inside a
+ * painted row (a panel, the composer, the sidebar) punched a hole in it.
+ * Keeps the fill continuous.
+ */
+export function keepBg(bg: string, content: string): string {
+  return content.includes(RESET) ? content.split(RESET).join(RESET + bg) : content;
+}
+
 export const inlineCode = (t: string) => `${bgRgb(T.panel2)}${rgb(T.green)} ${t} ${RESET}`;
