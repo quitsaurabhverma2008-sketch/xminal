@@ -97,6 +97,7 @@ canvas renderer, so the animation above is a real render of the page, not a mock
 - **Modes**: `plan` (read-only + analysis) · `build` (implement end-to-end) · `compose` (plan→implement→verify→review) · `review` (read-only code review) · `yolo` (autonomous)
 - **Tool-use**: read · write · edit · multi_edit · glob · grep · list · bash · todo · memory · skill · checkpoint · git · worktree · verify · web_fetch · web_search · diagnostics · mcp_list · mcp_call · task · think · **capabilities** · **mcp_search** · **mcp_add** · **skill_registry_search** · **skill_install**
 - **Capability awareness**: the system prompt tells the model exactly which tools/MCP-servers/skills it can reach this turn, and a `capabilities` tool answers “what can you do?” with live MCP status (a dead server says so instead of vanishing)
+- **Rendering**: opencode ± **diff background bands** in edit cards · **code-fence gutter** with `↪` continuation markers for wrapped lines · keyword highlighting for 16 languages · tables measured on the *rendered* cell
 
 ### MCP catalog (offline, 3800+ servers)
 - **Search 3,832 public MCP servers without touching the network** — the catalog ships inside the package (`data/mcp-catalog.json`, built from the Smithery registry + GitHub by `scripts/fetch-mcp-catalog.py`)

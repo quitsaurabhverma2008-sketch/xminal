@@ -4,6 +4,31 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.23.0] — 2026-11-12
+
+**The rendering pass: opencode's ± diff bands, a code-fence gutter with continuation markers, a rendered-cell table grid — and one provider catalog.**
+
+### Added
+
+- **The edit/write diff card renders the opencode ± background bands** (`#20303b` / `#37222c` — the theme tokens existed, nothing rendered them), plus a `… N more diff lines` footer.
+- **Code fences**: a thin left gutter separates the code surface from prose; wrapped long lines carry a `↪` continuation marker (indistinguishable from new code lines before); keyword highlighting for 16 languages (was 4).
+- **`src/tui/chat-lines.ts`**: the chat-line renderer extracted out of the `startTui` closure — width in, rows out, unit-tested without a PTY (`tests/chat-lines.test.js`).
+- **`tests/session-repair.test.js`**: session-resume repair covered by tests.
+
+### Fixed
+
+- **Tables** measure the **rendered** cell (markdown-aware) and budget `cols*2+1` — a column of `**bold**` no longer overruns its slot, and clipping is ANSI-safe.
+- **± rows in the diff card are background-tinted**, not just foreground-colored.
+- **Checkpoints**: checkpoint blobs are written `0600` and checkpoint directories `0700` (best effort — a no-op on FAT/exFAT shared storage, documented as such).
+- **Permissions**: `mcp_call` is explicitly classified (names the external server), `capabilities`/`mcp_search`/`skill_registry_search`/`mcp_add`/`skill_install` are classified correctly, and the skills fallback is documented-first (`when_to_use` + triggers) instead of first-12-alphabetical.
+- **Provider catalog drift eliminated**: `PROVIDER_CATALOG` (`src/config/providers.ts`) is the single source of truth — the TUI's `PROVIDERS`, the router's `PROVIDER_DEFAULT_MODELS` and `defaultConfig()`'s providers were three copies that had drifted (togetherai, siliconflow `.com`/`.cn`, minimax's adapter type, gemini). `provider-defaults.ts` is deleted.
+
+### Changed
+
+- **60 uncalled exports removed** (19 deleted outright, 39 demoted to internal — e.g. `toolGlyph`, `diffFiles`, `pagerank`); `Agent.phase()` (never called) removed.
+- **Shared helpers deduplicated**: `costOf()` (render.ts + CostTracker), `keepBg` (theme.ts), `WORDMARK` (render/TUI/classic banner), `estimateTokens` (tool-usage is the single implementation), `openExternal` (used by classic REPL and TUI).
+- **SECURITY.md** documents the config permission hardening (0600/0700 at startup), checkpoint plaintext, and the shared-storage no-op mode.
+
 ## [0.22.0] — 2026-11-12
 
 **The audit-driven hardening release: honest diffs, honest quota errors, an agent that knows what it can do, and a native skills.sh installer.**
