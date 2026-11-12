@@ -130,6 +130,8 @@ const fs = require("node:fs");
 
 function normalizeFrame(frame) {
   return frame
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
     .replace(/~\/[^\s:]*:[^\s]*/g, "<workspace>:<branch>")
     .replace(/[0-9]+\.[0-9]+K \([0-9]+%\)/g, "0.0K (0%)")
     .replace(/\$[0-9]+\.[0-9]+/g, "$0.0000")
@@ -153,6 +155,6 @@ test("the command palette frame matches the golden snapshot", async () => {
     return;
   }
   assert.ok(fs.existsSync(goldenPath), "tests/golden/palette.txt is missing — run UPDATE_GOLDEN=1 node tests/tui-e2e.test.js");
-  const golden = fs.readFileSync(goldenPath, "utf8").trim();
-  assert.equal(normalized, golden, "the command palette frame drifted — if this is intentional, run UPDATE_GOLDEN=1 node tests/tui-e2e.test.js");
+  const golden = fs.readFileSync(goldenPath, "utf8").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  assert.equal(normalized.trim(), golden, "the command palette frame drifted — if this is intentional, run UPDATE_GOLDEN=1 node tests/tui-e2e.test.js");
 });
