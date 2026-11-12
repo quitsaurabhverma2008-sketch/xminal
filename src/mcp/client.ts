@@ -139,8 +139,23 @@ export class McpClient {
   }
 }
 
+export interface McpServerStatus {
+  readonly name: string;
+  readonly enabled: boolean;
+  readonly status: "ok" | "error" | "disabled";
+  readonly toolCount: number;
+  /** first tool names, for discovery */
+  readonly toolNames?: string[];
+  readonly error?: string;
+}
+
 export class McpManager {
   private clients = new Map<string, McpClient>();
+  private lastError?: Error;
+
+  lastListError(): Error | undefined {
+    return this.lastError;
+  }
 
   constructor(private readonly servers: Record<string, McpServerConfig>) {}
 
@@ -163,14 +178,37 @@ export class McpManager {
     return this.enabledServers().map(([name]) => name);
   }
 
+  /**
+   * The truth about every configured server: what works, what is dead.
+   * (The old listAllTools swallowed dead servers silently, so the model had
+   * no way to know an MCP existed but failed to start.)
+   */
+  async status(): Promise<McpServerStatus[]> {
+    const out: McpServerStatus[] = [];
+    for (const [name, config] of Object.entries(this.servers)) {
+      if (config.enabled === false) {
+        out.push({ name, enabled: false, status: "disabled", toolCount: 0 });
+        continue;
+      }
+      try {
+        const tools = await this.getClient(name).listTools();
+        out.push({ name, enabled: true, status: "ok", toolCount: tools.length, toolNames: tools.map((t) => t.name).slice(0, 40) });
+      } catch (error) {
+        out.push({ name, enabled: true, status: "error", toolCount: 0, error: (error as Error)?.message ?? String(error) });
+      }
+    }
+    return out;
+  }
+
   async listAllTools(): Promise<Array<{ server: string; tool: McpTool }>> {
     const out: Array<{ server: string; tool: McpTool }> = [];
     for (const [name] of this.enabledServers()) {
       try {
         const tools = await this.getClient(name).listTools();
         for (const tool of tools) out.push({ server: name, tool });
-      } catch {
-        // server failed; skip
+      } catch (error) {
+        // remember the failure — status() reports it to the model and the user
+        this.lastError = error as Error;
       }
     }
     return out;

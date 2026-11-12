@@ -95,13 +95,18 @@ canvas renderer, so the animation above is a real render of the page, not a mock
 ### Agent runtime
 - **Streaming** token-by-token output, real-time cost tracking, budget caps
 - **Modes**: `plan` (read-only + analysis) · `build` (implement end-to-end) · `compose` (plan→implement→verify→review) · `review` (read-only code review) · `yolo` (autonomous)
-- **Tool-use**: read · write · edit · multi_edit · glob · grep · list · bash · todo · memory · skill · checkpoint · git · worktree · verify · web_fetch · web_search · diagnostics · mcp_list · mcp_call · task · think
+- **Tool-use**: read · write · edit · multi_edit · glob · grep · list · bash · todo · memory · skill · checkpoint · git · worktree · verify · web_fetch · web_search · diagnostics · mcp_list · mcp_call · task · think · **capabilities** · **mcp_search** · **mcp_add** · **skill_registry_search** · **skill_install**
+- **Capability awareness**: the system prompt tells the model exactly which tools/MCP-servers/skills it can reach this turn, and a `capabilities` tool answers “what can you do?” with live MCP status (a dead server says so instead of vanishing)
 
 ### MCP catalog (offline, 3800+ servers)
 - **Search 3,832 public MCP servers without touching the network** — the catalog ships inside the package (`data/mcp-catalog.json`, built from the Smithery registry + GitHub by `scripts/fetch-mcp-catalog.py`)
 - Search by **name**, by **what the server does** ("work"), or by **where it runs**
 - Every entry carries platform availability: `LINUX` · `WINDOWS` · `MOBILE` (Termux/Android counts as mobile)
-- In the TUI: `/mcp` opens the searchable catalog, `Enter` shows the details plus the `mcpServers` snippet, `Ctrl+A` writes the entry into `~/.xminal/config.json` (disabled, with a backup)
+- In the TUI: `/mcp` opens the searchable catalog, `Enter` shows the details plus the `mcpServers` snippet, `Ctrl+A` writes the entry into `~/.xminal/config.json` (disabled, with a backup). The model can also search it itself (`mcp_search`) and register an entry (`mcp_add`, disabled, approval-gated).
+
+### Skills (skills.sh registry)
+- **Search 10,000+ public skills** from the terminal or the agent: `xminal skills search <query>` · `/skill-search` · the `skill_registry_search` tool
+- **Install without npx or Node 22**: `xminal skills install <name>` downloads the GitHub tarball, extracts the skill folder (path-traversal guarded, symlinks refused), records a **v2 `computedHash`** in `.xminal/skills.lock.v2.json` (SHA-256 over `path\0byteLen\0content`, compatible with skills.sh v2). The offline index is cached for 24h (`~/.xminal/skills-index.json`)
 - From the shell: `xminal mcp search pdf --platform mobile`
 
 ### Sessions
@@ -239,6 +244,7 @@ Session — `/new` · `/resume` · `/continue` · `/sessions` · `/rename` · `/
 Agent — `/mode <plan|build|compose|review|yolo>` · `/model` · `/models` · `/variant` (low · medium · high · max) · `/effort` · `/reasoning`
 Providers — `/provider` · `/connect` · `/set-key` · `/clear-key`
 Tasks — `/tasks` · `/todo` · `/memory <list|add|search|forget>` · `/skills` · `/skill <name>` · `/mcp` · `/audit` · `/map` · `/diff` · `/verify`
+Skills registry — `/skill-search <query>` · `/skill-install <name> [--global]` · `xminal skills search|install`
 Git — `/diff [args]` · `/git [args]` · `/worktree <list|create|remove|merge>`
 Verify — `/verify [cmd]` · `/ralph <task> --verify <cmd> [--iterations N]` · `/diagnostics`
 System — `/doctor` · `/init` · `/config` · `/status` · `/cost` · `/tools` · `/docs` · `/verify` · `/help` · `/clear` · `/exit` · `/report` (opens GitHub issue tracker)

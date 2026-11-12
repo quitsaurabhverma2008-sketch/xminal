@@ -4,6 +4,44 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-11-12
+
+**The audit-driven hardening release: honest diffs, honest quota errors, an agent that knows what it can do, and a native skills.sh installer.**
+
+### Added
+
+- **Capability awareness**: the system prompt carries a `<CAPABILITIES>` block — every tool with a read-only marker and one-line purpose, the configured MCP servers, and the skills ranked for the current request. New read-only `capabilities` tool runs the full async snapshot, including **per-MCP status** (a dead server now reports `FAILED — <reason>` instead of vanishing silently).
+- **`mcp_search`** tool: searches the built-in 3,832-server offline catalog from inside the agent (previously human-only).
+- **`mcp_add`** tool: registers a catalog entry in `~/.xminal/config.json` (disabled, with a placeholder command, approval-gated).
+- **Native skills.sh registry installer** (`src/skills/registry.ts`): `xminal skills search <query>` / `xminal skills install <name>` / `/skill-search` / `/skill-install` / `skill_registry_search` + `skill_install` tools. Works from the public sitemap + GitHub codeload — no npx, no Node 22, no OIDC. Zero-dep tar.gz reader with a path-traversal guard, symlink refusal, 25 MB / 500-file caps; installs are recorded with a skills.sh-v2-compatible **`computedHash`** (SHA-256 of `path\0byteLen\0content`, sorted by path — test vector verified against `# hi\n`) in `.xminal/skills.lock.v2.json`. The index is cached on disk for 24 h.
+- **`/clear-key <provider>`** command (the palette advertised it; it did not exist).
+- **Session repair on load**: an interrupted tool-call turn gets synthetic tool responses (`[interrupted: …]`) instead of poisoning the next provider request (which providers reject with a 400).
+- **Signal handlers**: SIGTERM/SIGHUP/SIGINT and uncaughtException now restore the terminal (alternate screen off, cursor visible), flush the session and exit cleanly — Android can kill the app without warning.
+- **`skill_registry_search` / `skill_install`** in the tool registry.
+
+### Fixed
+
+- **The diff engine was wrong**: a 2-line edit reported +6 −6. Real LCS line diff with `@@ -a,b +c,d @@` hunk headers (`src/util/diff.ts`).
+- **Quota errors were misclassified**: a 429 with a free-quota body now classifies as `quota` (not "rate limited"), carries `retry-after`, and the fallback notice names the model that will actually serve next, says when the pool may be shared, and how long to wait. Non-quota failures skip to the next candidate instead of aborting the chain; a per-session exhausted set stops re-probing dead models; usage events tag the model that actually answered; the candidate loop has a hard attempt cap (12).
+- **The context meter showed cumulative spend** as "% of the window". It now shows the current prompt's token estimate; the sidebar labels spend separately ("spent this session").
+- **The formatter rewrote the model's words** (`...` → `.`). Model output now reaches the reader byte-for-byte.
+- **`visibleWidth` was wrong for colon-form SGR (`ESC[38:2:…m`) and ST-terminated OSC** (counted escapes as glyphs — every row containing them was padded wrong). One width engine (`src/tui/ansi.ts`): grapheme-safe, ZWJ sequences, word-aware wrapping, no split surrogate pairs. The markdown renderer's duplicate width table is gone.
+- **The condenser never saw the tool schemas** (`estimateTokens(String(8000))` measured the digits `"8000"`). It now counts `schemaChars/4` from the actual serialized defs (measured ≈12 KB, ≈3,000 tokens, re-sent every turn).
+- **Tool arguments were silently "repaired"**: malformed JSON became `{}` and the tool ran with no arguments. Malformed calls are now refused with an actionable observation, and args are validated against each tool's own JSON-Schema-lite (required fields + top-level types) before execution.
+- **The audit chain broke on restart** (verify said "BROKEN"). The log rehydrates seq/prev from disk.
+- **Run-state**: `finished → running` is refused properly (`startTurn()` funnel).
+- **Scroll pinning**: pushing a line while the user is scrolled up no longer snaps the viewport to the bottom.
+- **Provider keys** written 0600 (they were world-readable); `~/.xminal` chmod 0700 at startup and added to the default protected paths.
+- **Redaction**: `gsk_…` (Groq), `nvapi-…` (NVIDIA), `hf_…` (Hugging Face), `sk-*` variants and `API_KEY`-style field names are now scrubbed from tool output sent to the model.
+- **Palette**: 19 advertised commands had no implementation; they were removed or implemented. The remaining palette is mechanically audited against both the TUI and classic handlers.
+
+### Changed
+
+- `ink`, `react`, `react-reconciler` moved to **optionalDependencies** — the built-in TUI needs nothing; phones can `npm install -g xminal --omit=optional`.
+- Mouse reporting is **off by default on Android** (it broke tap-to-scroll in Termux).
+- Dead code removed: `DANGEROUS_PATTERNS`/`RISKY_PATTERNS` (the live risk engine is `core/risk.ts`), `src/tui/layout.ts`, and several uncalled exports.
+
+
 ## [0.21.0] — 2026-11-12
 
 **Everything that was left is done: durable specs, a real condenser, an explicit run state, the architect split, the working set, skill validation and the trajectory.**

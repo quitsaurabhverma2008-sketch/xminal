@@ -21,12 +21,14 @@ import { newWorkflowState, noteTool, noteVerified, currentPhase, renderWorkflow,
 import { resolveVerifyCommand, runVerify, renderVerifyResult, verifySummary, type VerifyResult } from "./verify-runner";
 import { buildRepoMap, renderRepoMap, type RepoMap } from "./repo-map";
 import { renderObservation, type Observation } from "./observation";
+import { parseToolArguments } from "../tools/validate";
 import { StuckDetector } from "./stuck";
 import { condense, estimatePromptTokens, summarizePrompt, SUMMARIZE_SYSTEM, DEFAULT_CONDENSER_OPTIONS } from "./condenser";
 import { RunStateMachine, type RunState, type StateTransition } from "./run-state";
 import { runArchitect, ARCHITECT_SYSTEM, type ArchitectResult } from "./architect";
 import { renderChatFiles, type ChatFilesStore } from "./chat-files";
 import { renderBootstrap } from "../skills/bootstrap";
+import { renderCapabilitySummary } from "./capabilities";
 import { loadConstitution, renderConstitutionForPrompt, checkConstitution } from "./spec/constitution";
 import { resolveFeature, readArtifact } from "./spec/store";
 import { writeTrajectory, type Trajectory, type TrajectoryStep } from "./trajectory";
@@ -129,6 +131,11 @@ export class Agent {
     this.maxTurns = options.maxTurns ?? options.config.limits.maxTurns;
     this.depth = options.depth ?? 0;
     this.ephemeral = options.ephemeral ?? false;
+    try {
+      this.toolSchemaChars = JSON.stringify(this.options.tools.defs(false)).length;
+    } catch {
+      this.toolSchemaChars = 0;
+    }
     if (!this.ephemeral) {
       this.history.push(...options.session.messages);
     }
@@ -173,7 +180,7 @@ export class Agent {
   private async maybeCondense(force: boolean): Promise<boolean> {
     const model = safeResolve(this.router, this.modelSpec);
     const window = model?.contextWindow ?? 128000;
-    const estimate = estimatePromptTokens(this.history as never[], 8000);
+    const estimate = estimatePromptTokens(this.history as never[], this.toolSchemaChars);
     if (!force && estimate < Math.floor(window * DEFAULT_CONDENSER_OPTIONS.maxTokensRatio)) return false;
     const summarizer = async (messages: never[], previousSummary: string): Promise<string> => {
       const events = await this.router.chat({
@@ -373,6 +380,8 @@ export class Agent {
   private lastWorkingModel?: string;
   /** approximate tokens in the current prompt (for the TUI's context meter) */
   private lastContextTokens = 0;
+  /** serialized size of the tool schemas — they are re-sent every turn */
+  private readonly toolSchemaChars: number;
   /** model that produced the reply (may be a fallback, not the requested one) */
   private answeredBy?: string;
 
@@ -510,7 +519,7 @@ export class Agent {
           } else if (event.type === "reasoning") {
             this.callbacks.onReasoning?.(event.text);
           } else if (event.type === "tool_call") {
-            toolCalls.push({ ...event.call, arguments: normalizeToolArguments(event.call.arguments) });
+            toolCalls.push({ ...event.call, arguments: canonicalToolArguments(event.call.arguments) });
           } else if (event.type === "usage") {
             const actualModel = event.model ?? model;
             this.cost.add(event.usage, actualModel);
@@ -591,14 +600,26 @@ export class Agent {
       for (const call of toolCalls) {
         noteTool(this.workflow, call.name);
         this.callbacks.onToolCall?.(call);
-        const args = safeParseArgs(call.arguments);
+        const parsed = parseToolArguments(call.arguments);
+        const validation = parsed.args
+          ? this.options.tools.checkArgs(call.name, parsed.args)
+          : { ok: false, errors: [parsed.error ?? "invalid arguments"] };
         const started = Date.now();
-        const rawResult = await this.options.tools.execute(call.name, args, this.toolContext());
+        // malformed calls never reach the tool — the model gets an
+        // actionable observation instead of a silent empty-arg run
+        const rawResult =
+          parsed.args && validation.ok
+            ? await this.options.tools.execute(call.name, parsed.args, this.toolContext())
+            : {
+                content: `[xminal] Invalid arguments for tool "${call.name}": ${validation.errors.join("; ")}. Re-send the call with arguments as a valid JSON object matching the tool's schema.`,
+                isError: true as const,
+              };
         const redacted = redactSecrets(rawResult.content);
         const result = redacted.count
           ? { ...rawResult, content: `${redacted.text}\n[xminal: ${redacted.count} secret(s) redacted before sending to the model]` }
           : rawResult;
         const durationMs = Date.now() - started;
+        const args = parsed.args ?? {};
         const mcpServer = call.name === "mcp_call" ? String(args.server ?? "mcp") : "xminal";
         const mcpDetail = call.name === "mcp_call" ? String(args.tool ?? "") : undefined;
         recordToolUsage(this.options.cwd, {
@@ -702,7 +723,7 @@ export class Agent {
     // remember how big the prompt actually is — the TUI's context meter shows
     // this, not the cumulative spend (which grows without bound and says nothing)
     this.lastContextTokens =
-      estimatePromptTokens([system as never], 0) + estimatePromptTokens(this.history as never[], 8000);
+      estimatePromptTokens([system as never], 0) + estimatePromptTokens(this.history as never[], this.toolSchemaChars);
     const compacted = compactHistory(this.history, Math.max(6, Math.floor(model.contextWindow / 12000)));
     return [system, ...compacted];
   }
@@ -720,13 +741,22 @@ export class Agent {
     const skillList = this.options.skills.relevant(this.currentBrief?.goal ?? "", 8);
     const skills = renderBootstrap({ skills: skillList, request: this.currentBrief?.goal ?? "" });
     const memory = this.options.memory.renderForPrompt(10);
+    // capability awareness: the model is told what it can reach, instead of
+    // hallucinating limits — concrete tools, MCP servers, and the skills for
+    // this request
+    const capabilitySummary = renderCapabilitySummary({
+      tools: this.options.tools.defs(this.readOnlyMode()).map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        readOnly: tool.readOnly,
+      })),
+      mcpServers: this.options.mcp.listServerNames(),
+      relevantSkills: skillList.map((s) => s.name),
+    });
     if (this.projectRulesCache === undefined) this.projectRulesCache = readProjectRules(this.options.cwd);
     const projectRules = this.projectRulesCache;
     const model = safeResolve(this.router, this.modelSpec);
-    const toolNames = this.options.tools
-      .defs(this.readOnlyMode())
-      .map((tool) => tool.name)
-      .join(", ");
+    // the tool list itself is embedded in <CAPABILITIES> via capabilitySummary
 
     const modeGuide: Record<AgentMode, string> = {
       plan: "PLAN MODE: read-only analysis. Do not modify files or run destructive commands. Produce a concrete plan and identify risks.",
@@ -770,7 +800,7 @@ Date: ${new Date().toISOString()}
 Model: ${model ? `${model.alias} (${model.provider}/${model.model})` : this.modelSpec}
 Mode: ${this.mode.toUpperCase()}
 Permission mode: ${this.options.permissions.mode}
-Available tools: ${toolNames}
+${capabilitySummary}
 
 ${modeGuide[this.mode]}
 
@@ -812,31 +842,21 @@ function compactHistory(messages: ChatMessage[], keepRecent: number): ChatMessag
 const EFFORT_CAP: Record<AgentEffort, number> = { low: 1024, medium: 4096, high: 16384, max: Number.POSITIVE_INFINITY };
 
 /** Cap the per-turn output budget by the configured effort level. */
+/**
+ * Canonical JSON for history storage. Malformed model output is stored as
+ * {"__raw": "…"} — the transcript shows what was actually sent, and the
+ * execution loop rejects it with an actionable error.
+ */
+function canonicalToolArguments(raw: string): string {
+  const parsed = parseToolArguments(raw);
+  if (parsed.args) return JSON.stringify(parsed.args);
+  return JSON.stringify({ __raw: raw ?? "" });
+}
+
 export function effortCap(effort: AgentEffort, modelMax: number, configMax: number): number {
   // configMax <= 0 means "no per-turn cap" — the model's own limit governs
   const limit = configMax > 0 ? configMax : Number.POSITIVE_INFINITY;
   return Math.floor(Math.min(modelMax, limit, EFFORT_CAP[effort]));
-}
-
-function normalizeToolArguments(raw: string): string {
-  const trimmed = (raw ?? "").trim();
-  if (!trimmed) return "{}";
-  try {
-    const parsed = JSON.parse(trimmed);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? JSON.stringify(parsed) : "{}";
-  } catch {
-    return "{}";
-  }
-}
-
-function safeParseArgs(text: string): Record<string, unknown> {
-  if (!text || !text.trim()) return {};
-  try {
-    const parsed = JSON.parse(text);
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : { value: parsed };
-  } catch {
-    return { raw: text };
-  }
 }
 
 function readProjectRules(cwd: string): string {

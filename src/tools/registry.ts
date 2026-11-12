@@ -1,6 +1,7 @@
 import type { ToolDef } from "../providers/types";
 import type { Tool, ToolContext, ToolResult } from "./types";
 import { errorResult } from "./types";
+import { validateToolArguments } from "./validate";
 
 export class ToolRegistry {
   private tools = new Map<string, Tool>();
@@ -19,6 +20,13 @@ export class ToolRegistry {
 
   names(): string[] {
     return [...this.tools.keys()].sort();
+  }
+
+  /** JSON-Schema-lite validation of args against the tool's parameters. */
+  checkArgs(name: string, args: Record<string, unknown>): { ok: boolean; errors: string[] } {
+    const tool = this.tools.get(name);
+    if (!tool) return { ok: false, errors: [`unknown tool "${name}"`] };
+    return validateToolArguments(tool.parameters, args);
   }
 
   defs(readOnlyOnly = false): ToolDef[] {

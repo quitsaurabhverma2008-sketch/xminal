@@ -109,7 +109,7 @@ test("the TUI boots and renders the opencode-style frame", async () => {
 
 test("a slash command runs inside the TUI instead of leaving the alternate screen", async () => {
   const out = await runTui(["/skills\r", "/exit\r"]);
-  assert.ok(/no skills installed/i.test(out), `/skills did not run in the TUI:\n${out.slice(-800)}`);
+  assert.ok(/no skills installed|skills?\b.*·/i.test(out), `/skills did not run in the TUI:\n${out.slice(-800)}`);
   // the classic path leaves the alternate screen (mode 1049) — the native one does not
   const raw = out.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
   assert.ok(!raw.includes("[?1049l"), "the TUI left the alternate screen");

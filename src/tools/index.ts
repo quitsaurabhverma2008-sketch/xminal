@@ -12,6 +12,8 @@ import { webTools } from "./web-tool";
 import { diagnosticsTools } from "./diagnostics-tool";
 import { mcpTools } from "./mcp-tool";
 import { agentTools } from "./agent-tools";
+import { capabilityTools } from "./capability-tool";
+import { skillRegistryTools } from "./skill-registry-tool";
 
 export function allTools(): Tool[] {
   return [
@@ -28,5 +30,7 @@ export function allTools(): Tool[] {
     ...diagnosticsTools,
     ...mcpTools,
     ...agentTools,
+    ...capabilityTools,
+    ...skillRegistryTools,
   ];
 }

@@ -56,6 +56,8 @@ const PERMISSION_MODES: PermissionMode[] = ["ask", "auto", "full"];
 
 const HELP = `Commands
   /help                      show this help
+  /skill-search <query>      search the skills.sh registry
+  /skill-install <name>      install a skill from the registry
   /mode <plan|build|compose|review|yolo>
   /plan /build /review /yolo mode shortcuts
   /model [spec]              show or switch model (provider/model or alias)
@@ -686,6 +688,60 @@ export async function handleCommand(input: string, ctx: CommandContext): Promise
         return true;
       }
       renderer.warn("Usage: /audit [verify|tail]");
+      return true;
+    }
+
+    case "skill-search": {
+      // search the skills.sh registry (live, or the 24h disk cache)
+      const query = rest.trim();
+      if (!query) {
+        renderer.warn("Usage: /skill-search <query>");
+        return true;
+      }
+      try {
+        const { fetchRegistryIndex, searchRegistry } = await import("../skills/registry");
+        renderer.status("searching the skills.sh registry…");
+        const index = await fetchRegistryIndex();
+        const hits = searchRegistry(index, query, 12);
+        if (hits.length === 0) renderer.info(`(no matches for "${query}" in the registry)`);
+        for (const hit of hits) {
+          renderer.status(`${hit.skill}  ·  ${hit.owner}/${hit.repo}`);
+          renderer.info(`   ${hit.url}`);
+        }
+        renderer.info(`${hits.length} match(es) · install with: /skill-install ${hits[0]?.skill ?? "<name>"}`);
+      } catch (error) {
+        renderer.error((error as Error).message);
+      }
+      return true;
+    }
+
+    case "skill-install": {
+      // install a skill from the skills.sh registry by name
+      const parts = rest.trim().split(/\s+/).filter(Boolean);
+      const globalFlag = parts.includes("--global") || parts.includes("-g");
+      const name = parts.find((p) => !p.startsWith("-"));
+      if (!name) {
+        renderer.warn("Usage: /skill-install <name> [--global]   (search first with /skill-search)");
+        return true;
+      }
+      try {
+        const { fetchRegistryIndex, searchRegistry, installFromRegistry } = await import("../skills/registry");
+        renderer.status(`installing skill "${name}"…`);
+        const index = await fetchRegistryIndex();
+        const matches = searchRegistry(index, name, 5).filter((hit) => hit.skill.toLowerCase() === name.toLowerCase());
+        const chosen = matches[0] ?? searchRegistry(index, name, 1)[0];
+        if (!chosen) {
+          renderer.warn(`no registry skill matches "${name}" — try /skill-search ${name}`);
+          return true;
+        }
+        if (matches.length === 0) renderer.warn(`no exact match for "${name}" — installing the closest: ${chosen.skill} (${chosen.repo})`);
+        const result = await installFromRegistry(runtime.cwd, chosen, { global: globalFlag });
+        renderer.success(`installed ${result.name} → ${result.destination} (${result.fileCount} files)`);
+        renderer.info(`computedHash (v2): ${result.computedHash}`);
+        renderer.info("it is available immediately to the skill tool.");
+      } catch (error) {
+        renderer.error((error as Error).message);
+      }
       return true;
     }
 

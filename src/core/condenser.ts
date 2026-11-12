@@ -61,7 +61,9 @@ export function estimateTokens(text: string): number {
 
 /** The estimated size of a message list, including the tool schemas. */
 export function estimatePromptTokens(messages: CondenserMessage[], schemaChars = 0): number {
-  let total = estimateTokens(String(schemaChars));
+  // chars → tokens; the old code did estimateTokens(String(schemaChars)) which
+  // measured the *digits* of the number, i.e. ~1 token no matter the schema size
+  let total = Math.ceil(schemaChars / 4);
   for (const message of messages) {
     total += estimateTokens(message.content ?? "") + 4;
     if (message.toolCalls?.length) total += estimateTokens(JSON.stringify(message.toolCalls));

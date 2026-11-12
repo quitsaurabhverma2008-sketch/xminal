@@ -17,31 +17,6 @@ export interface PermissionDecision {
 
 export type AskHandler = (question: string, detail?: string) => Promise<boolean>;
 
-const DANGEROUS_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
-  { pattern: /\brm\s+-[a-z]*r[a-z]*f|\brm\s+-[a-z]*f[a-z]*r/i, reason: "recursive force delete" },
-  { pattern: /\bsudo\b|\bdoas\b/i, reason: "privilege escalation" },
-  { pattern: /\bchmod\s+777\b/i, reason: "world-writable permissions" },
-  { pattern: /\bcurl\b[^|]*\|\s*(ba)?sh\b/i, reason: "pipe download to shell" },
-  { pattern: /\bwget\b[^|]*\|\s*(ba)?sh\b/i, reason: "pipe download to shell" },
-  { pattern: /\bgit\s+push\b[^\n]*--force|\bgit\s+push\b[^\n]*-f\b/i, reason: "force push" },
-  { pattern: /\bgit\s+reset\s+--hard\b/i, reason: "discard working tree" },
-  { pattern: /\bgit\s+clean\s+-[a-z]*f/i, reason: "delete untracked files" },
-  { pattern: /\bdd\s+if=|\bmkfs\b|\bfdisk\b|\bparted\b/i, reason: "disk operation" },
-  { pattern: /\bshutdown\b|\breboot\b|\bpoweroff\b/i, reason: "system power" },
-  { pattern: /:\s*\(\s*\)\s*\{.*\|.*&.*\}/i, reason: "fork bomb" },
-  { pattern: />\s*\/dev\/sd[a-z]/i, reason: "raw device write" },
-  { pattern: /\b(curl|wget|nc|ncat|socat)\b/i, reason: "network command" },
-];
-
-const RISKY_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
-  { pattern: /\bnpm\s+(install|i)\b|\byarn\s+add\b|\bpnpm\s+add\b/i, reason: "installs dependencies" },
-  { pattern: /\bpip\s+install\b|\buv\s+pip\s+install\b/i, reason: "installs packages" },
-  { pattern: /\bgit\s+(commit|merge|rebase|checkout|switch)\b/i, reason: "modifies git state" },
-  { pattern: /\bmv\b|\bcp\b|\brm\b/i, reason: "filesystem mutation" },
-  { pattern: /\bdocker\b|\bpodman\b/i, reason: "container operation" },
-  { pattern: /\bkill\b|\bpkill\b|\bkillall\b/i, reason: "process control" },
-];
-
 const READ_ONLY_TOOLS = new Set([
   "read",
   "glob",

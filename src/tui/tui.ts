@@ -129,13 +129,14 @@ const COMMANDS: Cmd[] = [
   { name: "/memory", desc: "memory list · add · search · forget", group: "Tasks" },
   { name: "/skills", desc: "list installed skills", group: "Skills" },
   { name: "/skill", desc: "print a skill by name", group: "Skills" },
-  { name: "/skill-lock", desc: "lock current skills (.xminal/skills.lock.json)", group: "Skills" },
-  { name: "/skill-verify", desc: "verify skills against lockfile", group: "Skills" },
+  { name: "/skills --lock", desc: "lock current skills (.xminal/skills.lock.json)", group: "Skills" },
+  { name: "/skills --verify", desc: "verify skills against the lockfile", group: "Skills" },
+  { name: "/skill-search", desc: "search the skills.sh registry (live)", group: "Skills" },
+  { name: "/skill-install", desc: "install a skill from the skills.sh registry", group: "Skills" },
 
   { name: "/mcp", desc: "list MCP servers + tools", group: "MCP" },
 
-  { name: "/verify", desc: "run project tests/lint/typecheck", group: "Dev" },
-  { name: "/build", desc: "run project build", group: "Dev" },
+  { name: "/build", desc: "build mode (shorthand for /mode build)", group: "Agent" },
   { name: "/ralph", desc: "iterate impl until verify passes", group: "Dev" },
 
   { name: "/diff", desc: "git diff", group: "Git" },
@@ -1166,7 +1167,9 @@ const sessionRows = (query: string): SessionRow[] => {
   const pushLine = (kind: LineKind, text: string) => {
     lineVersion++;
     lines.push({ kind, text });
-    scroll = 0;
+    // keep the user's anchor while they are scrolled up — the viewport must
+    // not jump to the bottom just because a tool printed something
+    if (scroll > 0) scroll += 1;
     if (kind === "err") logEvent("error", stripAnsiW(text));
     render();
   };
@@ -1198,7 +1201,7 @@ const sessionRows = (query: string): SessionRow[] => {
       lineVersion++;
       lines.push({ kind: "tool", text: "", activity });
       pendingToolIdx.push(lines.length - 1);
-      scroll = 0;
+      if (scroll > 0) scroll += 1;
       render();
     },
     onToolResult: (name, r) => {
