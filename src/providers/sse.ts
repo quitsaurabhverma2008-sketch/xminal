@@ -38,27 +38,51 @@ export async function* sseJson(response: Response): AsyncGenerator<Record<string
   }
 }
 
-export async function readError(response: Response): Promise<string> {
+export interface ErrorDetail {
+  readonly message: string;
+  /** the machine-readable upstream code, when there is one */
+  readonly code?: string;
+  /** retry-after, in milliseconds */
+  readonly retryAfterMs?: number;
+}
+
+/** Parse a provider error body + the rate-limit headers. */
+export async function readErrorDetail(response: Response): Promise<ErrorDetail> {
+  let retryAfterMs: number | undefined;
+  const retryAfter = response.headers?.get?.("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) retryAfterMs = seconds * 1000;
+    else {
+      const date = Date.parse(retryAfter);
+      if (Number.isFinite(date)) retryAfterMs = Math.max(0, date - Date.now());
+    }
+  }
   try {
     const text = await response.text();
     const trimmed = text.trim();
     if (trimmed.startsWith("{")) {
       try {
         const parsed = JSON.parse(trimmed) as {
-          error?: { message?: string; type?: string };
+          error?: { message?: string; type?: string; code?: string };
           message?: string;
+          code?: string;
         };
         const message = parsed?.error?.message ?? parsed?.message;
-        const type = parsed?.error?.type;
+        const code = parsed?.error?.code ?? parsed?.code;
         if (typeof message === "string" && message.length > 0) {
-          return type ? `${message} (${type})` : message;
+          return { message: code ? `${message} [code=${code}]` : message, code, retryAfterMs };
         }
       } catch { /* not JSON after all */ }
     }
-    return trimmed.slice(0, 400) || `${response.status} ${response.statusText}`;
+    return { message: trimmed.slice(0, 400) || `${response.status} ${response.statusText}`, retryAfterMs };
   } catch {
-    return `${response.status} ${response.statusText}`;
+    return { message: `${response.status} ${response.statusText}`, retryAfterMs };
   }
+}
+
+export async function readError(response: Response): Promise<string> {
+  return (await readErrorDetail(response)).message;
 }
 
 export function joinUrl(base: string, suffix: string): string {

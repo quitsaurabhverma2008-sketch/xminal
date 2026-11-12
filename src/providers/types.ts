@@ -56,8 +56,15 @@ export class ProviderError extends Error {
     message: string,
     readonly status?: number,
     readonly retryable = false,
+    /** the upstream error code, e.g. insufficient_quota vs rate_limit_error */
+    readonly code?: string,
+    /** how long to wait before retrying (seconds or milliseconds from the header) */
+    readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = "ProviderError";
   }
 }
+
+/** Why a request failed — drives what we do next, and what we say. */
+export type ProviderFailureKind = "auth" | "quota" | "throttle" | "model" | "server" | "network" | "unknown";

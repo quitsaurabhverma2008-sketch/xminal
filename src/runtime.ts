@@ -82,9 +82,25 @@ export class Runtime {
         ? readJson<Partial<XminalConfig>>(globalConfigPath(), {})
         : {};
       const providers = { ...(raw.providers ?? {}), [provider]: { ...(raw.providers?.[provider] ?? current), apiKey } };
-      writeJson(globalConfigPath(), { ...raw, providers });
+      // the file holds API keys — always owner-only, never umask-default
+      writeJson(globalConfigPath(), { ...raw, providers }, 0o600);
     } catch {
       try { saveGlobalConfig(this.config); } catch { /* best effort */ }
+    }
+  }
+
+  /** Remove the stored key for a provider (the user can add it again). */
+  clearProviderKey(provider: string): void {
+    const current = this.config.providers[provider];
+    if (!current) throw new Error(`unknown provider: ${provider}`);
+    const { apiKey: _remove, ...rest } = current;
+    this.config.providers = { ...this.config.providers, [provider]: rest };
+    try {
+      const raw = exists(globalConfigPath()) ? readJson<Partial<XminalConfig>>(globalConfigPath(), {}) : {};
+      const providers = { ...(raw.providers ?? {}), [provider]: rest };
+      writeJson(globalConfigPath(), { ...raw, providers }, 0o600);
+    } catch {
+      saveGlobalConfig(this.config);
     }
   }
 

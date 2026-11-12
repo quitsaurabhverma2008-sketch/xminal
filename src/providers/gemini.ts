@@ -1,7 +1,7 @@
 import type { ChatEvent, ChatMessage, ChatRequest, ProviderAdapter, ToolCall } from "./types";
 import { ProviderError } from "./types";
 import { getApiKey } from "../config/config";
-import { joinUrl, readError } from "./sse";
+import { joinUrl, readErrorDetail } from "./sse";
 
 export class GeminiAdapter implements ProviderAdapter {
   readonly providerType = "gemini";
@@ -57,7 +57,8 @@ export class GeminiAdapter implements ProviderAdapter {
       throw new ProviderError(`request to ${baseUrl} failed: ${message}`, undefined, true);
     }
     if (!response.ok) {
-      throw new ProviderError(await readError(response), response.status, response.status >= 500 || response.status === 429);
+      const detail = await readErrorDetail(response);
+      throw new ProviderError(detail.message, response.status, response.status >= 500 || response.status === 429, detail.code, detail.retryAfterMs);
     }
 
     const data = (await response.json()) as Record<string, unknown>;

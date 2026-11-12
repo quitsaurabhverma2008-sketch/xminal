@@ -146,6 +146,7 @@ export class Session {
         this.meta.model = event.data.model as string;
       }
     }
+    this.messages = closeDanglingToolCalls(this.messages);
   }
 
   appendEvent(type: SessionEventType, data: Record<string, unknown>): SessionEvent {
@@ -288,6 +289,37 @@ export class Session {
     next.push(this.meta);
     writeJson(indexFile, next);
   }
+}
+
+/**
+ * Close out tool-call turns that were interrupted (a kill, a crash): every
+ * provider rejects an assistant message carrying a tool_call that has no
+ * matching tool response, so a half-finished turn poisons the whole resumed
+ * session. Synthesize the missing tool results instead — they say exactly
+ * what happened, and the transcript stays honest.
+ */
+export function closeDanglingToolCalls(messages: ChatMessage[]): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index];
+    out.push(message);
+    if (message.role !== "assistant" || !message.toolCalls?.length) continue;
+    const answered = new Set<string>();
+    for (let cursor = index + 1; cursor < messages.length && messages[cursor].role === "tool"; cursor += 1) {
+      const id = messages[cursor].toolCallId;
+      if (id) answered.add(id);
+    }
+    for (const call of message.toolCalls) {
+      if (answered.has(call.id)) continue;
+      out.push({
+        role: "tool",
+        toolCallId: call.id,
+        name: call.name,
+        content: "[interrupted: the session was stopped before this tool finished — XMINAL did not run it to completion]",
+      });
+    }
+  }
+  return out;
 }
 
 function readEvents(file: string): SessionEvent[] {

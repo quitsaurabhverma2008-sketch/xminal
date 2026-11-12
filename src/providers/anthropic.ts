@@ -1,7 +1,7 @@
 import type { ChatEvent, ChatMessage, ChatRequest, ProviderAdapter, ToolCall } from "./types";
 import { ProviderError } from "./types";
 import { getApiKey } from "../config/config";
-import { joinUrl, readError, sseJson } from "./sse";
+import { joinUrl, readErrorDetail, sseJson } from "./sse";
 
 interface AnthropicBlock {
   type: string;
@@ -61,7 +61,8 @@ export class AnthropicAdapter implements ProviderAdapter {
       throw new ProviderError(`request to ${baseUrl} failed: ${message}`, undefined, true);
     }
     if (!response.ok) {
-      throw new ProviderError(await readError(response), response.status, response.status >= 500 || response.status === 429);
+      const detail = await readErrorDetail(response);
+      throw new ProviderError(detail.message, response.status, response.status >= 500 || response.status === 429, detail.code, detail.retryAfterMs);
     }
 
     const blocks = new Map<number, { type: string; id?: string; name?: string; json: string; text: string }>();

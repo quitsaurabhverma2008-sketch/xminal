@@ -91,7 +91,6 @@ interface Cmd {
 const COMMANDS: Cmd[] = [
   { name: "/new", desc: "start a new session", group: "Session" },
   { name: "/resume", desc: "resume previous session", group: "Session" },
-  { name: "/continue", desc: "continue with saved state", group: "Session" },
   { name: "/sessions", desc: "list all sessions", group: "Session" },
   { name: "/rename", desc: "rename the current session", group: "Session" },
   { name: "/branch", desc: "branch session into alternate history", group: "Session" },
@@ -127,7 +126,6 @@ const COMMANDS: Cmd[] = [
   { name: "/verify", desc: "run the project's verify command now", group: "Repo" },
 
   { name: "/tasks", desc: "the task list (.xminal/todos.json)", group: "Tasks" },
-  { name: "/todo", desc: "add a todo item", group: "Tasks" },
   { name: "/memory", desc: "memory list · add · search · forget", group: "Tasks" },
   { name: "/skills", desc: "list installed skills", group: "Skills" },
   { name: "/skill", desc: "print a skill by name", group: "Skills" },
@@ -135,34 +133,21 @@ const COMMANDS: Cmd[] = [
   { name: "/skill-verify", desc: "verify skills against lockfile", group: "Skills" },
 
   { name: "/mcp", desc: "list MCP servers + tools", group: "MCP" },
-  { name: "/mcp-tools", desc: "list all MCP tool names", group: "MCP" },
-  { name: "/mcp-call", desc: "call a tool on an MCP server", group: "MCP" },
-  { name: "/mcp-catalog", desc: "search 3800+ MCP servers by name, work, platform", group: "MCP" },
 
   { name: "/verify", desc: "run project tests/lint/typecheck", group: "Dev" },
-  { name: "/test", desc: "alias for /verify", group: "Dev" },
   { name: "/build", desc: "run project build", group: "Dev" },
-  { name: "/lint", desc: "run project linter", group: "Dev" },
   { name: "/ralph", desc: "iterate impl until verify passes", group: "Dev" },
-  { name: "/diagnose", desc: "run diagnostics tool", group: "Dev" },
 
   { name: "/diff", desc: "git diff", group: "Git" },
   { name: "/git", desc: "run a git command", group: "Git" },
   { name: "/status", desc: "git status --short --branch", group: "Git" },
-  { name: "/log", desc: "git log --oneline -n 15", group: "Git" },
   { name: "/branch", desc: "git branch -vv", group: "Git" },
-  { name: "/worktree", desc: "git worktree list / add / remove / merge", group: "Git" },
-  { name: "/stash", desc: "git stash push / pop", group: "Git" },
 
   { name: "/cost", desc: "token spend breakdown", group: "Usage" },
-  { name: "/usage", desc: "alias for /cost", group: "Usage" },
   { name: "/tools", desc: "per-tool token usage", group: "Usage" },
-  { name: "/budget", desc: "set max cost per session", group: "Usage" },
 
   { name: "/doctor", desc: "environment diagnostics", group: "Setup" },
-  { name: "/env", desc: "show env var names (masked)", group: "Setup" },
   { name: "/init", desc: "create .xminal in this project", group: "Setup" },
-  { name: "/setup", desc: "guided first-run setup", group: "Setup" },
   { name: "/permissions", desc: "review or change ask/auto/full", group: "Setup" },
   { name: "/compact", desc: "compact in-memory conversation", group: "Session" },
 
@@ -170,10 +155,8 @@ const COMMANDS: Cmd[] = [
   { name: "/docs", desc: "show docs/ROADMAP.md", group: "Docs" },
 
   { name: "/version", desc: "print xminal version", group: "System" },
-  { name: "/about", desc: "about XMINAL", group: "System" },
   { name: "/help", desc: "this command list", group: "System" },
   { name: "/clear", desc: "clear the screen", group: "System" },
-  { name: "/theme", desc: "toggle dark/light (light = coming)", group: "System" },
   { name: "/report", desc: "report a bug on GitHub", group: "System" },
   { name: "/issue", desc: "alias for /report", group: "System" },
   { name: "/exit", desc: "quit XMINAL", group: "System" },
@@ -477,7 +460,12 @@ const sessionRows = (query: string): SessionRow[] => {
 };
 
 
-  const mouseMode = !/^(0|off|false)$/i.test(process.env.XMINAL_MOUSE ?? "");
+  // mouse reporting breaks tap-to-scroll on Android terminals (Termux, etc.):
+  // default OFF there unless explicitly enabled
+  const mouseMode =
+    process.platform === "android"
+      ? /^(1|on|true|yes)$/i.test(process.env.XMINAL_MOUSE ?? "")
+      : !/^(0|off|false)$/i.test(process.env.XMINAL_MOUSE ?? "");
   // opencode's own placeholder samples (routes/home.tsx)
   const PLACEHOLDERS = [
     'Ask anything…  "Fix a TODO in the codebase"',
@@ -635,9 +623,9 @@ const sessionRows = (query: string): SessionRow[] => {
       let rest = logical;
       while (rest.length > 0) {
         const slice = graphemeSlice(rest, budget);
-        if (slice.length === 0) break;
-        out.push(slice);
-        rest = rest.slice(slice.length);
+        if (slice.columns === 0) break;
+        out.push(slice.text);
+        rest = rest.slice(slice.consumed);
       }
     }
     return out;
@@ -667,7 +655,7 @@ const sessionRows = (query: string): SessionRow[] => {
       try { value = resolveModel(runtime.config, spec).contextWindow ?? 128000; } catch { /* keep fallback */ }
       ctxWindowMemo = { spec, value };
     }
-    const used = runtime.agent.getCost().inputTokens;
+    const used = runtime.agent.getContextTokens();
     return Math.min(100, Math.round((100 * used) / (ctxWindowMemo?.value ?? 128000)));
   };
 
@@ -801,7 +789,7 @@ const sessionRows = (query: string): SessionRow[] => {
     // ── footer — opencode: workspace + branch left, usage + hints right
     if (row === footerRow()) {
       const cost = runtime.agent.getCost();
-      const usage = `${(cost.inputTokens / 1000).toFixed(1)}K (${ctxPct()}%)`;
+      const usage = `${(runtime.agent.getContextTokens() / 1000).toFixed(1)}K (${ctxPct()}%)`;
       const left = busy
         ? `${fgCyan(SPINNER_FRAMES[spinnerTick % SPINNER_FRAMES.length])} ${fgText("esc")} ${fgMuted("interrupt")}`
         : scroll > 0
@@ -839,12 +827,9 @@ const sessionRows = (query: string): SessionRow[] => {
       case 1: return line(branch ? fgMuted(`⎇ ${branch}`) : "");
       // opencode shows the context window first
       case 3: return heading("Context");
-      case 4: {
-        const cost = runtime.agent.getCost();
-        return line(fgText(`${cost.inputTokens.toLocaleString("en-US")} tokens`));
-      }
-      case 5: return line(fgMuted(`${ctxPct()}% used`));
-      case 6: return line(fgMuted(`$${runtime.agent.getCost().costUsd.toFixed(4)} spent`));
+      case 4: return line(fgText(`${runtime.agent.getContextTokens().toLocaleString("en-US")} tokens in prompt`));
+      case 5: return line(fgMuted(`${ctxPct()}% of the window`));
+      case 6: return line(fgMuted(`$${runtime.agent.getCost().costUsd.toFixed(4)} spent this session`));
       case 8: return heading("Todo");
       case 9: case 10: case 11: case 12: case 13: case 14: {
         const i = row - 9;
@@ -1469,6 +1454,20 @@ const sessionRows = (query: string): SessionRow[] => {
       render();
       return true;
     }
+    if (name === "/clear-key") {
+      // remove the stored key for a provider
+      const target = parts.slice(1).join(" ").trim();
+      const key = PROVIDERS.find((entry) => entry.key === target || entry.label.toLowerCase() === target.toLowerCase())?.key;
+      if (!key) { pushLine("system", fgMuted(`usage: /clear-key <${PROVIDERS.map((p) => p.key).join("|")}>`)); render(); return true; }
+      try {
+        runtime.clearProviderKey(key);
+        pushLine("ok", `cleared the key for ${key}`);
+      } catch (error) {
+        pushLine("err", (error as Error).message);
+      }
+      render();
+      return true;
+    }
     if (name === "/cost") {
       const cost = runtime.agent.getCost();
       pushLine("system", `${fgAccent("cost")} ${fgMuted(`· ${cost.inputTokens} in / ${cost.outputTokens} out · $${cost.costUsd.toFixed(4)}`)}`);
@@ -1988,6 +1987,30 @@ const sessionRows = (query: string): SessionRow[] => {
 
   process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l\x1b[48;2;26;27;38m\x1b[38;2;200;211;245m" + (mouseMode ? "\x1b[?1000h\x1b[?1006h" : ""));
   process.stdout.on("resize", render);
+  // Android and other hosts can kill the app without asking: restore the
+  // terminal and flush the session so the user is not left with a black
+  // screen and a half-written transcript
+  const onSignal = (signal: string) => {
+    process.stderr.write(`\n[xminal: received ${signal} — restoring the terminal and saving the session]\n`);
+    try {
+      close();
+    } catch {
+      process.stdout.write("\x1b[?1049l\x1b[?25h\x1b[0m\n");
+      process.exit(130);
+    }
+  };
+  process.on("SIGTERM", () => onSignal("SIGTERM"));
+  process.on("SIGHUP", () => onSignal("SIGHUP"));
+  process.on("SIGINT", () => onSignal("SIGINT"));
+  process.on("uncaughtException", (error) => {
+    process.stdout.write(`\x1b[?1049l\x1b[?25h\x1b[0m\n[xminal: unexpected error — the terminal was restored]\n${error?.stack ?? error}\n`);
+    try {
+      runtime.close();
+    } catch {
+      /* session flush is best-effort here */
+    }
+    process.exit(1);
+  });
   process.stdin.setRawMode?.(true);
   process.stdin.resume();
   process.stdin.on("data", onData);

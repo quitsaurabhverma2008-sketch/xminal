@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { exists, readJson, writeJson, ensureDir, chmodPrivate } from "../util/fs";
-import { globalConfigPath, projectConfigPath } from "./paths";
+import { globalConfigPath, projectConfigPath, globalXminalDir } from "./paths";
 import { DEFAULT_MODELS } from "./default-models";
 import { PROVIDER_DEFAULT_MODELS } from "./provider-defaults";
 import { effectiveModelMap, isFreeModel, lookupModelAlias } from "./models-catalog";
@@ -89,7 +89,8 @@ export function defaultConfig(): XminalConfig {
     autoVerifyRepairs: 1,
     permissions: {
       mode: "auto",
-      protectedPaths: ["~/.ssh", "~/.aws", "~/.gnupg", "~/.config/gh", ".env", ".env.local"],
+      // ~/.xminal holds the provider keys — the agent must not read it
+      protectedPaths: ["~/.ssh", "~/.aws", "~/.gnupg", "~/.config/gh", "~/.xminal", "~/.config/xminal", ".env", ".env.local"],
     },
     sandbox: { enabled: false, backend: "none", allowNetwork: true },
     mcpServers: {},
@@ -143,6 +144,11 @@ export function loadConfig(cwd: string): LoadedConfig {
 
 export function saveGlobalConfig(config: XminalConfig): void {
   // the global config holds provider API keys → owner-read/write only
+  try {
+    fs.chmodSync(globalXminalDir(), 0o700);
+  } catch {
+    // best effort (shared storage does not support POSIX modes)
+  }
   writeJson(globalConfigPath(), config, 0o600);
 }
 

@@ -77,6 +77,46 @@ export class AuditLog {
   constructor(private readonly cwd: string) {
     const dir = projectReceiptsDir(this.cwd);
     ensureDir(dir);
+    this.restore();
+  }
+
+  /**
+   * Rehydrate the chain from disk.
+   *
+   * Without this every process restart began again at seq 1 / "genesis", so
+   * the chain could never verify across restarts — the whole point of a
+   * hash-chained log. The last *valid* entry wins: a truncated or corrupt
+   * tail is ignored (and reported by verifyFile).
+   */
+  private restore(): void {
+    const file = path.join(projectReceiptsDir(this.cwd), "audit.jsonl");
+    let content = "";
+    try {
+      content = readText(file);
+    } catch {
+      return;
+    }
+    let prev = "genesis";
+    let seq = 0;
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      let entry: Record<string, unknown>;
+      try {
+        entry = JSON.parse(trimmed) as Record<string, unknown>;
+      } catch {
+        break; // a malformed line ends the trusted chain
+      }
+      const expected = sha256(
+        prev + JSON.stringify({ seq: entry.seq, ts: entry.ts, action: entry.action, decision: entry.decision, details: entry.details }),
+      );
+      if (entry.prev !== prev || entry.hash !== expected) break;
+      prev = expected;
+      const value = Number(entry.seq ?? 0);
+      if (Number.isFinite(value) && value > seq) seq = value;
+    }
+    this.seq = seq;
+    this.prev = prev;
   }
 
   static verifyFile(file: string): AuditVerification {

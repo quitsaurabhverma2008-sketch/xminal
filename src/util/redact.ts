@@ -9,6 +9,20 @@ const PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /AIza[0-9A-Za-z_-]{20,}/g, label: "google-api-key" },
   { pattern: /xox[baprs]-[0-9A-Za-z-]{10,}/g, label: "slack-token" },
   { pattern: /eyJ[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{20,}/g, label: "jwt" },
+  // provider key shapes that were missing — a Groq/NVIDIA/HuggingFace/ZAI key
+  // used to reach the model verbatim
+  { pattern: /\bgsk_[A-Za-z0-9]{24,}/g, label: "groq-api-key" },
+  { pattern: /\bnvapi-[A-Za-z0-9_\-]{30,}/g, label: "nvidia-api-key" },
+  { pattern: /\bhf_[A-Za-z0-9]{24,}/g, label: "huggingface-token" },
+  { pattern: /\bsk-[A-Za-z0-9]{20,}\.[A-Za-z0-9]{20,}\.[A-Za-z0-9_-]{20,}/g, label: "zai-api-key" },
+  { pattern: /\b(?:sk|csk|pk)-[A-Za-z0-9_-]{32,}\b/g, label: "api-key" },
+];
+
+/** JSON field names whose values are secrets whatever they look like. */
+const SECRET_FIELD_NAMES = [
+  "apikey", "api_key", "api-key", "authorization", "auth_token", "authtoken",
+  "access_token", "accesstoken", "refresh_token", "client_secret", "private_key",
+  "secret_key", "x-api-key", "anthropic-api-key", "openai-api-key",
 ];
 
 export interface RedactionResult {
@@ -26,6 +40,17 @@ export function redactSecrets(text: string): RedactionResult {
       return `[REDACTED:${label}]`;
     });
   }
+  // field-name pass: a JSON blob (a config, a provider response) must not
+  // leak a key just because its shape is unusual
+  out = out.replace(
+    /("[A-Za-z0-9_\-]*(?:api[_-]?key|token|secret|password|authorization)[A-Za-z0-9_\-]*"\s*:\s*")([^"\\]{8,})(")/gi,
+    (_match, prefix, _value, closing) => {
+      count += 1;
+      const field = /"([^"]*)"/.exec(prefix)?.[1] ?? "";
+      const label = SECRET_FIELD_NAMES.includes(field.toLowerCase()) ? "api-key" : "secret";
+      return `${prefix}[REDACTED:${label}]${closing}`;
+    },
+  );
   return { text: out, count };
 }
 

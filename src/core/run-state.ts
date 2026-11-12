@@ -106,6 +106,20 @@ export class RunStateMachine {
     return change;
   }
 
+  /**
+   * Start a new turn.
+   *
+   * The machine lives for the whole session, but a turn ends in `finished` —
+   * so the next turn needs `finished → idle → running`. Without this the
+   * second message of a session was refused and the state lied.
+   */
+  startTurn(reason?: string): StateChange {
+    if (this.state === "finished" || this.state === "stopped" || this.state === "error" || this.state === "stuck") {
+      this.transition("idle", "new turn");
+    }
+    return this.transition("running", reason);
+  }
+
   /** Is the agent allowed to take a step right now? */
   canStep(): boolean {
     return this.state === "running";

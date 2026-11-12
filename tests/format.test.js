@@ -3,10 +3,13 @@ const test = require("node:test");
 const assert = require("node:assert");
 const { formatAssistantText } = require("../dist/tui/format");
 
-test("prose: repeated punctuation collapses, single punctuation survives", () => {
-  assert.equal(formatAssistantText("Done!!!").trim(), "Done!");
+test("the formatter does not rewrite the model's punctuation", () => {
+  // collapsing "..." into "." rewrote the assistant's words and read as
+  // mangled output — prose must reach the reader byte-for-byte
+  assert.equal(formatAssistantText("Done!!!").trim(), "Done!!!");
   assert.equal(formatAssistantText("What?!?").trim(), "What?!?");
-  assert.equal(formatAssistantText("Fine.").trim(), "Fine.");
+  assert.equal(formatAssistantText("Loading...").trim(), "Loading...");
+  assert.equal(formatAssistantText("Wait... let me check").trim(), "Wait... let me check");
 });
 
 test("code fences are preserved byte-exact", () => {
@@ -19,12 +22,12 @@ test("code fence with repeated punctuation inside is untouched", () => {
   assert.equal(formatAssistantText(src), src);
 });
 
-test("prose around code fences is normalized, fences are not", () => {
+test("prose and code fences are both preserved", () => {
   const src = "Great!!!\n```\na!!!b\n```\nDone!!!";
   const out = formatAssistantText(src);
-  assert.ok(out.includes("a!!!b"));
-  assert.ok(out.startsWith("Great!"));
-  assert.ok(out.endsWith("Done!") === true || out.endsWith("Done!\n"));
+  assert.ok(out.includes("a!!!b"), "the fence content must be byte-exact");
+  assert.ok(out.startsWith("Great!!!"), "the model's punctuation must survive");
+  assert.ok(out.endsWith("Done!!!") || out.endsWith("Done!!!\n"));
 });
 
 test("excessive blank lines collapse to one", () => {

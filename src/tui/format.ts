@@ -41,9 +41,9 @@ export function segment(input: string): Segment[] {
 
 function normalizeProse(text: string): string {
   let t = text;
-  // collapse decorative punctuation runs — but never sentence-final single chars
-  t = t.replace(/([!?.])\1{1,}/g, "$1");        // !!! → !  ... → .
-  t = t.replace(/([-–—])\1{2,}/g, "$1$1");      // --- → --
+  // Only broken markdown is repaired here. The model's own punctuation is
+  // left alone — collapsing "..." into "." rewrote the assistant's words and
+  // read as if the reply had been mangled.
   t = t.replace(/:\s*:/g, ":");                 // :: repeated colons
   t = t.replace(/;\s*;/g, ";");
   t = t.replace(/\*\*\s*\*\*/g, "**");          // accidental empty bold markers

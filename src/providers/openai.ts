@@ -1,7 +1,7 @@
 import type { ChatEvent, ChatMessage, ChatRequest, ProviderAdapter } from "./types";
 import { ProviderError } from "./types";
 import { getApiKey } from "../config/config";
-import { joinUrl, readError, sseJson } from "./sse";
+import { joinUrl, readErrorDetail, sseJson } from "./sse";
 
 interface OpenAiToolCallDelta {
   index?: number;
@@ -60,7 +60,8 @@ export class OpenAiAdapter implements ProviderAdapter {
       throw new ProviderError(`request to ${baseUrl} failed: ${message}${cause}`, undefined, true);
     }
     if (!response.ok) {
-      throw new ProviderError(await readError(response), response.status, response.status >= 500 || response.status === 429);
+      const detail = await readErrorDetail(response);
+      throw new ProviderError(detail.message, response.status, response.status >= 500 || response.status === 429, detail.code, detail.retryAfterMs);
     }
 
     const calls = new Map<number, { id: string; name: string; arguments: string }>();

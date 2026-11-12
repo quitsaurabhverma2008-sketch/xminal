@@ -26,6 +26,7 @@ import { condense, estimatePromptTokens, summarizePrompt, SUMMARIZE_SYSTEM, DEFA
 import { RunStateMachine, type RunState, type StateTransition } from "./run-state";
 import { runArchitect, ARCHITECT_SYSTEM, type ArchitectResult } from "./architect";
 import { renderChatFiles, type ChatFilesStore } from "./chat-files";
+import { renderBootstrap } from "../skills/bootstrap";
 import { loadConstitution, renderConstitutionForPrompt, checkConstitution } from "./spec/constitution";
 import { resolveFeature, readArtifact } from "./spec/store";
 import { writeTrajectory, type Trajectory, type TrajectoryStep } from "./trajectory";
@@ -370,11 +371,15 @@ export class Agent {
 
   /** last model that actually answered — used to fall back when a model is unavailable */
   private lastWorkingModel?: string;
+  /** approximate tokens in the current prompt (for the TUI's context meter) */
+  private lastContextTokens = 0;
   /** model that produced the reply (may be a fallback, not the requested one) */
   private answeredBy?: string;
 
   markModelWorking(): void {
-    this.lastWorkingModel = this.modelSpec;
+    // record the model that actually answered (a fallback may have served),
+    // not the requested one
+    this.lastWorkingModel = this.answeredBy ?? this.modelSpec;
   }
 
   get fallbackModel(): string | undefined {
@@ -434,7 +439,7 @@ export class Agent {
     this.stuck.reset();
     this.trajectory = [];
     this.runStartedAt = new Date().toISOString();
-    this.states.transition("running", "request received");
+    this.states.startTurn("request received");
     this.options.permissions.setAskHook?.((done) => {
       this.states.transition("awaiting_confirmation", "waiting for approval");
       done();
@@ -694,15 +699,26 @@ export class Agent {
       role: "system",
       content: this.systemPrompt(),
     };
+    // remember how big the prompt actually is — the TUI's context meter shows
+    // this, not the cumulative spend (which grows without bound and says nothing)
+    this.lastContextTokens =
+      estimatePromptTokens([system as never], 0) + estimatePromptTokens(this.history as never[], 8000);
     const compacted = compactHistory(this.history, Math.max(6, Math.floor(model.contextWindow / 12000)));
     return [system, ...compacted];
+  }
+
+  /** tokens in the prompt that would be sent right now (approximate) */
+  getContextTokens(): number {
+    return this.lastContextTokens;
   }
 
   private systemPrompt(): string {
     const config = this.options.config;
     // skills are ranked for the current request — the agent can only load a
     // skill it knows exists, so the list has to point at the right one
-    const skills = this.options.skills.renderForRequest(this.currentBrief?.goal ?? "", 12);
+    // the bootstrap tells the model to load a relevant skill BEFORE it acts
+    const skillList = this.options.skills.relevant(this.currentBrief?.goal ?? "", 8);
+    const skills = renderBootstrap({ skills: skillList, request: this.currentBrief?.goal ?? "" });
     const memory = this.options.memory.renderForPrompt(10);
     if (this.projectRulesCache === undefined) this.projectRulesCache = readProjectRules(this.options.cwd);
     const projectRules = this.projectRulesCache;
@@ -771,7 +787,7 @@ ${workflow ? `${workflow}\n` : ""}${projectBrief ? `Project brief:\n${projectBri
 - Report findings with a severity and a file:line reference. Do not report speculative issues as confirmed bugs.
 - When you finish, report what changed, how it was verified (with the real output), and any follow-ups.
 
-${projectRules ? `Project rules (AGENTS.md):\n${projectRules}\n` : ""}${skills ? `Available skills (use the skill tool to load one):\n${skills}\n` : ""}${memory ? `Relevant memory:\n${memory}\n` : ""}${config.verifyCommand ? `Verification command: ${config.verifyCommand}\n` : ""}`;
+${projectRules ? `Project rules (AGENTS.md):\n${projectRules}\n` : ""}${skills ? `${skills}\n` : ""}${memory ? `Relevant memory:\n${memory}\n` : ""}${config.verifyCommand ? `Verification command: ${config.verifyCommand}\n` : ""}`;
   }
 }
 

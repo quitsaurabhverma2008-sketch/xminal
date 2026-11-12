@@ -211,7 +211,7 @@ function renderCodeLine(line: string, width: number, lang = ""): string[] {
   const out: string[] = [];
   let rest = bare;
   while (rest.length > 0) {
-    const chunk = graphemeSliceToWidth(rest, limit);
+    const chunk = graphemeSlice(rest, limit);
     rest = rest.slice(chunk.columns === 0 ? 1 : chunk.consumed);
     out.push(bgLine(`  ${rgb(T.green)}${chunk.text}${RESET}`, 2 + chunk.columns));
     if (chunk.columns === 0) break;
@@ -223,31 +223,7 @@ function escapeProse2(text: string): string {
   return stripAnsi(text);
 }
 
-interface SliceResult { text: string; consumed: number; columns: number }
-function graphemeSliceToWidth(text: string, maxWidth: number): SliceResult {
-  let width = 0, consumed = 0, out = "";
-  for (const g of splitGraphemes(text)) {
-    const w = g === "\u200d" || /^[\p{Mn}\p{Me}]/u.test(g) ? 0 : (g.codePointAt(0)! >= 0x1100 && inWide(g.codePointAt(0)!) ? 2 : 1);
-    if (width + w > maxWidth) break;
-    out += g;
-    consumed += g.length;
-    width += w;
-  }
-  return { text: out, consumed, columns: width };
-}
-import { graphemeSlice } from "./width";
-const WIDE_SET = (() => {
-  const ranges: Array<[number, number]> = [
-    [0x1100, 0x115f], [0x2e80, 0xa4cf], [0xa960, 0xa97f], [0xac00, 0xd7a3], [0xf900, 0xfaff],
-    [0xfe30, 0xfe6b], [0xff00, 0xff60], [0xffe0, 0xffe6], [0x1f300, 0x1faff], [0x20000, 0x3fffd],
-  ];
-  return ranges;
-})();
-function inWide(cp: number): boolean {
-  for (const [a, b] of WIDE_SET) if (cp >= a && cp <= b) return true;
-  return false;
-}
-
+import { graphemeSlice } from "./ansi";
 function renderTable(block: string[], width: number): string[] {
   const rows = block.map((l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim()));
   if (rows.length < 2) return block;
