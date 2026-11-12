@@ -5,6 +5,8 @@ import { verifyAudit } from "../cli/audit";
 import { loadConfig, resolveModel, addGlobalMcpServer } from "../config/config";
 import { listEffectiveAliases, refreshModelsCatalog, effectiveModelMap, catalogMeta } from "../config/models-catalog";
 import { loadMcpCatalog, searchMcpServers, mcpConfigSnippet, mcpServerConfig, type McpCatalogEntry } from "../mcp/catalog";
+import { loadSkillsCatalog, searchSkillsCatalog, skillsCatalogMeta } from "../skills/catalog";
+import { installFromRegistry } from "../skills/registry";
 import { visibleWidth, graphemeSlice, stripAnsi as stripAnsiW, splitGraphemes, wrapAnsi } from "./width";
 import { redactSecrets } from "../util/redact";
 import { openExternal } from "../util/open-external";
@@ -94,7 +96,7 @@ const COMMANDS: Cmd[] = [
 
   { name: "/tasks", desc: "the task list (.xminal/todos.json)", group: "Tasks" },
   { name: "/memory", desc: "memory list · add · search · forget", group: "Tasks" },
-  { name: "/skills", desc: "list installed skills", group: "Skills" },
+  { name: "/skills", desc: "browse the skills.sh catalog (20,000 skills · Ctrl+A installs)", group: "Skills" },
   { name: "/skill", desc: "print a skill by name", group: "Skills" },
   { name: "/skills --lock", desc: "lock current skills (.xminal/skills.lock.json)", group: "Skills" },
   { name: "/skills --verify", desc: "verify skills against the lockfile", group: "Skills" },
@@ -230,8 +232,11 @@ type Overlay =
   | { kind: "model"; query: string; index: number }
   | { kind: "variant"; index: number }
   | { kind: "mcp"; query: string; index: number }
+  | { kind: "skills"; query: string; index: number }
   | { kind: "sessions"; query: string; index: number }
   | { kind: "mode"; index: number };
+
+const isSkillsOverlay = (o: Overlay): o is Extract<Overlay, { kind: "skills" }> => o.kind === "skills";
 
 const EFFORTS = ["low", "medium", "high", "max"];
 const modelAliases = (): Array<{ alias: string; provider: string; model: string; free: boolean }> => {
@@ -405,6 +410,7 @@ const sessionRows = (query: string): SessionRow[] => {
   let cursor = 0;
   let scroll = 0;
   let overlay: Overlay = { kind: "none" };
+  const overlayKind = (): Overlay["kind"] => overlay.kind;
   let paletteIndex = 0;
   let pendingPermission: { tool: string; reason: string; resolve: (allow: boolean) => void } | null = null;
   const lines: Line[] = [];
@@ -819,6 +825,44 @@ const sessionRows = (query: string): SessionRow[] => {
       return;
     }
 
+    if (ov.kind === "skills") {
+      const catalog = loadSkillsCatalog();
+      const hits = searchSkillsCatalog(ov.query, { limit: 300 });
+      const { width, top, left } = centerPanel(r, w, Math.min(r - 4, 18));
+      const innerW = width - 2;
+      const lines: string[] = [];
+      lines.push(panelBorder(`skills.sh${ov.query ? ` — ${ov.query}` : ""}`, innerW));
+      if (!catalog) {
+        lines.push(panelSide(`${fgMuted("catalog missing — run scripts/fetch-skills-catalog.py")}`, innerW, C.panel));
+      } else {
+        lines.push(panelSide(`${fgMuted(`${catalog.count.toLocaleString("en-US")} skills · type to search`)}`, innerW, C.panel));
+        const visible = Math.max(1, Math.min(12, r - 8));
+        const maxIndex = Math.max(0, hits.length - 1);
+        const index = Math.min(paletteIndex, maxIndex);
+        ov.index = index;
+        const start = Math.max(0, Math.min(Math.max(0, hits.length - visible), index - Math.floor(visible / 2)));
+        const repoW = Math.max(8, innerW - 32);
+        for (let i = start; i < Math.min(hits.length, start + visible); i++) {
+          const entry = hits[i];
+          const selected = i === index;
+          const name = entry.name.length > 24 ? entry.name.slice(0, 23) + "…" : entry.name;
+          const repo = `${entry.owner}/${entry.repo}`;
+          const dimmed = repo.length > repoW ? repo.slice(0, repoW - 1) + "…" : repo;
+          const row = `${fgAccent(name.padEnd(24))}${fgMuted(dimmed.padEnd(repoW))}`;
+          lines.push(panelSide(selected ? `${bgRgb(C.panel3)}${row}${RESET}` : row, innerW, C.panel));
+        }
+        if (hits.length === 0) lines.push(panelSide(`${fgMuted("no matches")}`, innerW, C.panel));
+      }
+      lines.push(panelSide(`${fgMuted("↑↓ select · type to filter · Enter details · Ctrl+A install · Esc close")}`, innerW, C.panel));
+      lines.push(panelBottom(width));
+      for (let i = 0; i < lines.length; i++) {
+        const y = top + i;
+        if (y < 0 || y >= r) continue;
+        frame[y] = lines[i];
+      }
+      return;
+    }
+
     if (ov.kind === "mcp") {
       const catalog = loadMcpCatalog();
       const hits = searchMcpServers(ov.query, { limit: 300 });
@@ -1159,6 +1203,13 @@ const sessionRows = (query: string): SessionRow[] => {
     }
     if (name === "/variant" || name == "/effort" || name === "/reasoning") { overlay = { kind: "variant", index: 3 }; input = ""; cursor = 0; render(); return true; }
     if (name === "/mcp") { overlay = { kind: "mcp", query: "", index: 0 }; input = ""; cursor = 0; render(); return true; }
+    if (name === "/skills") {
+      // bare /skills browses the 20,000-skill skills.sh catalog; "/skills --lock"
+      // and friends keep the classic flag-style handler
+      if (parts.length <= 1) { overlay = { kind: "skills", query: "", index: 0 }; input = ""; cursor = 0; render(); return true; }
+      void runClassicInTui(cmdLine);
+      return true;
+    }
     if (name === "/new") {
       switchSession({ newSession: true });
       lines.length = 0;
@@ -1458,7 +1509,9 @@ const sessionRows = (query: string): SessionRow[] => {
     render();
   };
 
-  const overlayUp = () => { if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "mcp" || overlay.kind === "sessions" || overlay.kind === "mode") { paletteIndex = Math.max(0, paletteIndex - 1); } else if (overlay.kind === "provider") { overlay.index = Math.max(0, overlay.index - 1); } else if (overlay.kind === "variant") { overlay.index = Math.max(0, overlay.index - 1); } };
+
+
+  const overlayUp = () => { if (overlay.kind === "palette" || overlay.kind === "model" || overlay.kind === "mcp" || overlay.kind === "skills" || overlay.kind === "sessions" || overlay.kind === "mode") { paletteIndex = Math.max(0, paletteIndex - 1); } else if (overlay.kind === "provider") { overlay.index = Math.max(0, overlay.index - 1); } else if (overlay.kind === "variant") { overlay.index = Math.max(0, overlay.index - 1); } };
   const overlayDown = () => {
     if (overlay.kind === "mode") {
       paletteIndex = Math.min(4, paletteIndex + 1);
@@ -1471,6 +1524,11 @@ const sessionRows = (query: string): SessionRow[] => {
     }
     if (overlay.kind === "mcp") {
       const count = searchMcpServers(overlay.query, { limit: 300 }).length;
+      paletteIndex = Math.min(Math.max(0, count - 1), paletteIndex + 1);
+      return;
+    }
+    if (isSkillsOverlay(overlay)) {
+      const count = searchSkillsCatalog(overlay.query, { limit: 300 }).length;
       paletteIndex = Math.min(Math.max(0, count - 1), paletteIndex + 1);
       return;
     }
@@ -1607,6 +1665,18 @@ const sessionRows = (query: string): SessionRow[] => {
       render();
       return true;
     }
+    if (isSkillsOverlay(overlay)) {
+      const hits = searchSkillsCatalog(overlay.query, { limit: 300 });
+      const entry = hits[Math.min(paletteIndex, Math.max(0, hits.length - 1))];
+      overlay = { kind: "none" };
+      if (entry) {
+        pushLine("system", `${fgAccent(entry.name)} ${fgMuted(`· ${entry.owner}/${entry.repo}`)}`);
+        pushLine("system", `${fgMuted(`${entry.url}`)}`);
+        pushLine("system", fgMuted("Ctrl+A installs it into this project → .xminal/skills/"));
+      }
+      render();
+      return true;
+    }
     return false;
   };
 
@@ -1702,6 +1772,7 @@ const sessionRows = (query: string): SessionRow[] => {
         if (overlay.kind === "provider-key") { overlay.input = overlay.input.slice(0, overlay.input.length - 1); render(); return; }
         if (overlay.kind === "model") { overlay.query = overlay.query.slice(0, overlay.query.length - 1); paletteIndex = 0; render(); return; }
         if (overlay.kind === "mcp") { overlay.query = overlay.query.slice(0, overlay.query.length - 1); paletteIndex = 0; render(); return; }
+        if (isSkillsOverlay(overlay)) { overlay.query = overlay.query.slice(0, overlay.query.length - 1); paletteIndex = 0; render(); return; }
         if (overlay.kind === "sessions") { overlay.query = overlay.query.slice(0, overlay.query.length - 1); paletteIndex = 0; render(); return; }
         input = input.slice(0, cursor - 1) + input.slice(cursor);
         cursor -= 1;
@@ -1711,22 +1782,45 @@ const sessionRows = (query: string): SessionRow[] => {
       return;
     }
     if (s === "\x10") { overlay = overlay.kind === "palette" ? { kind: "none" } : { kind: "palette", index: 0 }; render(); return; } // Ctrl+P
-    if (s === "\x01" && overlay.kind === "mcp") {
-      // Ctrl+A: add the highlighted catalog entry to ~/.xminal/config.json
-      const hits = searchMcpServers(overlay.query, { limit: 300 });
-      const entry = hits[Math.min(paletteIndex, Math.max(0, hits.length - 1))];
-      if (!entry) { pushLine("system", fgMuted("nothing to add")); render(); return; }
-      const key = entry.id.replace(/[^a-zA-Z0-9_-]/g, "-");
-      try {
-        const saved = addGlobalMcpServer(key, mcpServerConfig(entry));
-        pushLine("system", `${fgGreen("added")} ${fgMuted(`${key} → ${saved.path}${saved.backup ? ` (backup: ${saved.backup})` : ""}`)}`);
-        pushLine("system", fgMuted("disabled on purpose — copy the run command from the README, then set \"enabled\": true"));
-      } catch (error) {
-        pushLine("err", (error as Error).message);
+    if (s === "\x01") { // Ctrl+A — install/add the highlighted catalog entry
+      if (isSkillsOverlay(overlay)) {
+        const hits = searchSkillsCatalog(overlay.query, { limit: 300 });
+        const entry = hits[Math.min(paletteIndex, Math.max(0, hits.length - 1))];
+        if (!entry) { pushLine("system", fgMuted("nothing to install")); render(); return; }
+        overlay = { kind: "none" };
+        pushLine("system", `${fgMuted("installing ")}${fgAccent(entry.id)}${fgMuted(" from GitHub…")}`);
+        render();
+        void installFromRegistry(cwd, entry).then(
+          (result) => {
+            pushLine("ok", `installed ${result.name} → ${result.destination.replace(process.cwd() + "/", "")} (${result.fileCount} files)`);
+            pushLine("system", fgMuted(`computedHash (v2): ${result.computedHash.slice(0, 16)}…`));
+            render();
+          },
+          (error) => {
+            pushLine("err", `skill install failed: ${(error as Error)?.message ?? String(error)}`);
+            render();
+          },
+        );
+        return;
       }
-      render();
+      if (overlay.kind === "mcp") {
+        const hits = searchMcpServers(overlay.query, { limit: 300 });
+        const entry = hits[Math.min(paletteIndex, Math.max(0, hits.length - 1))];
+        if (!entry) { pushLine("system", fgMuted("nothing to add")); render(); return; }
+        const key = entry.id.replace(/[^a-zA-Z0-9_-]/g, "-");
+        try {
+          const saved = addGlobalMcpServer(key, mcpServerConfig(entry));
+          pushLine("system", `${fgGreen("added")} ${fgMuted(`${key} → ${saved.path}${saved.backup ? ` (backup: ${saved.backup})` : ""}`)}`);
+          pushLine("system", fgMuted("disabled on purpose — copy the run command from the README, then set \"enabled\": true"));
+        } catch (error) {
+          pushLine("err", (error as Error).message);
+        }
+        render();
+        return;
+      }
       return;
     }
+
 
     // split embedded newlines and dispatch each segment
     let rest = s;
@@ -1744,7 +1838,7 @@ const sessionRows = (query: string): SessionRow[] => {
             render();
             return;
           }
-          if (overlay.kind === "mcp") {
+          if (overlay.kind === "mcp" || isSkillsOverlay(overlay)) {
             for (const ch of rest) if (ch >= " " && ch !== "\x7f") { overlay.query += ch; paletteIndex = 0; }
             render();
             return;

@@ -693,31 +693,30 @@ export async function handleCommand(input: string, ctx: CommandContext): Promise
     }
 
     case "skill-search": {
-      // search the skills.sh registry (live, or the 24h disk cache)
+      // search the offline skills.sh catalog (ships in the package)
       const query = rest.trim();
       if (!query) {
         renderer.warn("Usage: /skill-search <query>");
         return true;
       }
-      try {
-        const { fetchRegistryIndex, searchRegistry } = await import("../skills/registry");
-        renderer.status("searching the skills.sh registry…");
-        const index = await fetchRegistryIndex();
-        const hits = searchRegistry(index, query, 12);
-        if (hits.length === 0) renderer.info(`(no matches for "${query}" in the registry)`);
-        for (const hit of hits) {
-          renderer.status(`${hit.skill}  ·  ${hit.owner}/${hit.repo}`);
-          renderer.info(`   ${hit.url}`);
-        }
-        renderer.info(`${hits.length} match(es) · install with: /skill-install ${hits[0]?.skill ?? "<name>"}`);
-      } catch (error) {
-        renderer.error((error as Error).message);
+      const { loadSkillsCatalog, searchSkillsCatalog, skillsCatalogMeta } = await import("../skills/catalog");
+      const meta = skillsCatalogMeta();
+      if (!meta) {
+        renderer.warn("the offline skills catalog is missing from this build");
+        return true;
       }
+      const hits = searchSkillsCatalog(query, { limit: 12 });
+      if (hits.length === 0) renderer.info(`(no matches for "${query}" in ${meta.count.toLocaleString("en-US")} skills)`);
+      for (const hit of hits) {
+        renderer.status(`${hit.name}  ·  ${hit.owner}/${hit.repo}`);
+        renderer.info(`   ${hit.url}`);
+      }
+      if (hits.length > 0) renderer.info(`${hits.length} match(es) · install with: /skill-install ${hits[0]?.name ?? "<name>"}`);
       return true;
     }
 
     case "skill-install": {
-      // install a skill from the skills.sh registry by name
+      // install a skill from the skills.sh catalog by name (or full id)
       const parts = rest.trim().split(/\s+/).filter(Boolean);
       const globalFlag = parts.includes("--global") || parts.includes("-g");
       const name = parts.find((p) => !p.startsWith("-"));
@@ -725,17 +724,18 @@ export async function handleCommand(input: string, ctx: CommandContext): Promise
         renderer.warn("Usage: /skill-install <name> [--global]   (search first with /skill-search)");
         return true;
       }
+      const { searchSkillsCatalog } = await import("../skills/catalog");
+      const { installFromRegistry } = await import("../skills/registry");
+      const hits = searchSkillsCatalog(name, { limit: 25 });
+      const exact = hits.filter((hit) => hit.name.toLowerCase() === name.toLowerCase() || hit.id.toLowerCase() === name.toLowerCase());
+      const chosen = exact[0] ?? hits[0];
+      if (!chosen) {
+        renderer.warn(`no catalog skill matches "${name}" — try /skill-search ${name}`);
+        return true;
+      }
+      if (exact.length === 0) renderer.warn(`no exact match for "${name}" — installing the closest: ${chosen.id}`);
       try {
-        const { fetchRegistryIndex, searchRegistry, installFromRegistry } = await import("../skills/registry");
-        renderer.status(`installing skill "${name}"…`);
-        const index = await fetchRegistryIndex();
-        const matches = searchRegistry(index, name, 5).filter((hit) => hit.skill.toLowerCase() === name.toLowerCase());
-        const chosen = matches[0] ?? searchRegistry(index, name, 1)[0];
-        if (!chosen) {
-          renderer.warn(`no registry skill matches "${name}" — try /skill-search ${name}`);
-          return true;
-        }
-        if (matches.length === 0) renderer.warn(`no exact match for "${name}" — installing the closest: ${chosen.skill} (${chosen.repo})`);
+        renderer.status(`installing ${chosen.id}…`);
         const result = await installFromRegistry(runtime.cwd, chosen, { global: globalFlag });
         renderer.success(`installed ${result.name} → ${result.destination} (${result.fileCount} files)`);
         renderer.info(`computedHash (v2): ${result.computedHash}`);

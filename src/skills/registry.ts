@@ -20,8 +20,16 @@ import { ensureDir, exists } from "../util/fs";
 export interface RegistrySkill {
   readonly owner: string;
   readonly repo: string;
+  /** the skill name — catalogs may call it `skill` (sitemap) or `name` */
   readonly skill: string;
   readonly url: string;
+}
+
+/** Accept either shape (offline catalog entries use `name`). */
+export function toRegistrySkill(entry: { owner: string; repo: string; url: string; skill?: string; name?: string }): RegistrySkill {
+  const skill = entry.skill ?? entry.name;
+  if (!skill) throw new Error("catalog entry is missing the skill name");
+  return { owner: entry.owner, repo: entry.repo, skill, url: entry.url };
 }
 
 const SITEMAP_SOURCES = (n: number): string[] =>
@@ -278,24 +286,25 @@ export interface InstallOptions {
  */
 export async function installFromRegistry(
   cwd: string,
-  skill: RegistrySkill,
+  skill: RegistrySkill | { owner: string; repo: string; url: string; skill?: string; name?: string },
   options: InstallOptions = {},
 ): Promise<RegistryInstallResult> {
+  const { owner, repo, skill: skillName, url } = toRegistrySkill(skill);
   const fetchImpl = options.fetchImpl ?? (fetch as unknown as FetchLike);
-  const codeload = `https://codeload.github.com/${encodeURIComponent(skill.owner)}/${encodeURIComponent(skill.repo)}/tar.gz/HEAD`;
+  const codeload = `https://codeload.github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/tar.gz/HEAD`;
   const response = await fetchImpl(codeload);
   if (!response.ok) {
-    throw new Error(`GitHub returned ${response.status} for ${skill.owner}/${skill.repo} — check the repository exists and is public`);
+    throw new Error(`GitHub returned ${response.status} for ${owner}/${repo} — check the repository exists and is public`);
   }
   const tarball = Buffer.from(await response.arrayBuffer());
   const entries = parseTar(gunzip(tarball));
-  const { files } = extractSkill(entries, skill.skill);
+  const { files } = extractSkill(entries, skillName);
   const hash = computedHashV2(files);
 
   const skillsRoot = options.global
     ? path.join(options.homeDir ?? os.homedir(), ".xminal", "skills")
     : projectSkillsDir(cwd);
-  const destination = path.join(skillsRoot, skill.skill);
+  const destination = path.join(skillsRoot, skillName);
   ensureDir(skillsRoot);
   fs.rmSync(destination, { recursive: true, force: true });
   for (const file of files) {
@@ -314,10 +323,10 @@ export async function installFromRegistry(
     const lockPath = path.join(cwd, ".xminal", "skills.lock.v2.json");
     const previous = exists(lockPath) ? (JSON.parse(fs.readFileSync(lockPath, "utf8") || "{}") as Record<string, unknown>) : {};
     const skills = { ...((previous.skills as Record<string, unknown>) ?? {}) };
-    skills[skill.skill] = {
+    skills[skillName] = {
       computedHash: hash,
-      source: `https://github.com/${skill.owner}/${skill.repo}`,
-      url: skill.url,
+      source: `https://github.com/${owner}/${repo}`,
+      url: url,
       installedAt: new Date().toISOString(),
     };
     fs.mkdirSync(path.dirname(lockPath), { recursive: true });
@@ -327,9 +336,9 @@ export async function installFromRegistry(
   }
 
   return {
-    name: skill.skill,
+    name: skillName,
     destination,
-    source: `https://github.com/${skill.owner}/${skill.repo}`,
+    source: `https://github.com/${owner}/${repo}`,
     computedHash: hash,
     fileCount: files.length,
   };

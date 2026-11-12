@@ -4,6 +4,24 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.24.0] — 2026-11-12
+
+**The skills.sh catalog — 20,000 skills, offline, searchable from everywhere.**
+
+### Added
+
+- **The whole skills.sh registry ships in the package** (`data/skills-catalog.json`, built from the public skills.sh sitemaps by `scripts/fetch-skills-catalog.py` — 20,000 skills, 1 MB minified) and is **searchable offline** everywhere the MCP catalog already was.
+- **`/skills` opens the skills.sh catalog overlay in the TUI** (a direct analogue of `/mcp`): type to filter, `↑↓` to move, `Enter` for details, `Ctrl+A` to install into `.xminal/skills/`. No network needed to browse or search.
+- **`skill_registry_search`** is now backed by the offline catalog (was: live fetch of the sitemap). **`skill_install`** finds the exact entry and downloads the GitHub tarball (no npx, no Node 22, no OIDC).
+- **`xminal skills search <query>`** and **`/skill-search`** use the offline catalog; **`xminal skills install`** and **`/skill-install`** accept the exact name or the full `owner/repo/skill` id.
+- **Install by id**: `xminal skills install mattpocock/skills/tdd` installs that exact skill without guessing.
+- **Tests**: the catalog has its own suite (20,000 entries present, ids well-formed, `tdd` lands on `mattpocock/skills/tdd`, meta reports count and fetch date) and the TUI e2e harness feeds the script robustly (one line per 300 ms tick so a lone Esc never coalesces with printable text).
+
+### Changed
+
+- **E2E harness stability**: the TUI end-to-end test no longer races the boot render; each script line is written 300 ms apart.
+- **`/skills` (bare) now opens the catalog overlay** — `/skills --lock` and `/skills --verify` keep the classic flag-style handler.
+
 ## [0.23.1] — 2026-11-12
 
 **The rendering bug that broke every inline code span — and screenshots proof it.**

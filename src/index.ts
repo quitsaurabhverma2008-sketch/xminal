@@ -93,16 +93,17 @@ async function main(): Promise<void> {
           process.exitCode = 1;
           return;
         }
-        // a non-path, non-git-url target is a skills.sh registry skill name
+        // a non-path, non-git-url target is a skills.sh catalog skill name (or id)
         const looksLocal = fs.existsSync(path.resolve(cwd, target)) || fs.existsSync(target) || /^(https?:\/\/|git@|ssh:\/\/).+|^.*\.git$/i.test(target);
         if (!looksLocal) {
           try {
-            const { fetchRegistryIndex, searchRegistry, installFromRegistry } = await import("./skills/registry");
-            const index = await fetchRegistryIndex();
-            const exact = searchRegistry(index, target, 25).filter((hit) => hit.skill.toLowerCase() === target.toLowerCase());
-            const chosen = exact[0] ?? searchRegistry(index, target, 1)[0];
+            const { searchSkillsCatalog } = await import("./skills/catalog");
+            const { installFromRegistry } = await import("./skills/registry");
+            const hits = searchSkillsCatalog(target, { limit: 25 });
+            const exact = hits.filter((hit) => hit.name.toLowerCase() === target.toLowerCase() || hit.id.toLowerCase() === target.toLowerCase());
+            const chosen = exact[0] ?? hits[0];
             if (!chosen) {
-              console.error(`no skills.sh registry skill matches "${target}" — try: xminal skills search ${target}`);
+              console.error(`no skills.sh catalog skill matches "${target}" — try: xminal skills search ${target}`);
               process.exitCode = 1;
               return;
             }
@@ -131,17 +132,12 @@ async function main(): Promise<void> {
           process.exitCode = 1;
           return;
         }
-        try {
-          const { fetchRegistryIndex, searchRegistry } = await import("./skills/registry");
-          const index = await fetchRegistryIndex();
-          const hits = searchRegistry(index, query, 12);
-          if (hits.length === 0) console.log(`(no matches for "${query}")`);
-          for (const hit of hits) console.log(`${hit.skill}  ·  ${hit.owner}/${hit.repo}\n    ${hit.url}`);
-          console.log(`install with: xminal skills install <name>`);
-        } catch (error) {
-          console.error((error as Error).message);
-          process.exitCode = 1;
-        }
+        const { searchSkillsCatalog, skillsCatalogMeta } = await import("./skills/catalog");
+        const meta = skillsCatalogMeta();
+        const hits = searchSkillsCatalog(query, { limit: 12 });
+        if (hits.length === 0) console.log(`(no matches for "${query}" in ${meta?.count.toLocaleString("en-US") ?? "?"} skills)`);
+        for (const hit of hits) console.log(`${hit.name}  ·  ${hit.owner}/${hit.repo}\n    ${hit.url}`);
+        if (hits.length > 0) console.log(`install with: xminal skills install <name>`);
         return;
       }
       if (args.flags.lock) {

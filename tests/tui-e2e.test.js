@@ -47,10 +47,18 @@ function runTuiRaw(script, { timeout = 30000 } = {}) {
       clearTimeout(timer);
       resolve(out);
     });
-    // let the first frame render, then feed the script
+    // let the first frame render AND the boot animation finish (~1.4s), then
+    // feed the script — one line per tick so a lone Esc never shares a chunk
     setTimeout(() => {
-      for (const line of script) child.stdin.write(line);
-    }, 900);
+      let i = 0;
+      const tick = () => {
+        if (i >= script.length) return;
+        child.stdin.write(script[i]);
+        i += 1;
+        if (i < script.length) setTimeout(tick, 300);
+      };
+      tick();
+    }, 1700);
   });
 }
 
@@ -108,8 +116,10 @@ test("the TUI boots and renders the opencode-style frame", async () => {
 });
 
 test("a slash command runs inside the TUI instead of leaving the alternate screen", async () => {
-  const out = await runTui(["/skills\r", "/exit\r"]);
-  assert.ok(/no skills installed|skills?\b.*·/i.test(out), `/skills did not run in the TUI:\n${out.slice(-800)}`);
+  // /skills opens the catalog overlay; Esc closes it; /exit quits the TUI
+  // Esc alone (its own \r-segment) closes the overlay; /exit quits
+  const out = await runTui(["/skills\r", "\x1b", "/exit\r"]);
+  assert.ok(/20,000 skills|skills\.sh/i.test(out), `/skills did not open the catalog overlay:\n${out.slice(-800)}`);
   // the classic path leaves the alternate screen (mode 1049) — the native one does not
   const raw = out.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
   assert.ok(!raw.includes("[?1049l"), "the TUI left the alternate screen");

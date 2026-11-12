@@ -105,9 +105,11 @@ canvas renderer, so the animation above is a real render of the page, not a mock
 - Every entry carries platform availability: `LINUX` · `WINDOWS` · `MOBILE` (Termux/Android counts as mobile)
 - In the TUI: `/mcp` opens the searchable catalog, `Enter` shows the details plus the `mcpServers` snippet, `Ctrl+A` writes the entry into `~/.xminal/config.json` (disabled, with a backup). The model can also search it itself (`mcp_search`) and register an entry (`mcp_add`, disabled, approval-gated).
 
-### Skills (skills.sh registry)
-- **Search 10,000+ public skills** from the terminal or the agent: `xminal skills search <query>` · `/skill-search` · the `skill_registry_search` tool
-- **Install without npx or Node 22**: `xminal skills install <name>` downloads the GitHub tarball, extracts the skill folder (path-traversal guarded, symlinks refused), records a **v2 `computedHash`** in `.xminal/skills.lock.v2.json` (SHA-256 over `path\0byteLen\0content`, compatible with skills.sh v2). The offline index is cached for 24h (`~/.xminal/skills-index.json`)
+### Skills (skills.sh — 20,000+ skills, fully offline)
+- **Browse the whole skills.sh registry from the TUI**: `/skills` opens a searchable catalog overlay (20,000 skills — type to filter, `↑↓` to move, `Enter` for details, `Ctrl+A` to install into `.xminal/skills/`)
+- **Search from the terminal or the agent**: `xminal skills search <query>` · `/skill-search` · the `skill_registry_search` tool — all offline, no network needed
+- **Install without npx or Node 22**: `xminal skills install <name>` (or `/skill-install`, or the `skill_install` tool) downloads the GitHub tarball, extracts the skill folder (path-traversal guarded, symlinks refused), records a **v2 `computedHash`** in `.xminal/skills.lock.v2.json` (SHA-256 over `path\0byteLen\0content`, compatible with skills.sh v2)
+- The catalog is a data file (`data/skills-catalog.json`, built from the public skills.sh sitemaps by `scripts/fetch-skills-catalog.py`, ships in the package and is searched entirely offline)
 - From the shell: `xminal mcp search pdf --platform mobile`
 
 ### Sessions

@@ -52,7 +52,7 @@ screen, sidebar, Markdown rendering, diff-tinted tool output, mouse capture.
 | `y` / `N` | answer the permission prompt |
 
 Overlays: command palette, `/model`, `/provider` (key wizard), `/variant`
-(effort), `/mcp` (catalog), `/sessions` (session picker).
+(effort), `/mcp` (catalog), `/skills` (skills.sh catalog), `/sessions` (session picker).
 
 Notes:
 
@@ -61,8 +61,11 @@ Notes:
   tap-to-scroll in Termux — there it starts off and `XMINAL_MOUSE=1` turns it
   on. `XMINAL_MOUSE=0` turns it off anywhere.
 - Slash commands the TUI does not implement natively (`/verify`, `/memory`,
-  `/skills`, `/git`, …) run through the classic renderer **inside the
+  `/git`, …) run through the classic renderer **inside the
   alternate screen** — no leave/return flicker; you stay in the same session.
+  (`/skills` is native: it opens the skills.sh catalog overlay — `↑↓` move,
+  type to filter, `Enter` shows details, `Ctrl+A` installs into
+  `.xminal/skills/`.)
 
 ## The message-layout contract
 
