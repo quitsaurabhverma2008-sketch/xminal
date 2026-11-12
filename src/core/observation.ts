@@ -11,6 +11,7 @@
  * Pure functions, no I/O: everything here is unit-testable.
  */
 import type { ToolResult } from "../tools/types";
+import { stripAnsi } from "../util/ansi";
 
 export type ObservationOutcome = "ok" | "failed" | "empty" | "timeout" | "denied" | "error";
 
@@ -71,7 +72,9 @@ export function renderObservation(result: ToolResult, options: ObservationOption
   else if (isError && exitCode !== 0) outcome = "failed";
   else if (isError) outcome = "error";
 
-  const body = result.content ?? "";
+  // tool output must never reach the model with raw ANSI bytes — the model
+  // echoes them back mangled, wastes tokens, and garbles the reply
+  const body = stripAnsi(result.content ?? "");
   const clipped = clipOutput(body, maxChars);
   const truncated = clipped.elided > 0;
   // "no output" means the command produced no stdout/stderr — the shell tool

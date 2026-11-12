@@ -4,6 +4,22 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.23.1] — 2026-11-12
+
+**The rendering bug that broke every inline code span — and screenshots proof it.**
+
+### Fixed
+
+- **`wrapAnsi` split SGR escape sequences mid-token**: a token with zero visible width (a pure escape sequence — e.g. the inline-code background) was treated as "a word wider than the whole line", so the lone ESC byte was emitted as its own row and the sequence body printed as literal text — every inline-code span in a long line broke the layout and leaked raw `[48;2;30;30;30m`-style output into the screen. Slices that consume only escapes are now accepted verbatim.
+- **Tool output no longer reaches the model with raw ANSI bytes** — `renderObservation` strips every escape sequence before the model sees it, so the model can no longer echo terminal escapes back into its reply. The shared `util/ansi.ts` `stripAnsi` was upgraded to the full grammar (CSI, colon-SGR, OSC→BEL/ST, single-char ESC) to match; the observation path uses it.
+- **The built-in TUI palettes are now covered by a golden-frame snapshot** (`tests/golden/palette.txt`, `tests/tui-e2e.test.js`): the settled `/help` frame is compared byte-for-byte after normalizing the volatile spans (workspace path, token/cost counters, placeholder rotation). Regenerate with `UPDATE_GOLDEN=1 node tests/tui-e2e.test.js`.
+
+### Changed
+
+- **Layout contract**: the six indent conventions are now named constants in `src/tui/chat-lines.ts` (`CONTENT_COL`, `RULE_COL`, `DETAIL_COL`, `RULE`, `BODY_COL`, `CONTINUATION`) and documented in `docs/FRONTENDS.md`.
+- **README screenshots regenerated** from the live TUI with the wrapAnsi fix (inline code with backgrounds now renders correctly).
+- **`wrapAnsi` shows zero-width tokens attached** instead of pushing the lone ESC byte as its own row.
+
 ## [0.23.0] — 2026-11-12
 
 **The rendering pass: opencode's ± diff bands, a code-fence gutter with continuation markers, a rendered-cell table grid — and one provider catalog.**

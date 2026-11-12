@@ -175,22 +175,23 @@ export function wrapAnsi(text: string, width: number): string[] {
       while (rest.length > 0) {
         const room = Math.max(1, width - columns);
         const slice = sliceToWidth(rest, room);
-        if (slice.columns === 0) {
-          // the word alone is wider than the whole line
+        if (slice.columns === 0 && slice.consumed === 0) {
+          // a single grapheme wider than the budget is kept whole — a
+          // grapheme is indivisible, and splitting it would corrupt it
+          const grapheme = splitGraphemes(rest)[0];
+          if (!grapheme) break;
           if (columns > 0) {
             lines.push(current.replace(/\s+$/, ""));
             current = "";
             columns = 0;
             continue;
           }
-          // a single grapheme wider than the budget is kept whole — a
-          // grapheme is indivisible, and splitting it would corrupt it
-          const grapheme = splitGraphemes(rest)[0];
-          if (!grapheme) break;
           lines.push(grapheme);
           rest = rest.slice(grapheme.length);
           continue;
         }
+        // slices that consume only escape sequences add no width — they are
+        // always accepted verbatim, never treated as an over-budget word
         current += slice.text;
         columns += slice.columns;
         rest = rest.slice(slice.consumed);

@@ -43,8 +43,14 @@ export const ansi = {
   },
 };
 
+const CSI = /\x1b\[[0-9;:?<>= ]*[ -/]*[@-~]/g;
+const OSC = /\x1b\][^\x07]*?(?:\x07|\x1b\\)/g;
+const ESC = /\x1b./g;
+
+/** Remove every escape sequence (CSI, OSC/BEL or ST, single-char ESC). */
 export function stripAnsi(text: string): string {
-  return text.replace(/\u001b\[[0-9;]*m/g, "");
+  if (!text) return "";
+  return text.replace(OSC, "").replace(CSI, "").replace(ESC, "");
 }
 
 function visibleLength(text: string): number {

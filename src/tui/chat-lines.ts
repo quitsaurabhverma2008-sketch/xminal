@@ -15,6 +15,25 @@ import { renderActivity, toolTarget, type ActivityLine } from "./output/tool-act
 import { visibleWidth, stripAnsi as stripAnsiW, wrapAnsi } from "./ansi";
 import { redactSecrets } from "../util/redact";
 
+/**
+ * The message-layout contract — the six indent conventions the renderer
+ * honours (documented in docs/FRONTENDS.md):
+ *
+ *   1. user panel       bar at col 0, text at col 3, 2-col symmetry
+ *   2. assistant body    col 3
+ *   3. reasoning         rule at col 3, body at col 5
+ *   4. tool rows         glyph at col 3, continuation at col 5
+ *   5. tool error detail at col 5
+ *   6. ok/err/system     col 3 (+ tinted diff rows re-join col 0)
+ */
+export const CONTENT_COL = 3;
+export const USER_TEXT_COL = 3;
+export const RULE_COL = 3;
+export const BODY_COL = 5;
+export const DETAIL_COL = 5;
+export const RULE = "┃"; // U+2503, opencode's heavy vertical rule
+export const CONTINUATION = "↪"; // wrapped code line marker
+
 export type LineKind = "user" | "assistant" | "reasoning" | "tool" | "ok" | "err" | "system";
 
 export interface Line {
@@ -61,7 +80,7 @@ export function renderStyledLine(line: Line, w: number, options: { mode?: string
       // opencode block tool: ┃ rule at content col 0, raised panel, text at col 3
       const cardW = Math.max(8, w);
       const cmd = toolTarget(a.name, a.argsRaw, cardW - 4);
-      const rule = `${rgb(T.bg)}┃${RESET}`;
+      const rule = `${rgb(T.bg)}${RULE}${RESET}`;
       const fill = bgRgb(T.panel);
       const card = (body: string) =>
         `${rule}${fill}  ${keepBg(fill, body)}${" ".repeat(Math.max(0, cardW - 4 - visible(body)))}${RESET}`;
@@ -79,7 +98,7 @@ export function renderStyledLine(line: Line, w: number, options: { mode?: string
     // and ± rows get the diff background bands (#20303b / #37222c)
     if (a.preview && a.preview.length) {
       const cardW = Math.max(8, w);
-      const rule = `${rgb(T.bg)}┃${RESET}`;
+      const rule = `${rgb(T.bg)}${RULE}${RESET}`;
       const panel = bgRgb(T.panel);
       const addBg = bgRgb(T.diffAddedBg);
       const remBg = bgRgb(T.diffRemovedBg);
@@ -98,9 +117,9 @@ export function renderStyledLine(line: Line, w: number, options: { mode?: string
       }
       return rows;
     }
-    const out: string[] = renderActivity(a, Math.max(8, w - 5)).map((row) => `   ${row}`);
+    const out: string[] = renderActivity(a, Math.max(8, w - BODY_COL)).map((row) => `${" ".repeat(CONTENT_COL)}${row}`);
     if (a.status === "err" && a.detail) {
-      out.push(`     ${fgMuted(redactSecrets(a.detail).text)}`);
+      out.push(`${" ".repeat(DETAIL_COL)}${fgMuted(redactSecrets(a.detail).text)}`);
     }
     return out;
   }
@@ -110,9 +129,9 @@ export function renderStyledLine(line: Line, w: number, options: { mode?: string
     const inner = Math.max(4, w - 1);
     const textW = Math.max(4, inner - 4);
     const fill = bgRgb(T.panel);
-    const padRow = `${bar}┃${fill}${" ".repeat(inner)}${RESET}`;
+    const padRow = `${bar}${RULE}${fill}${" ".repeat(inner)}${RESET}`;
     const bodyRows = wrap(line.text, textW).map(
-      (part) => `${bar}┃${fill}  ${rgb(T.text)}${part}${" ".repeat(Math.max(0, inner - 4 - visible(part)))}${RESET}`,
+      (part) => `${bar}${RULE}${fill}  ${rgb(T.text)}${part}${" ".repeat(Math.max(0, inner - 4 - visible(part)))}${RESET}`,
     );
     return [padRow, ...bodyRows, padRow];
   }
@@ -120,21 +139,21 @@ export function renderStyledLine(line: Line, w: number, options: { mode?: string
   if (line.kind === "assistant") {
     const clean = formatMemo(line.text);
     const body = mdMemo(clean, Math.max(4, w - 3));
-    return body.map((row) => `   ${row}`);
+    return body.map((row) => `${" ".repeat(CONTENT_COL)}${row}`);
   }
   // ── reasoning — opencode: ┃ rule at col 3, body at col 5
   if (line.kind === "reasoning") {
     const inner = Math.max(4, w - 6);
     const rows = wrap(line.text, Math.max(4, inner));
     // opencode: the reasoning rule uses the warning colour
-    return rows.map((part) => `   ${fgAmber("┃")} ${fgMuted(part)}`);
+    return rows.map((part) => `${" ".repeat(RULE_COL)}${fgAmber(RULE)} ${fgMuted(part)}`);
   }
   // ── everything else (ok/err/system) — quiet, indented at col 3
   const color = line.kind === "err" ? fgRed : line.kind === "ok" ? fgGreen : fgMuted;
   const safe = redactSecrets(line.text).text;
   const out: string[] = [];
   for (const part of wrap(safe, Math.max(4, w - 3))) {
-    out.push(`   ${color(part)}`);
+    out.push(`${" ".repeat(CONTENT_COL)}${color(part)}`);
   }
   if ((line.kind === "ok" || line.kind === "err") && isLikelyDiff(line.text)) {
     return diffTint(out);

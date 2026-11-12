@@ -1,0 +1,18 @@
++- Commands -------------------------------------------------------------------+
+│ /new           SESSION  start a new session                                   │
+│ /resume       SESSION  resume previous session                                │
+│ /sessions     SESSION  list all sessions                                      │
+│ /rename       SESSION  rename the current session                             │
+│ /branch       SESSION  branch session into alternate history                  │
+│ /rewind       SESSION  restore a checkpoint                                   │
+│ /checkpoints  SESSION  list checkpoints                                       │
+│ /undo         SESSION  undo last file edit                                    │
+│ /mode         AGENT  switch plan/build/compose/review/yolo                    │
+│ /model        AGENT  pick default model                                       │
+│ /models       AGENT  list all model aliases                                   │
+│ /variant      AGENT  set effort (low/medium/high/max)                         │
+│ /effort       AGENT  alias for /variant                                       │
+│ /reasoning    AGENT  alias for /variant                                       │
+│ /provider     PROVIDERS  pick provider → enter API key → save                 │
+│                                                                               │
+│ ↑↓ select  ·  type to filter  ·  PgUp/PgDn scroll  ·  Enter run  ·  Esc close │

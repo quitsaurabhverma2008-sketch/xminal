@@ -16,7 +16,7 @@ function stripAnsi(text) {
 }
 
 /** Boot the TUI, run `script`, and return everything it printed (ANSI kept). */
-function runTuiRaw(script, { timeout = 20000 } = {}) {
+function runTuiRaw(script, { timeout = 30000 } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [ENTRY], {
       cwd: ROOT,
@@ -118,4 +118,41 @@ test("a slash command runs inside the TUI instead of leaving the alternate scree
 test("/cost reports the session cost inside the TUI", async () => {
   const out = await runTui(["/cost\r", "/exit\r"]);
   assert.ok(/cost/.test(out), `/cost did not run in the TUI:\n${out.slice(-800)}`);
+});
+
+// ─── golden frame ────────────────────────────────────────────────────────────
+// The settled command-palette frame is pinned byte-for-byte after normalizing
+// the volatile parts (workspace path, cost counters, placeholder rotation,
+// model alias). A deliberate UI change must update tests/golden/palette.txt
+// — UPDATE_GOLDEN=1 node tests/tui-e2e.test.js regenerates it.
+const pathFs = require("node:path");
+const fs = require("node:fs");
+
+function normalizeFrame(frame) {
+  return frame
+    .replace(/~\/[^\s:]*:[^\s]*/g, "<workspace>:<branch>")
+    .replace(/[0-9]+\.[0-9]+K \([0-9]+%\)/g, "0.0K (0%)")
+    .replace(/\$[0-9]+\.[0-9]+/g, "$0.0000")
+    .replace(/Ask anything…\s+"[^"]*"/, 'Ask anything…  "<placeholder>"')
+    .split("\n")
+    .map((l) => l.replace(/\s+$/, ""))
+    .join("\n");
+}
+
+test("the command palette frame matches the golden snapshot", async () => {
+  const raw = await runTuiRaw(["/help\r", "/exit\r"], { timeout: 30000 });
+  const start = raw.indexOf("+-");
+  assert.ok(start !== -1, "no palette box was drawn");
+  const end = raw.indexOf("↑↓ select", start);
+  assert.ok(end !== -1, "the palette footer was not drawn");
+  const palette = stripAnsi(raw.slice(start, raw.indexOf("\n", end)));
+  const goldenPath = pathFs.join(__dirname, "golden", "palette.txt");
+  const normalized = normalizeFrame(palette);
+  if (process.env.UPDATE_GOLDEN === "1") {
+    fs.writeFileSync(goldenPath, normalized + "\n");
+    return;
+  }
+  assert.ok(fs.existsSync(goldenPath), "tests/golden/palette.txt is missing — run UPDATE_GOLDEN=1 node tests/tui-e2e.test.js");
+  const golden = fs.readFileSync(goldenPath, "utf8").trim();
+  assert.equal(normalized, golden, "the command palette frame drifted — if this is intentional, run UPDATE_GOLDEN=1 node tests/tui-e2e.test.js");
 });

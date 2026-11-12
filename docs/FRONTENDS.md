@@ -57,13 +57,30 @@ Overlays: command palette, `/model`, `/provider` (key wizard), `/variant`
 Notes:
 
 - The sidebar appears above 120 columns; the layout reflows down to ~40 columns.
-- Mouse capture is on by default. `XMINAL_MOUSE=0` turns it off and restores
-  your terminal's text selection.
-- Slash commands that the TUI does not implement natively (`/verify`,
-  `/memory`, `/skills`, `/git`, …) fall through to the classic renderer: the
-  alternate screen is left, the command output is printed, and the TUI returns
-  after you press a key. Use `xminal --no-tui` if you want the full classic
-  command set without that flicker.
+- Mouse capture is on by default, **except on Android** where it breaks
+  tap-to-scroll in Termux — there it starts off and `XMINAL_MOUSE=1` turns it
+  on. `XMINAL_MOUSE=0` turns it off anywhere.
+- Slash commands the TUI does not implement natively (`/verify`, `/memory`,
+  `/skills`, `/git`, …) run through the classic renderer **inside the
+  alternate screen** — no leave/return flicker; you stay in the same session.
+
+## The message-layout contract
+
+Every transcript row follows one of six named conventions (constants in
+`src/tui/chat-lines.ts`):
+
+| # | Row | Columns |
+|---|---|---|
+| 1 | user panel | heavy rule `┃` at col 0, accent-coloured by agent mode, body at col 3, symmetric padding |
+| 2 | assistant body | content col 3, markdown-rendered |
+| 3 | reasoning | amber `┃` at col 3, body at col 5 |
+| 4 | tool rows | glyph at col 3, continuation at col 5 |
+| 5 | tool error detail | col 5, redacted, muted |
+| 6 | ok / err / system | col 3, `ok` green / `err` red, diff hunks re-join col 0 and get tinted |
+
+Rendering lives in `src/tui/chat-lines.ts` (`renderStyledLine`), extracted
+from the `startTui` closure so rows can be unit-tested without a PTY
+(`tests/chat-lines.test.js`).
 
 ## 2. Ink engine (`XMINAL_TUI_ENGINE=ink`)
 
