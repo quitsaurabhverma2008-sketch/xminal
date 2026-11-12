@@ -5,6 +5,7 @@ import { booleanArg, errorResult, numberArg, stringArg, textResult } from "./typ
 import { expandHome, isBinary, relativeTo, truncateText, walkFiles, ensureDir } from "../util/fs";
 import { matchesGlob } from "../util/glob";
 import { diffPreview, diffStat } from "../util/diff";
+import { nearestLines, renderEditFailure } from "../core/edit-report";
 
 export function resolveToolPath(cwd: string, input: string): string {
   if (!input) throw new Error("Path is required.");
@@ -102,7 +103,21 @@ const editTool: Tool = {
     if (oldString === newString) return errorResult("oldString and newString are identical.");
     const before = fs.readFileSync(file, "utf8");
     const count = countOccurrences(before, oldString);
-    if (count === 0) return errorResult(`oldString not found in ${relativeTo(context.cwd, file)}.`);
+    if (count === 0) {
+      // tell the model what the file actually looks like — a bare
+      // "not found" makes it guess
+      const rel = relativeTo(context.cwd, file);
+      return errorResult(
+        renderEditFailure({
+          path: rel,
+          oldString,
+          newString,
+          nearest: nearestLines(before, oldString),
+          alreadyPresent: newString.length > 0 && before.includes(newString),
+          appliedElsewhere: [],
+        }),
+      );
+    }
     if (count > 1 && !booleanArg(args, "replaceAll", false)) {
       return errorResult(
         `oldString occurs ${count} times. Provide more context or set replaceAll=true.`,
@@ -156,15 +171,28 @@ const multiEditTool: Tool = {
     context.session.touch(file);
     const before = content;
     let applied = 0;
+    const appliedEdits: string[] = [];
     for (const [index, raw] of edits.entries()) {
       const edit = raw as Record<string, unknown>;
       const oldString = stringArg(edit, "oldString");
       const newString = stringArg(edit, "newString");
       const replaceAll = booleanArg(edit, "replaceAll", false);
       if (!content.includes(oldString)) {
-        return errorResult(`Edit #${index + 1} failed: oldString not found. No changes written.`);
+        // nothing is written (the call is atomic) — but the model must know
+        // which blocks did match, so it does not repeat them
+        return errorResult(
+          `Edit #${index + 1} failed. No changes written.\n\n${renderEditFailure({
+            path: relativeTo(context.cwd, file),
+            oldString,
+            newString,
+            nearest: nearestLines(content, oldString),
+            alreadyPresent: newString.length > 0 && content.includes(newString),
+            appliedElsewhere: appliedEdits,
+          })}`,
+        );
       }
       content = replaceAll ? content.split(oldString).join(newString) : content.replace(oldString, newString);
+      appliedEdits.push(`#${index + 1}`);
       applied++;
     }
     fs.writeFileSync(file, content, "utf8");

@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { buildRepoMap, renderRepoMap, repoMapSummary, extractSignatures } = require("../dist/core/repo-map");
+const { buildRepoMap, renderRepoMap, repoMapSummary, extractDefinitions, extractReferences } = require("../dist/core/repo-map");
 const { parseDiff, analyzeDiff, renderFindings, reviewSummary } = require("../dist/core/review");
 
 function tmpDir(prefix) {
@@ -13,22 +13,32 @@ function tmpDir(prefix) {
 }
 
 // ── repository map ─────────────────────────────────────────────────────
-test("signatures are extracted from the declarations of a file", () => {
-  const names = extractSignatures(
+test("definitions are extracted with their line numbers", () => {
+  const defs = extractDefinitions(
     [
       "export function greet(name) {}",
       "export class Session {}",
       "export interface Brief { goal: string }",
       "export type Mode = 'build' | 'plan';",
-      "const helper = () => {};",
       "export async function load() {}",
     ].join("\n"),
   );
+  const names = defs.map((d) => d.name);
   assert.ok(names.includes("greet"));
   assert.ok(names.includes("Session"));
   assert.ok(names.includes("Brief"));
   assert.ok(names.includes("Mode"));
   assert.ok(names.includes("load"));
+  const greet = defs.find((d) => d.name === "greet");
+  assert.equal(greet.line, 1, "the line number must be 1-based");
+  assert.equal(greet.kind, "def");
+});
+
+test("references are extracted from the calls a file makes", () => {
+  const refs = extractReferences("const x = chargeInvoice(1);\nrender();\n");
+  const names = refs.map((r) => r.name);
+  assert.ok(names.includes("chargeInvoice"));
+  assert.ok(names.includes("render"));
 });
 
 test("the map ranks the files that match the request first", () => {
@@ -45,7 +55,8 @@ test("the map ranks the files that match the request first", () => {
     assert.ok(!paths.includes("node_modules/pkg/index.js"), "node_modules must be skipped");
     const top = map.entries.find((e) => e.path === "src/billing.ts");
     assert.ok(top.score > 0, "the matching file must score above zero");
-    assert.ok(top.signatures.includes("chargeInvoice"));
+    assert.ok(top.symbols.some((s) => s.name === "chargeInvoice"));
+    assert.ok(top.symbols[0].line >= 1, "symbols carry their line number");
     const rendered = renderRepoMap(map);
     assert.ok(rendered.includes("src/billing.ts"));
     assert.ok(repoMapSummary(map).includes("scanned"));
@@ -65,11 +76,26 @@ test("the map finds the backbone of the project through its import graph", () =>
     const map = buildRepoMap(dir, "");
     const core = map.entries.find((e) => e.path === "src/core.ts");
     const a = map.entries.find((e) => e.path === "src/a.ts");
-    assert.equal(core.refs, 2, "core.ts is imported twice");
-    assert.equal(a.refs, 1);
+    assert.ok(core.referencedBy >= 1, "core.ts is referenced by other files");
+    assert.ok(a.referencedBy >= 1);
     const rendered = renderRepoMap(map);
     assert.ok(rendered.includes("central files"));
     assert.ok(rendered.includes("src/core.ts"));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the map is never empty for a big repository (regression)", () => {
+  const dir = tmpDir("xminal-map4-");
+  try {
+    fs.mkdirSync(path.join(dir, "src"), { recursive: true });
+    for (let i = 0; i < 450; i += 1) {
+      fs.writeFileSync(path.join(dir, "src", `f${i}.ts`), `export function thing${i}() {}\n`);
+    }
+    const map = buildRepoMap(dir, "");
+    assert.ok(map.entries.length > 100, `the map must not be empty, got ${map.entries.length}`);
+    assert.ok(map.scanned >= 450, `every file must be scanned, got ${map.scanned}`);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

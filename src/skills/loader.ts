@@ -8,6 +8,10 @@ export interface SkillInfo {
   description: string;
   path: string;
   source: string;
+  /** when the agent should reach for this skill (frontmatter `when_to_use`) */
+  whenToUse?: string;
+  /** keywords that make the skill relevant for a request */
+  triggers: string[];
 }
 
 export interface SkillVerification {
@@ -117,12 +121,52 @@ export class SkillRegistry {
       .map((skill) => `- ${skill.name}: ${skill.description.slice(0, 220)}`)
       .join("\n");
   }
+
+  /**
+   * The skills that matter for a request.
+   *
+   * A skill that says when it should be used is worth more than one that
+   * does not: the agent can only load a skill it knows exists, so the list
+   * has to point at the right one. Ranking uses the skill's own triggers and
+   * the words in its description.
+   */
+  relevant(request: string, limit = 8): SkillInfo[] {
+    const terms = request
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 3);
+    if (terms.length === 0) return this.list().slice(0, limit);
+    const scored = this.list().map((skill) => {
+      const haystack = `${skill.name} ${skill.description} ${skill.whenToUse ?? ""} ${skill.triggers.join(" ")}`.toLowerCase();
+      let score = 0;
+      for (const term of terms) if (haystack.includes(term)) score += 1;
+      for (const trigger of skill.triggers) if (request.toLowerCase().includes(trigger)) score += 3;
+      return { skill, score };
+    });
+    return scored
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score || a.skill.name.localeCompare(b.skill.name))
+      .slice(0, limit)
+      .map((entry) => entry.skill);
+  }
+
+  /** The skill list for the prompt, with the relevant ones first. */
+  renderForRequest(request: string, limit = 12): string {
+    const relevant = this.relevant(request, limit);
+    if (relevant.length === 0) return this.renderForPrompt(limit);
+    return relevant
+      .map((skill) => {
+        const hint = skill.whenToUse ? ` (use when: ${skill.whenToUse.slice(0, 120)})` : "";
+        return `- ${skill.name}: ${skill.description.slice(0, 200)}${hint}`;
+      })
+      .join("\n");
+  }
 }
 
-function parseSkill(content: string, folderName: string): { name: string; description: string } {
+export function parseSkill(content: string, folderName: string): SkillInfo {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) {
-    return { name: folderName, description: firstNonEmptyLine(content) };
+    return { name: folderName, description: firstNonEmptyLine(content), path: "", source: "", triggers: [] };
   }
   const frontmatter = match[1];
   const fields: Record<string, string> = {};
@@ -138,7 +182,22 @@ function parseSkill(content: string, folderName: string): { name: string; descri
   }
   const name = (fields.name || folderName).replace(/^["']|["']$/g, "");
   const description = (fields.description || firstNonEmptyLine(content)).replace(/^["']|["']$/g, "");
-  return { name, description };
+  const whenToUse = (fields.when_to_use || fields.whenToUse || fields.use_when || "").replace(/^["']|["']$/g, "");
+  const triggerSource = fields.triggers || fields.keywords || fields.tags || "";
+  const triggers = triggerSource
+    .replace(/^\[/, "")
+    .replace(/\]$/, "")
+    .split(/[,;]/)
+    .map((t) => t.replace(/^["']|["']$/g, "").trim().toLowerCase())
+    .filter(Boolean);
+  return {
+    name,
+    description,
+    path: "",
+    source: "",
+    whenToUse: whenToUse || undefined,
+    triggers,
+  };
 }
 
 function firstNonEmptyLine(content: string): string {

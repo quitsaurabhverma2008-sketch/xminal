@@ -4,6 +4,35 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-11-12
+
+**The agent got smarter: it reads the repo as a graph, edits like a pro, refuses to loop, and judges commands by what they actually do.**
+
+The ideas below were studied in five open-source projects (superpowers, spec-kit,
+aider, OpenHands, SWE-agent). Nothing was copied and nothing depends on them —
+the implementations below are XMINAL's own TypeScript, and every behaviour is
+covered by offline tests.
+
+### Fixed
+
+- **The repository map was empty for any project with 400+ files.** Two walks shared one file counter, so the second pass yielded nothing. The map is now built in a single pass and always returns the files it scanned.
+- **`echo "rm -rf /"` was classified as a destructive command.** The risk rules matched the whole command line. Commands are now split into their real segments (quotes respected) and judged per segment — a string that merely mentions a dangerous word is no longer dangerous, while `rm -r -f /` and `rm  -rf  /` are now caught.
+- **A failed edit told the model nothing.** "oldString not found" is now a report: the nearest matching block with its line numbers, whether the replacement is already in the file, and — for `multi_edit` — which of the other edits were applied, so the model does not repeat them.
+- **The model could not tell a failed command from one that printed "exit 1".** Every tool result is now a typed observation (ok / failed / empty / timeout / denied / error) with the exit code, the duration, and an explicit note when the output was empty, truncated or timed out.
+
+### Added
+
+- **Repository map v2** (`src/core/repo-map.ts`): definitions and references with line numbers, an ident-level graph, a weighted PageRank over it, and the request's own identifiers boosted. A file that important files depend on now ranks high even when the request never mentions it. Important project files (package.json, tsconfig, …) are always in the map.
+- **Skill triggers and a bootstrap** (`src/skills/bootstrap.ts`): skills can declare *when to use* them (`when_to_use`, `triggers` in the frontmatter); the list is ranked for the current request, and the agent is told to load a relevant skill **before** it acts.
+- **Risk analysis** (`src/core/risk.ts`, `src/core/shell-segments.ts`): four-valued risk (LOW/MEDIUM/HIGH/UNKNOWN), structural rails (fetch-to-exec, catastrophic-delete), and prompt-injection scanning of tool output. An analyser that cannot decide fails closed.
+- **Stuck detection** (`src/core/stuck.ts`): the same failing action twice, or a streak of errors, produces one corrective nudge ("do not retry it unchanged") instead of burning turns.
+- **Edit failure reports** (`src/core/edit-report.ts`): the nearest matching block, found with a line-ratio comparison.
+
+### Notes
+
+- 148/148 tests green (23 new ones covering the risk rules, the edit reports, the stuck detector, the observations and the bootstrap).
+
+
 ## [0.19.0] — 2026-11-12
 
 **The agent now sees the repository as a map and reviews changes as facts — not as guesses.**

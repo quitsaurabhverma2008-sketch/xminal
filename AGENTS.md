@@ -3,7 +3,7 @@
 ## Commands
 
 - Build: `npm run build` (tsc → `dist/`)
-- Verify everything (build + 123 tests): `npm run verify`
+- Verify everything (build + 148 tests): `npm run verify`
 - Run the CLI from source: `npm run build && node dist/index.js doctor`
 - Tests: `npm test` (node:test, no network required; tests run against `dist/`)
 
@@ -15,6 +15,7 @@
 - `src/core/verify-runner.ts` — runs the project's verify command after a change and feeds the real output back; the agent may never claim a test passed unless it ran and passed.
 - `src/core/repo-map.ts` — the ranked repository map (file signatures + import-graph centrality) that goes into the prompt.
 - `src/core/review.ts` — the deterministic diff analysis behind review mode (severity + file:line facts).
+- `src/core/risk.ts` + `src/core/shell-segments.ts` — commands are judged per segment; `src/core/stuck.ts` stops repeated failures; `src/core/observation.ts` gives every tool result a typed outcome; `src/core/edit-report.ts` explains a failed edit.
 
 ## Conventions
 

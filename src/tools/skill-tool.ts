@@ -27,7 +27,12 @@ const skillTool: Tool = {
     const skills = context.skills.list();
     if (skills.length === 0) return textResult("(no skills installed)");
     return textResult(
-      skills.map((skill) => `${skill.name} [${skill.source}] — ${skill.description.slice(0, 200)}`).join("\n"),
+      skills
+        .map((skill) => {
+          const hint = skill.whenToUse ? ` — use when: ${skill.whenToUse.slice(0, 160)}` : "";
+          return `${skill.name} [${skill.source}] — ${skill.description.slice(0, 200)}${hint}`;
+        })
+        .join("\n"),
     );
   },
 };

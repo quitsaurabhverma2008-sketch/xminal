@@ -3,6 +3,7 @@ import os from "node:os";
 import { appendLine, ensureDir, expandHome, readText, sha256 } from "../util/fs";
 import { projectReceiptsDir } from "../config/paths";
 import { matchesGlob } from "../util/glob";
+import { analyzeCommand } from "./risk";
 import type { PermissionMode } from "../config/types";
 
 export type RiskLevel = "safe" | "risky" | "dangerous";
@@ -170,11 +171,16 @@ export class PermissionManager {
       const command = String(args.command ?? "");
       const escape = this.bashOutsideWorkspace(command);
       if (escape) return { risk: "dangerous", reason: escape };
-      for (const item of DANGEROUS_PATTERNS) {
-        if (item.pattern.test(command)) return { risk: "dangerous", reason: item.reason };
+      // the command is analysed segment by segment: a string that merely
+      // mentions "rm -rf" is not a delete, and `rm -r -f /` is caught
+      const analysis = analyzeCommand(command);
+      if (analysis.risk === "HIGH") {
+        const first = analysis.findings[0];
+        return { risk: "dangerous", reason: first ? first.description : "dangerous command" };
       }
-      for (const item of RISKY_PATTERNS) {
-        if (item.pattern.test(command)) return { risk: "risky", reason: item.reason };
+      if (analysis.risk === "MEDIUM") {
+        const first = analysis.findings[0];
+        return { risk: "risky", reason: first ? first.description : "shell command" };
       }
       return { risk: "risky", reason: "shell command" };
     }

@@ -20,6 +20,8 @@ import { analyzeRequest, type TaskBrief } from "./requirements";
 import { newWorkflowState, noteTool, noteVerified, currentPhase, renderWorkflow, type WorkflowState } from "./workflow";
 import { resolveVerifyCommand, runVerify, renderVerifyResult, verifySummary, type VerifyResult } from "./verify-runner";
 import { buildRepoMap, renderRepoMap, type RepoMap } from "./repo-map";
+import { renderObservation, type Observation } from "./observation";
+import { StuckDetector } from "./stuck";
 import { analyzeDiff, renderFindings, type DiffAnalysis } from "./review";
 import { execFileSync } from "node:child_process";
 
@@ -89,6 +91,10 @@ export class Agent {
   private repoMapCache?: { request: string; map: RepoMap };
   /** the deterministic diff analysis of the current change */
   private diffAnalysis?: DiffAnalysis;
+  /** the last tool observation (typed) */
+  private lastObservation?: Observation;
+  /** detects repeated failures so the agent does not burn turns on them */
+  private stuck = new StuckDetector();
   /** the last verification result, shown in the turn summary */
   private verifyResult?: VerifyResult;
   /** how many repair rounds the verify loop may still use */
@@ -280,6 +286,7 @@ export class Agent {
   async run(input: string): Promise<AgentRunResult> {
     this.workflow = newWorkflowState();
     this.verifyResult = undefined;
+    this.stuck.reset();
     this.verifyRepairsLeft = this.options.config.autoVerifyRepairs ?? 1;
     this.currentBrief = analyzeRequest(input, { verifyCommand: this.verifyCommand() });
     this.rememberVerifyCommand();
@@ -315,6 +322,13 @@ export class Agent {
         };
       }
 
+      // the agent repeated the same failing action — say so once, then let it
+      // continue (or stop, if it is truly looping)
+      const nudge = this.stuck.nudge();
+      if (nudge) {
+        this.callbacks.onStatus?.(nudge);
+        this.history.push({ role: "user", content: nudge });
+      }
       const messages = this.buildContext(model);
       const tools = this.options.tools.defs(this.readOnlyMode());
       let text = "";
@@ -438,11 +452,21 @@ export class Agent {
           durationMs,
         });
         this.callbacks.onToolResult?.(call.name, result);
+        // the model sees a typed observation: exit code, empty output, timeout
+        // and truncation are all explicit, never a mystery inside free text
+        const observation = renderObservation(result);
+        this.lastObservation = observation;
+        this.stuck.note({
+          tool: call.name,
+          args,
+          isError: Boolean(result.isError),
+          detail: observation.outcome === "failed" ? `exit ${observation.exitCode ?? "?"}` : undefined,
+        });
         const toolMessage: ChatMessage = {
           role: "tool",
           toolCallId: call.id,
           name: call.name,
-          content: result.content,
+          content: observation.text,
         };
         if (!this.ephemeral) this.options.session.addMessage(toolMessage);
         this.history.push(toolMessage);
@@ -511,7 +535,9 @@ export class Agent {
 
   private systemPrompt(): string {
     const config = this.options.config;
-    const skills = this.options.skills.renderForPrompt();
+    // skills are ranked for the current request — the agent can only load a
+    // skill it knows exists, so the list has to point at the right one
+    const skills = this.options.skills.renderForRequest(this.currentBrief?.goal ?? "", 12);
     const memory = this.options.memory.renderForPrompt(10);
     if (this.projectRulesCache === undefined) this.projectRulesCache = readProjectRules(this.options.cwd);
     const projectRules = this.projectRulesCache;
