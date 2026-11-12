@@ -17,7 +17,7 @@ import type { SubagentOptions, ToolResult } from "../tools/types";
 import { truncateText } from "../util/fs";
 import { loadProjectBrief, renderProjectBrief, type ProjectBrief } from "./project-context";
 import { analyzeRequest, type TaskBrief } from "./requirements";
-import { newWorkflowState, noteTool, noteVerified, currentPhase, renderWorkflow, type WorkflowState } from "./workflow";
+import { newWorkflowState, noteTool, noteVerified, renderWorkflow, type WorkflowState } from "./workflow";
 import { resolveVerifyCommand, runVerify, renderVerifyResult, verifySummary, type VerifyResult } from "./verify-runner";
 import { buildRepoMap, renderRepoMap, type RepoMap } from "./repo-map";
 import { renderObservation, type Observation } from "./observation";
@@ -306,11 +306,6 @@ export class Agent {
   /** The last verification result — the TUI shows it in the turn summary. */
   verifyStatus(): string {
     return verifySummary(this.verifyResult);
-  }
-
-  /** The workflow phase of the current turn. */
-  phase(): string {
-    return currentPhase(this.workflow);
   }
 
   /** The explicit run state. */

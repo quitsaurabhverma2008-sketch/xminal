@@ -114,8 +114,18 @@ export class SkillRegistry {
     return this.list().find((skill) => skill.name === name);
   }
 
+  /**
+   * The order used when nothing matches: best-documented first (skills with
+   * when_to_use + triggers are the ones the agent can actually discover),
+   * not alphabetical.
+   */
+  private static documentedFirst(a: SkillInfo, b: SkillInfo): number {
+    const weight = (s: SkillInfo) => (s.whenToUse ? 2 : 0) + (s.triggers.length > 0 ? 1 : 0);
+    return weight(b) - weight(a) || a.name.localeCompare(b.name);
+  }
+
   renderForPrompt(limit = 40): string {
-    const skills = this.list().slice(0, limit);
+    const skills = [...this.list()].sort(SkillRegistry.documentedFirst).slice(0, limit);
     if (skills.length === 0) return "";
     return skills
       .map((skill) => `- ${skill.name}: ${skill.description.slice(0, 220)}`)
@@ -135,7 +145,7 @@ export class SkillRegistry {
       .toLowerCase()
       .split(/[^a-z0-9]+/)
       .filter((t) => t.length >= 3);
-    if (terms.length === 0) return this.list().slice(0, limit);
+    if (terms.length === 0) return [...this.list()].sort(SkillRegistry.documentedFirst).slice(0, limit);
     const scored = this.list().map((skill) => {
       const haystack = `${skill.name} ${skill.description} ${skill.whenToUse ?? ""} ${skill.triggers.join(" ")}`.toLowerCase();
       let score = 0;
@@ -148,6 +158,7 @@ export class SkillRegistry {
       .sort((a, b) => b.score - a.score || a.skill.name.localeCompare(b.skill.name))
       .slice(0, limit)
       .map((entry) => entry.skill);
+    // (an empty result is what triggers the documented-first fallback upstream)
   }
 
   /** The skill list for the prompt, with the relevant ones first. */

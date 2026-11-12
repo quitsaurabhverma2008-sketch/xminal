@@ -3,79 +3,24 @@ import path from "node:path";
 import { exists, readJson, writeJson, ensureDir, chmodPrivate } from "../util/fs";
 import { globalConfigPath, projectConfigPath, globalXminalDir } from "./paths";
 import { DEFAULT_MODELS } from "./default-models";
-import { PROVIDER_DEFAULT_MODELS } from "./provider-defaults";
+import { PROVIDER_CATALOG, PROVIDER_DEFAULT_MODELS } from "./providers";
 import { effectiveModelMap, isFreeModel, lookupModelAlias } from "./models-catalog";
 import type { McpServerConfig, ProviderConfig, ResolvedModel, XminalConfig } from "./types";
 
 export function defaultConfig(): XminalConfig {
-  const providers: Record<string, ProviderConfig> = {
-    opencode: {
-      type: "openai",
-      baseUrl: "https://opencode.ai/inference/openai/v1",
-      requiresKey: false,
-    },
-    openai: { type: "openai", baseUrl: "https://api.openai.com/v1", apiKeyEnv: "OPENAI_API_KEY" },
-    anthropic: { type: "anthropic", baseUrl: "https://api.anthropic.com", apiKeyEnv: "ANTHROPIC_API_KEY" },
-    gemini: {
-      type: "gemini",
-      baseUrl: "https://generativelanguage.googleapis.com",
-      apiKeyEnv: "GEMINI_API_KEY",
-    },
-    openrouter: {
-      type: "openai",
-      baseUrl: "https://openrouter.ai/api/v1",
-      apiKeyEnv: "OPENROUTER_API_KEY",
-    },
-    groq: { type: "openai", baseUrl: "https://api.groq.com/openai/v1", apiKeyEnv: "GROQ_API_KEY" },
-    deepseek: { type: "openai", baseUrl: "https://api.deepseek.com/v1", apiKeyEnv: "DEEPSEEK_API_KEY" },
-    mistral: { type: "openai", baseUrl: "https://api.mistral.ai/v1", apiKeyEnv: "MISTRAL_API_KEY" },
-    xai: { type: "openai", baseUrl: "https://api.x.ai/v1", apiKeyEnv: "XAI_API_KEY" },
-    cerebras: { type: "openai", baseUrl: "https://api.cerebras.ai/v1", apiKeyEnv: "CEREBRAS_API_KEY" },
-    cohere: { type: "openai", baseUrl: "https://api.cohere.com/compatibility/v1", apiKeyEnv: "COHERE_API_KEY" },
-    togetherai: { type: "openai", baseUrl: "https://api.together.xyz/v1", apiKeyEnv: "TOGETHER_API_KEY" },
-    fireworks: { type: "openai", baseUrl: "https://api.fireworks.ai/inference/v1", apiKeyEnv: "FIREWORKS_API_KEY" },
-    perplexity: { type: "openai", baseUrl: "https://api.perplexity.ai", apiKeyEnv: "PERPLEXITY_API_KEY" },
-    moonshotai: { type: "openai", baseUrl: "https://api.moonshot.ai/v1", apiKeyEnv: "MOONSHOT_API_KEY" },
-    moonshotai_cn: { type: "openai", baseUrl: "https://api.moonshot.cn/v1", apiKeyEnv: "MOONSHOT_API_KEY" },
-    huggingface: { type: "openai", baseUrl: "https://router.huggingface.co/v1", apiKeyEnv: "HF_TOKEN" },
-    github: { type: "openai", baseUrl: "https://models.github.ai/inference", apiKeyEnv: "GITHUB_TOKEN" },
-    nvidia: { type: "openai", baseUrl: "https://integrate.api.nvidia.com/v1", apiKeyEnv: "NVIDIA_API_KEY" },
-    deepinfra: { type: "openai", baseUrl: "https://api.deepinfra.com/v1/openai", apiKeyEnv: "DEEPINFRA_API_KEY" },
-    sambanova: { type: "openai", baseUrl: "https://api.sambanova.ai/v1", apiKeyEnv: "SAMBANOVA_API_KEY" },
-    novita: { type: "openai", baseUrl: "https://api.novita.ai/openai", apiKeyEnv: "NOVITA_API_KEY" },
-    friendli: { type: "openai", baseUrl: "https://api.friendli.ai/serverless/v1", apiKeyEnv: "FRIENDLI_API_KEY" },
-    nebius: { type: "openai", baseUrl: "https://api.tokenfactory.nebius.com/v1", apiKeyEnv: "NEBIUS_API_KEY" },
-    poe: { type: "openai", baseUrl: "https://api.poe.com/v1", apiKeyEnv: "POE_API_KEY" },
-    ollama_cloud: { type: "openai", baseUrl: "https://ollama.com/v1", apiKeyEnv: "OLLAMA_API_KEY" },
-    zai: { type: "openai", baseUrl: "https://api.z.ai/api/paas/v4", apiKeyEnv: "ZAI_API_KEY" },
-    zhipuai: { type: "openai", baseUrl: "https://open.bigmodel.cn/api/paas/v4", apiKeyEnv: "ZHIPU_API_KEY" },
-    minimax: { type: "anthropic", baseUrl: "https://api.minimax.io/anthropic", apiKeyEnv: "MINIMAX_API_KEY" },
-    stepfun: { type: "openai", baseUrl: "https://api.stepfun.ai/v1", apiKeyEnv: "STEPFUN_API_KEY" },
-    stepfun_cn: { type: "openai", baseUrl: "https://api.stepfun.com/v1", apiKeyEnv: "STEPFUN_API_KEY" },
-    siliconflow: { type: "openai", baseUrl: "https://api.siliconflow.com/v1", apiKeyEnv: "SILICONFLOW_API_KEY" },
-    volcengine: {
-      type: "openai",
-      baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-      apiKeyEnv: "VOLCENGINE_API_KEY",
-    },
-    "302ai": { type: "openai", baseUrl: "https://api.302.ai/v1", apiKeyEnv: "AI_302AI_API_KEY" },
-    venice: { type: "openai", baseUrl: "https://api.venice.ai/api/v1", apiKeyEnv: "VENICE_API_KEY" },
-    vercel: { type: "openai", baseUrl: "https://ai-gateway.vercel.sh/v1", apiKeyEnv: "VERCEL_AI_GATEWAY_API_KEY" },
-    alibaba: {
-      type: "openai",
-      baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-      apiKeyEnv: "DASHSCOPE_API_KEY",
-    },
-    ollama: { type: "openai", baseUrl: "http://localhost:11434/v1", apiKey: "ollama" },
-    ollama_cn: { type: "openai", baseUrl: "http://localhost:11435/v1", apiKey: "ollama" },
-    lmstudio: { type: "openai", baseUrl: "http://localhost:1234/v1", apiKey: "lmstudio" },
-    vllm: { type: "openai", baseUrl: "http://localhost:8000/v1", apiKey: "vllm" },
-    llama_cpp: { type: "openai", baseUrl: "http://localhost:8080/v1", apiKey: "llama.cpp" },
-    koboldcpp: { type: "openai", baseUrl: "http://localhost:5001/v1", apiKey: "koboldcpp" },
-    textgen: { type: "openai", baseUrl: "http://localhost:5000/v1", apiKey: "textgen" },
-    gpt4all: { type: "openai", baseUrl: "http://localhost:4891/v1", apiKey: "gpt4all" },
-    openwebui: { type: "openai", baseUrl: "http://localhost:3000/v1", apiKey: "openwebui" },
-  };
+  // built from the canonical catalog (src/config/providers.ts) — the only
+  // place provider identity lives
+  const providers: Record<string, ProviderConfig> = {};
+  for (const entry of PROVIDER_CATALOG) {
+    const requiresKey = entry.kind === "byok" && !entry.apiKey;
+    providers[entry.key] = {
+      type: entry.type,
+      baseUrl: entry.baseUrl,
+      ...(entry.env ? { apiKeyEnv: entry.env } : {}),
+      ...(entry.apiKey ? { apiKey: entry.apiKey } : {}),
+      ...(requiresKey ? {} : { requiresKey: false }),
+    };
+  }
 
   return {
     version: 1,

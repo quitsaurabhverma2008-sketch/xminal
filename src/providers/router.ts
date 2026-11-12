@@ -1,6 +1,6 @@
 import type { ResolvedModel, XminalConfig } from "../config/types";
 import { providerReady, resolveModel } from "../config/config";
-import { PROVIDER_DEFAULT_MODELS } from "../config/provider-defaults";
+import { PROVIDER_DEFAULT_MODELS } from "../config/providers";
 import type { ChatEvent, ChatRequest, ProviderAdapter } from "./types";
 import { ProviderError } from "./types";
 import { OpenAiAdapter } from "./openai";

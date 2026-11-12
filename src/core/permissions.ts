@@ -36,6 +36,10 @@ const READ_ONLY_TOOLS = new Set([
   "mcp_list",
   "think",
   "checkpoint_list",
+  // capability discovery is read-only — the model is allowed to ask what it can do
+  "capabilities",
+  "mcp_search",
+  "skill_registry_search",
 ]);
 
 export interface AuditVerification {
@@ -240,6 +244,19 @@ export class PermissionManager {
       return { risk: "risky", reason: "git mutation" };
     }
     if (tool === "verify" || tool === "ralph") return { risk: "risky", reason: "runs project commands" };
+    if (tool === "mcp_call") {
+      // external code with unknown capabilities — never "safe", but the reason
+      // names the server/tool so the approval is an informed decision
+      const server = String(args.server ?? "?");
+      const mcpTool = String(args.tool ?? "?");
+      return { risk: "risky", reason: `mcp_call ${server}/${mcpTool} — external server` };
+    }
+    if (tool === "mcp_add" || tool === "skill_install") {
+      return { risk: "risky", reason: `${tool} writes configuration and downloads content` };
+    }
+    if (tool === "capabilities" || tool === "mcp_search" || tool === "skill_registry_search") {
+      return { risk: "safe", reason: "read-only discovery" };
+    }
     return { risk: "risky", reason: "unknown tool" };
   }
 

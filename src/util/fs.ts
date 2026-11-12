@@ -46,9 +46,10 @@ export function readText(file: string): string {
   return fs.readFileSync(file, "utf8");
 }
 
-export function writeText(file: string, content: string): void {
+export function writeText(file: string, content: string, mode?: number): void {
   ensureDir(path.dirname(file));
-  fs.writeFileSync(file, content, "utf8");
+  fs.writeFileSync(file, content, mode !== undefined ? { encoding: "utf8", mode } : "utf8");
+  if (mode !== undefined) chmodPrivate(file);
 }
 
 export function appendLine(file: string, line: string): void {

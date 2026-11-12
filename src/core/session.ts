@@ -204,6 +204,16 @@ export class Session {
     const id = `${Date.now()}-${crypto.randomBytes(2).toString("hex")}`;
     const dir = path.join(projectCheckpointsDir(this.cwd), id);
     ensureDir(path.join(dir, "blobs"));
+    // checkpoint blobs are copies of your files: owner-only, and the folder
+    // itself is restricted. (On shared storage chmod is a no-op — the docs
+    // say so, and nothing here pretends otherwise.)
+    try {
+      fs.chmodSync(path.join(projectCheckpointsDir(this.cwd)), 0o700);
+      fs.chmodSync(dir, 0o700);
+      fs.chmodSync(path.join(dir, "blobs"), 0o700);
+    } catch {
+      // shared storage (FAT/exFAT) does not support modes — documented
+    }
     const manifest: CheckpointManifest = { id, label, ts: new Date().toISOString(), files: [] };
     for (const file of [...new Set(files)]) {
       const abs = path.resolve(this.cwd, file);
@@ -215,13 +225,13 @@ export class Session {
         const buffer = fs.readFileSync(abs);
         if (buffer.includes(0)) continue;
         const hash = sha256(buffer.toString("utf8"));
-        writeText(path.join(dir, "blobs", hash), buffer.toString("utf8"));
+        writeText(path.join(dir, "blobs", hash), buffer.toString("utf8"), 0o600);
         manifest.files.push({ path: rel, existed: true, blob: hash, hash, size: stat.size });
       } catch {
         manifest.files.push({ path: rel, existed: false });
       }
     }
-    writeJson(path.join(dir, "manifest.json"), manifest);
+    writeJson(path.join(dir, "manifest.json"), manifest, 0o600);
     this.appendEvent("checkpoint", { id, label, files: manifest.files.map((file) => file.path) });
     return id;
   }
