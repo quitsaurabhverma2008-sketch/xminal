@@ -19,6 +19,9 @@ import { loadProjectBrief, renderProjectBrief, type ProjectBrief } from "./proje
 import { analyzeRequest, type TaskBrief } from "./requirements";
 import { newWorkflowState, noteTool, noteVerified, currentPhase, renderWorkflow, type WorkflowState } from "./workflow";
 import { resolveVerifyCommand, runVerify, renderVerifyResult, verifySummary, type VerifyResult } from "./verify-runner";
+import { buildRepoMap, renderRepoMap, type RepoMap } from "./repo-map";
+import { analyzeDiff, renderFindings, type DiffAnalysis } from "./review";
+import { execFileSync } from "node:child_process";
 
 export type AgentMode = "plan" | "build" | "compose" | "review" | "yolo";
 
@@ -82,6 +85,10 @@ export class Agent {
    *  prompt is rebuilt every turn and re-reading the file costs a syscall
    *  plus a lot of context on every request) */
   private projectRulesCache?: string;
+  /** the ranked repository map (built once per request) */
+  private repoMapCache?: { request: string; map: RepoMap };
+  /** the deterministic diff analysis of the current change */
+  private diffAnalysis?: DiffAnalysis;
   /** the last verification result, shown in the turn summary */
   private verifyResult?: VerifyResult;
   /** how many repair rounds the verify loop may still use */
@@ -148,6 +155,56 @@ export class Agent {
   /** The command that verifies this project (config wins over detection). */
   verifyCommand(): string | undefined {
     return resolveVerifyCommand(this.options.cwd, this.options.config.verifyCommand);
+  }
+
+  /** The ranked repository map for the current request. */
+  repoMap(): RepoMap {
+    const request = this.currentBrief?.goal ?? "";
+    if (!this.repoMapCache || this.repoMapCache.request !== request) {
+      this.repoMapCache = { request, map: buildRepoMap(this.options.cwd, request) };
+    }
+    return this.repoMapCache.map;
+  }
+
+  /** The working-tree diff, bounded. */
+  workingDiff(maxChars = 6000): string {
+    try {
+      const out = execFileSync("git", ["diff", "--unified=2"], {
+        cwd: this.options.cwd,
+        encoding: "utf8",
+        maxBuffer: 8 * 1024 * 1024,
+      });
+      const text = String(out ?? "");
+      return text.length > maxChars ? `${text.slice(0, maxChars)}\n… (diff truncated)` : text;
+    } catch {
+      return "";
+    }
+  }
+
+  /** Deterministic analysis of the current change (used by review mode). */
+  analyzeCurrentDiff(): DiffAnalysis {
+    if (!this.diffAnalysis) {
+      this.diffAnalysis = analyzeDiff(this.workingDiff(), {
+        protectedPaths: this.options.config.permissions.protectedPaths,
+        root: this.options.cwd,
+      });
+    }
+    return this.diffAnalysis;
+  }
+
+  /** Remember the project's verify command so later sessions know it. */
+  rememberVerifyCommand(): void {
+    const command = this.verifyCommand();
+    if (!command) return;
+    try {
+      const known = this.options.memory
+        .list("project")
+        .some((entry) => entry.text.toLowerCase().includes("verify command"));
+      if (known) return;
+      this.options.memory.add(`verify command: ${command}`, ["verify", "project"], "project");
+    } catch {
+      // memory is best effort — never break a run over it
+    }
   }
 
   /** The last verification result — the TUI shows it in the turn summary. */
@@ -225,6 +282,7 @@ export class Agent {
     this.verifyResult = undefined;
     this.verifyRepairsLeft = this.options.config.autoVerifyRepairs ?? 1;
     this.currentBrief = analyzeRequest(input, { verifyCommand: this.verifyCommand() });
+    this.rememberVerifyCommand();
     const userMessage: ChatMessage = { role: "user", content: input };
     if (!this.ephemeral) this.options.session.addMessage(userMessage);
     this.history.push(userMessage);
@@ -478,6 +536,14 @@ export class Agent {
     const projectBrief = renderProjectBrief(this.project());
     const taskBrief = this.currentBrief?.summary ?? "";
     const workflow = renderWorkflow(this.mode, this.workflow);
+    // the ranked repo map — what exists, without loading the repository
+    const mapText =
+      this.currentBrief && this.currentBrief.kind !== "chat"
+        ? renderRepoMap(this.repoMap(), { maxChars: 1400 })
+        : "";
+    // in review mode the change itself is the subject
+    const reviewText = this.mode === "review" ? renderFindings(this.analyzeCurrentDiff()) : "";
+    const diffText = this.mode === "review" ? this.workingDiff(4000) : "";
 
     return `You are XMINAL (xminal), an expert terminal coding agent and orchestration platform.
 
@@ -493,7 +559,7 @@ Available tools: ${toolNames}
 
 ${modeGuide[this.mode]}
 
-${workflow ? `${workflow}\n` : ""}${projectBrief ? `Project brief:\n${projectBrief}\n` : ""}${taskBrief ? `Task brief:\n${taskBrief}\n` : ""}Operating rules:
+${workflow ? `${workflow}\n` : ""}${projectBrief ? `Project brief:\n${projectBrief}\n` : ""}${taskBrief ? `Task brief:\n${taskBrief}\n` : ""}${mapText ? `Repository map (ranked for this request — signatures only, read a file before you edit it):\n${mapText}\n` : ""}${reviewText ? `Change under review (computed facts):\n${reviewText}\n` : ""}${diffText ? `Diff:\n${diffText}\n` : ""}Operating rules:
 - Inspect the repository before making changes (read/list/glob/grep).
 - Prefer small, reviewable edits. Never overwrite unrelated code.
 - Use checkpoints/undo for risky changes. Verify with tests, lint, or typecheck when possible.

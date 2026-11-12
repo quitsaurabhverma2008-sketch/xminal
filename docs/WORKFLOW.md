@@ -78,6 +78,63 @@ The verify command is detected from the project's own build files:
 
 A configured `verifyCommand` always wins over the detected one.
 
+## The repository map
+
+The model should know *what exists* without the whole repository being loaded
+into the context. XMINAL builds a compact map of the project:
+
+```
+central files (most imported):
+  src/tools/types.ts (32 import(s)) — ToolResult, SubagentOptions, ToolContext, Tool
+  src/util/fs.ts (26 import(s)) — expandHome, ensureDir, readJson, writeJson
+  src/config/types.ts (17 import(s)) — PermissionMode, ProviderConfig, ModelConfig
+```
+
+How it works:
+
+1. every text file is scanned once (bounded: 400 files, the head of each file);
+2. the **signatures** are extracted — exported functions, classes, interfaces, types;
+3. the **import graph** is built, so the files most of the project depends on
+   come first;
+4. the files that match the **current request** are ranked to the top;
+5. the result is rendered into a character budget and injected into the prompt.
+
+The agent is told to read a file before editing it — the map is a map, not a
+substitute for the code.
+
+```bash
+xminal map "verify runner"     # the map, ranked for a query
+```
+
+In the TUI: `/map` (or `/map <query>`).
+
+## Reviewing a change
+
+`/review` does not guess — it computes the facts first (`src/core/review.ts`):
+
+| Fact | Severity |
+|---|---|
+| a protected path (`.env`, `~/.ssh`) was modified | critical |
+| a dependency manifest changed | major |
+| a lockfile changed | major |
+| a file was deleted | major |
+| many lines removed and nothing added | major |
+| source changed but no test changed | minor |
+| a very large diff | minor |
+
+```
+Diff: 4 file(s), +5/-3
+- [critical] .env:2 — a protected path was modified …
+- [major] package.json — a dependency manifest changed …
+```
+
+In review mode these facts and the diff itself are injected into the prompt, so
+the model argues about the change instead of guessing what changed. Findings
+it reports carry a severity and a `file:line`; a suspicion is never presented
+as a confirmed bug.
+
+In the TUI: `/diff` shows the diff and the flags.
+
 ## Verification is not optional
 
 After a turn that changed files, XMINAL runs the project's verify command and
@@ -98,6 +155,14 @@ The turn summary shows the result honestly:
 ```
 Build · inkling-2-small-free · 5.4s · 1901.2 tok/s · verify ✓
 ```
+
+### Running it by hand
+
+```bash
+xminal verify        # headless: run the project's verify command, exit with its code
+```
+
+In the TUI: `/verify` runs it on the spot and shows the real output.
 
 ### Settings
 

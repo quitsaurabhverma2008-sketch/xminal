@@ -4,6 +4,27 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-11-12
+
+**The agent now sees the repository as a map and reviews changes as facts — not as guesses.**
+
+### Added
+
+- **Repository map** (`src/core/repo-map.ts`): the project is scanned once into a compact map of file *signatures* (exports, classes, interfaces, types). Files are ranked by how well they match the current request and by how many other files import them, so the backbone of the project comes first. The map is character-budgeted and injected into the prompt — the agent knows what exists without the repository being loaded into the context.
+- **Diff analysis** (`src/core/review.ts`): the facts of a change are computed deterministically — protected paths touched (critical), dependency manifests and lockfiles changed (major), deleted files, large removals without additions (major), source changed without any test change (minor), oversized diffs (minor). In review mode these facts and the diff itself go into the prompt, so findings are concrete: severity + `file:line`, never speculation.
+- **New commands**:
+  - `/map` (and `/map <query>`) — the ranked repository map in the TUI;
+  - `/diff` — the working-tree diff plus its risk flags;
+  - `/verify` — run the project's verify command on the spot and show the real output;
+  - `xminal map [query]` — the map, headless;
+  - `xminal verify` — run the verify command headless and exit with its code (handy in CI).
+- The project brief is remembered as a project fact ("verify command: …") so later sessions start with it.
+
+### Notes
+
+- 123/123 tests green. The map and the diff analysis are covered by offline tests (signature extraction, ranking, import-graph centrality, diff parsing, severity rules, budgets).
+
+
 ## [0.18.0] — 2026-11-11
 
 **The agent now runs a real coding workflow — brief, phases, and a verification loop that cannot lie.**

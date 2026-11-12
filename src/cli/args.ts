@@ -54,6 +54,8 @@ const KNOWN_COMMANDS = new Set([
   "skills",
   "mcp",
   "config",
+  "verify",
+  "map",
   "version",
   "help",
   "telegram",
@@ -138,6 +140,8 @@ Usage:
   xminal serve [--port 8787] [--host 127.0.0.1] [--token T]
   xminal telegram [--token T]
   xminal skills | mcp [--serve] | config | audit [verify|tail] | version | help
+  xminal verify                   run the project's verify command (headless)
+  xminal map [query]              ranked repository map (file signatures)
 
 Flags:
   -m, --model <provider/model|alias>   model selection (default: auto)

@@ -10,6 +10,9 @@ import { formatAssistantText, isLikelyDiff, tintDiffRow } from "./format";
 import { renderMarkdown } from "./markdown";
 import { redactSecrets } from "../util/redact";
 import { logEvent } from "../util/log";
+import { renderRepoMap, repoMapSummary, buildRepoMap } from "../core/repo-map";
+import { renderFindings, reviewSummary } from "../core/review";
+import { runVerify, renderVerifyResult } from "../core/verify-runner";
 import type { ProviderConfig, ModelConfig } from "../config/types";
 import { Renderer } from "../cli/render";
 import { handleCommand } from "../cli/commands";
@@ -107,6 +110,11 @@ const COMMANDS: Cmd[] = [
   { name: "/connect", desc: "connect a provider (same as /provider)", group: "Providers", action: "provider" },
   { name: "/set-key", desc: "set provider key interactively", group: "Providers", action: "provider" },
   { name: "/clear-key", desc: "clear a provider key", group: "Providers" },
+
+  { name: "/map", desc: "ranked repository map (file signatures)", group: "Repo" },
+  { name: "/repo", desc: "alias for /map", group: "Repo" },
+  { name: "/diff", desc: "show the working diff + its risk flags", group: "Repo" },
+  { name: "/verify", desc: "run the project's verify command now", group: "Repo" },
 
   { name: "/tasks", desc: "the task list (.xminal/todos.json)", group: "Tasks" },
   { name: "/todo", desc: "add a todo item", group: "Tasks" },
@@ -1405,6 +1413,48 @@ const sessionRows = (query: string): SessionRow[] => {
         for (const line of doc.split("\n").slice(0, 40)) pushLine("system", fgMuted(line));
       } catch {
         pushLine("system", fgMuted("docs/ROADMAP.md not found (run from a checkout)"));
+      }
+      render();
+      return true;
+    }
+    if (name === "/map" || name === "/repo") {
+      // the ranked repository map: what exists, without loading the repo
+      const query = parts.slice(1).join(" ").trim();
+      const map = query ? buildRepoMap(cwd, query) : runtime.agent.repoMap();
+      pushLine("system", `${fgAccent("repository map")} ${fgMuted(repoMapSummary(map))}`);
+      const rendered = renderRepoMap(map, { maxChars: 4000 });
+      if (!rendered) pushLine("system", fgMuted("(no files found)"));
+      else for (const row of rendered.split("\n")) pushLine("system", fgMuted(row));
+      render();
+      return true;
+    }
+    if (name === "/diff") {
+      // the actual change plus the computed risk flags
+      const diff = runtime.agent.workingDiff(8000);
+      const analysis = runtime.agent.analyzeCurrentDiff();
+      pushLine("system", `${fgAccent("diff")} ${fgMuted(reviewSummary(analysis))}`);
+      if (!diff) pushLine("system", fgMuted("(no changes in the working tree)"));
+      else for (const row of diff.split("\n").slice(0, 60)) pushLine("system", fgMuted(row));
+      const findings = renderFindings(analysis);
+      if (analysis.findings.length) {
+        pushLine("system", fgMuted("risk flags:"));
+        for (const row of findings.split("\n").slice(1)) pushLine("system", fgMuted(row));
+      }
+      render();
+      return true;
+    }
+    if (name === "/verify") {
+      // run the project's verify command right now and show the real result
+      const command = runtime.agent.verifyCommand();
+      if (!command) {
+        pushLine("system", fgMuted("no verify command detected for this project (set verifyCommand in the config)"));
+        render();
+        return true;
+      }
+      pushLine("system", `${fgAccent("verify")} ${fgMuted(`· ${command} …`)}`);
+      const result = runVerify(cwd, command, { timeoutMs: 120_000 });
+      for (const row of renderVerifyResult(result).split("\n")) {
+        pushLine(result.passed ? "ok" : "err", fgMuted(row));
       }
       render();
       return true;

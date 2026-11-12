@@ -238,7 +238,7 @@ xminal        # fullscreen TUI, responsive down to ~44 cols
 Session — `/new` · `/resume` · `/continue` · `/sessions` · `/rename` · `/branch` · `/rewind <id>` · `/checkpoints` · `/undo` · `/compact`
 Agent — `/mode <plan|build|compose|review|yolo>` · `/model` · `/models` · `/variant` (low · medium · high · max) · `/effort` · `/reasoning`
 Providers — `/provider` · `/connect` · `/set-key` · `/clear-key`
-Tasks — `/tasks` · `/todo` · `/memory <list|add|search|forget>` · `/skills` · `/skill <name>` · `/mcp` · `/audit`
+Tasks — `/tasks` · `/todo` · `/memory <list|add|search|forget>` · `/skills` · `/skill <name>` · `/mcp` · `/audit` · `/map` · `/diff` · `/verify`
 Git — `/diff [args]` · `/git [args]` · `/worktree <list|create|remove|merge>`
 Verify — `/verify [cmd]` · `/ralph <task> --verify <cmd> [--iterations N]` · `/diagnostics`
 System — `/doctor` · `/init` · `/config` · `/status` · `/cost` · `/tools` · `/docs` · `/verify` · `/help` · `/clear` · `/exit` · `/report` (opens GitHub issue tracker)
@@ -301,18 +301,20 @@ understand → inspect → plan → implement → verify → review → summariz
 - **Project brief** — the repository's instructions, layout and build/test commands are collected once (offline) and injected into the prompt.
 - **Verification is real** — after a change, the project's own command (`npm test`, `cargo test`, `go test ./...`, …) runs and its output is fed back to the model. The turn summary says `verify ✓` or `verify ✗`; nothing is ever reported as passing unless it passed.
 - **Free-tier fallback** — when a model runs out of its daily free quota, the router switches to the provider's next free model and says so.
+- **Repository map** — the project is scanned once into a compact map of file signatures, ranked by the request and by how many files import each one. The agent knows what exists without the repository being loaded into the context.
+- **Review on facts** — `/review` computes the facts of the diff (protected paths, dependency changes, deletions, missing tests) and puts them next to the diff, so findings are concrete: severity + `file:line`.
 
 Details: [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
 
 ## Status (honest)
 
-**v0.18.0** — live on npm, 115/115 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.19.0** — live on npm, 123/123 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 
 ```bash
 npm run build            # tsc → dist/
-npm test                 # 115 tests (node:test, offline)
+npm test                 # 123 tests (node:test, offline)
 npm run verify           # build + test + secret scan (required before push)
 npm run verify:package   # pack → install into a temp prefix → run the CLI
 npm run verify:secrets   # fail if a credential-shaped string is committed

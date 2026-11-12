@@ -3,7 +3,7 @@
 ## Commands
 
 - Build: `npm run build` (tsc → `dist/`)
-- Verify everything (build + 115 tests): `npm run verify`
+- Verify everything (build + 123 tests): `npm run verify`
 - Run the CLI from source: `npm run build && node dist/index.js doctor`
 - Tests: `npm test` (node:test, no network required; tests run against `dist/`)
 
@@ -13,6 +13,8 @@
 - `src/core/project-context.ts` — the repository's instructions, layout and build/test commands, detected offline; also detects the project's verify command.
 - `src/core/workflow.ts` — the phases understand → inspect → plan → implement → verify → review → summarize; the phase follows the work that actually happened.
 - `src/core/verify-runner.ts` — runs the project's verify command after a change and feeds the real output back; the agent may never claim a test passed unless it ran and passed.
+- `src/core/repo-map.ts` — the ranked repository map (file signatures + import-graph centrality) that goes into the prompt.
+- `src/core/review.ts` — the deterministic diff analysis behind review mode (severity + file:line facts).
 
 ## Conventions
 

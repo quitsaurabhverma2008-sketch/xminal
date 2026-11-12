@@ -10,6 +10,8 @@ import { startRepl } from "./cli/repl";
 import { startTui } from "./tui/tui";
 import { Runtime } from "./runtime";
 import { loadConfig, defaultConfig, saveGlobalConfig, initProject, providerReady, listModelAliases, hardenConfigPermissions } from "./config/config";
+import { buildRepoMap, renderRepoMap, repoMapSummary } from "./core/repo-map";
+import { resolveVerifyCommand, runVerify, renderVerifyResult } from "./core/verify-runner";
 import { globalConfigPath, projectConfigPath, globalXminalDir } from "./config/paths";
 import { runDoctor, formatDoctor } from "./config/doctor";
 import { Session } from "./core/session";
@@ -164,6 +166,31 @@ async function main(): Promise<void> {
     case "config":
       commandConfig(cwd, args.positionals);
       return;
+
+    case "verify": {
+      // headless verification: run the project's own check and report it
+      const { config } = loadConfig(cwd);
+      const command = resolveVerifyCommand(cwd, config.verifyCommand);
+      if (!command) {
+        renderer.warn("no verify command detected for this project (set verifyCommand in the config)");
+        process.exitCode = 1;
+        return;
+      }
+      renderer.info(`verify: ${command}`);
+      const result = runVerify(cwd, command, { timeoutMs: config.verifyTimeoutMs ?? 120_000 });
+      renderer.info(renderVerifyResult(result));
+      process.exitCode = result.passed ? 0 : 1;
+      return;
+    }
+
+    case "map": {
+      // the ranked repository map — what exists, without loading the repo
+      const request = args.positionals.join(" ");
+      const map = buildRepoMap(cwd, request);
+      renderer.info(`repository map · ${repoMapSummary(map)}`);
+      renderer.info(renderRepoMap(map, { maxChars: 8000 }) || "(no files found)");
+      return;
+    }
 
     case "worktree":
       commandWorktree(cwd, args.positionals, args.flags);
