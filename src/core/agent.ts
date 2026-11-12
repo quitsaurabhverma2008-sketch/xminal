@@ -22,6 +22,13 @@ import { resolveVerifyCommand, runVerify, renderVerifyResult, verifySummary, typ
 import { buildRepoMap, renderRepoMap, type RepoMap } from "./repo-map";
 import { renderObservation, type Observation } from "./observation";
 import { StuckDetector } from "./stuck";
+import { condense, estimatePromptTokens, summarizePrompt, SUMMARIZE_SYSTEM, DEFAULT_CONDENSER_OPTIONS } from "./condenser";
+import { RunStateMachine, type RunState, type StateTransition } from "./run-state";
+import { runArchitect, ARCHITECT_SYSTEM, type ArchitectResult } from "./architect";
+import { renderChatFiles, type ChatFilesStore } from "./chat-files";
+import { loadConstitution, renderConstitutionForPrompt, checkConstitution } from "./spec/constitution";
+import { resolveFeature, readArtifact } from "./spec/store";
+import { writeTrajectory, type Trajectory, type TrajectoryStep } from "./trajectory";
 import { analyzeDiff, renderFindings, type DiffAnalysis } from "./review";
 import { execFileSync } from "node:child_process";
 
@@ -38,6 +45,8 @@ export interface AgentCallbacks {
 
 export interface AgentOptions {
   cwd: string;
+  /** the working set (optional — the agent works without it) */
+  chatFiles?: ChatFilesStore;
   config: XminalConfig;
   session: Session;
   permissions: PermissionManager;
@@ -95,10 +104,20 @@ export class Agent {
   private lastObservation?: Observation;
   /** detects repeated failures so the agent does not burn turns on them */
   private stuck = new StuckDetector();
+  /** the durable record of this run's actions */
+  private trajectory: TrajectoryStep[] = [];
+  /** the explicit run state — every transition is recorded */
+  private readonly states = new RunStateMachine((change) => {
+    if (!change.ok || !change.transition) return;
+    this.callbacks.onStatus?.(`state: ${change.to}`);
+    if (!this.ephemeral) this.options.session.note(`state: ${change.from} → ${change.to}`);
+  });
   /** the last verification result, shown in the turn summary */
   private verifyResult?: VerifyResult;
   /** how many repair rounds the verify loop may still use */
   private verifyRepairsLeft = 0;
+  /** when the current run started */
+  private runStartedAt = "";
 
   constructor(private readonly options: AgentOptions) {
     this.mode = options.mode ?? "build";
@@ -124,6 +143,69 @@ export class Agent {
    * Returns true when the failure was fed back to the model (so it can fix
    * it) — the caller then gives the agent another turn.
    */
+  /**
+   * Condense the history when it outgrows the context window.
+   *
+   * The summary is written by the model (so it is cumulative and useful); if
+   * that fails, the mechanical digest is used — the context shrinks either way.
+   */
+  /** Write the trajectory of the current run to disk. */
+  private saveTrajectory(exitStatus: string): void {
+    if (this.ephemeral) return;
+    const cost = this.cost.summary();
+    const trajectory: Trajectory = {
+      info: {
+        model: this.answeredBy ?? this.modelSpec,
+        exitStatus,
+        costUsd: cost.costUsd,
+        inputTokens: cost.inputTokens,
+        outputTokens: cost.outputTokens,
+        turns: cost.turns,
+        startedAt: this.runStartedAt,
+        endedAt: new Date().toISOString(),
+      },
+      trajectory: this.trajectory,
+    };
+    writeTrajectory(this.options.cwd, this.options.session.id, trajectory);
+  }
+
+  private async maybeCondense(force: boolean): Promise<boolean> {
+    const model = safeResolve(this.router, this.modelSpec);
+    const window = model?.contextWindow ?? 128000;
+    const estimate = estimatePromptTokens(this.history as never[], 8000);
+    if (!force && estimate < Math.floor(window * DEFAULT_CONDENSER_OPTIONS.maxTokensRatio)) return false;
+    const summarizer = async (messages: never[], previousSummary: string): Promise<string> => {
+      const events = await this.router.chat({
+        model: this.modelSpec,
+        messages: [
+          { role: "system", content: SUMMARIZE_SYSTEM },
+          { role: "user", content: summarizePrompt(previousSummary, messages as never[]) },
+        ],
+        tools: [],
+        maxTokens: 700,
+      });
+      let text = "";
+      for await (const event of events) {
+        if (event.type === "text") text += event.text;
+      }
+      return text;
+    };
+    const result = condense(
+      this.history as never[],
+      DEFAULT_CONDENSER_OPTIONS,
+      summarizer as never,
+      window,
+      force,
+    );
+    if (!result.condensed) return false;
+    this.history.length = 0;
+    this.history.push(...(result.messages as never[]));
+    this.callbacks.onStatus?.(
+      `Context condensed (${result.forgotten} message(s) summarised${result.reason ? `, reason: ${result.reason}` : ""})`,
+    );
+    return true;
+  }
+
   private async runVerification(): Promise<boolean> {
     const config = this.options.config;
     if (config.autoVerify === false) return false;
@@ -223,6 +305,69 @@ export class Agent {
     return currentPhase(this.workflow);
   }
 
+  /** The explicit run state. */
+  runState(): RunState {
+    return this.states.current;
+  }
+
+  /** The state transitions of the current run. */
+  stateHistory(): readonly StateTransition[] {
+    return this.states.transitions;
+  }
+
+  /**
+   * The architect/editor split: a read-only planner writes the plan, then a
+   * fresh editor (optionally a different model) implements it.
+   */
+  async runArchitect(
+    request: string,
+    options: { plannerModel?: string; editorModel?: string } = {},
+  ): Promise<ArchitectResult> {
+    const plannerModel = options.plannerModel ?? this.modelSpec;
+    const editorModel = options.editorModel ?? this.modelSpec;
+    const plan = async (): Promise<string> => {
+      const plannerContext = safeResolve(this.router, plannerModel) ?? safeResolve(this.router, this.modelSpec);
+      if (!plannerContext) return "";
+      const messages = this.buildContext(plannerContext);
+      let text = "";
+      for await (const event of this.router.chat({
+        model: plannerModel,
+        messages: [
+          ...messages,
+          { role: "system", content: ARCHITECT_SYSTEM },
+          { role: "user", content: request },
+        ],
+        tools: this.options.tools.defs(true),
+        maxTokens: effortCap(this.effort, 8192, this.options.config.limits.maxTokensPerTurn),
+      })) {
+        if (event.type === "text") text += event.text;
+      }
+      return text;
+    };
+    const edit = async (planText: string): Promise<string> => {
+      const editorContext = safeResolve(this.router, editorModel) ?? safeResolve(this.router, this.modelSpec);
+      if (!editorContext) return "";
+      const messages = this.buildContext(editorContext);
+      let text = "";
+      for await (const event of this.router.chat({
+        model: editorModel,
+        messages: [...messages, { role: "user", content: planText }],
+        tools: this.options.tools.defs(this.readOnlyMode()),
+        maxTokens: effortCap(this.effort, 8192, this.options.config.limits.maxTokensPerTurn),
+      })) {
+        if (event.type === "text") text += event.text;
+      }
+      return text;
+    };
+    return runArchitect(request, {
+      planner: plan,
+      editor: edit,
+      plannerModel,
+      editorModel,
+      cost: this.cost.summary().costUsd,
+    });
+  }
+
   /** last model that actually answered — used to fall back when a model is unavailable */
   private lastWorkingModel?: string;
   /** model that produced the reply (may be a fallback, not the requested one) */
@@ -287,6 +432,13 @@ export class Agent {
     this.workflow = newWorkflowState();
     this.verifyResult = undefined;
     this.stuck.reset();
+    this.trajectory = [];
+    this.runStartedAt = new Date().toISOString();
+    this.states.transition("running", "request received");
+    this.options.permissions.setAskHook?.((done) => {
+      this.states.transition("awaiting_confirmation", "waiting for approval");
+      done();
+    });
     this.verifyRepairsLeft = this.options.config.autoVerifyRepairs ?? 1;
     this.currentBrief = analyzeRequest(input, { verifyCommand: this.verifyCommand() });
     this.rememberVerifyCommand();
@@ -322,6 +474,8 @@ export class Agent {
         };
       }
 
+      // the context may have outgrown the window — condense before spending a turn
+      await this.maybeCondense(false);
       // the agent repeated the same failing action — say so once, then let it
       // continue (or stop, if it is truly looping)
       const nudge = this.stuck.nudge();
@@ -413,6 +567,7 @@ export class Agent {
       if (toolCalls.length === 0) {
         // the agent is about to answer — if it changed something, verify first
         if (await this.runVerification()) continue; // the failure was fed back; give it another turn
+        this.states.transition("finished", "the turn is complete");
         const assistant: ChatMessage = { role: "assistant", content: text };
         if (!this.ephemeral) this.options.session.addMessage(assistant);
         this.history.push(assistant);
@@ -462,6 +617,15 @@ export class Agent {
           isError: Boolean(result.isError),
           detail: observation.outcome === "failed" ? `exit ${observation.exitCode ?? "?"}` : undefined,
         });
+        this.trajectory.push({
+          action: call.name,
+          observation: observation.text.slice(0, 4000),
+          response: "",
+          executionTime: durationMs,
+          exitCode: observation.exitCode ?? null,
+          isError: Boolean(result.isError),
+        });
+        this.saveTrajectory("running");
         const toolMessage: ChatMessage = {
           role: "tool",
           toolCallId: call.id,
@@ -476,6 +640,7 @@ export class Agent {
     }
 
     if (turns >= this.maxTurns && stoppedReason === "done") stoppedReason = "max_turns";
+    this.saveTrajectory(stoppedReason);
 
     return {
       text: finalText,
@@ -563,10 +728,18 @@ export class Agent {
     const taskBrief = this.currentBrief?.summary ?? "";
     const workflow = renderWorkflow(this.mode, this.workflow);
     // the ranked repo map — what exists, without loading the repository
+    // the project's own rules (constitution) and the active feature spec
+    const constitution = loadConstitution(this.options.cwd);
+    const constitutionText = constitution ? renderConstitutionForPrompt(constitution, 900) : "";
+    const specPaths = resolveFeature(this.options.cwd);
+    const specText = specPaths ? readArtifact(this.options.cwd, "spec") ?? "" : "";
+    const chatFiles = this.options.chatFiles;
+    const chatPaths = chatFiles?.relativePaths(this.options.cwd) ?? [];
     const mapText =
       this.currentBrief && this.currentBrief.kind !== "chat"
-        ? renderRepoMap(this.repoMap(), { maxChars: 1400 })
+        ? renderRepoMap(this.repoMap(), { maxChars: 1400, chatFiles: chatPaths })
         : "";
+    const chatText = chatFiles ? renderChatFiles(chatFiles, this.options.cwd) : "";
     // in review mode the change itself is the subject
     const reviewText = this.mode === "review" ? renderFindings(this.analyzeCurrentDiff()) : "";
     const diffText = this.mode === "review" ? this.workingDiff(4000) : "";
@@ -585,7 +758,7 @@ Available tools: ${toolNames}
 
 ${modeGuide[this.mode]}
 
-${workflow ? `${workflow}\n` : ""}${projectBrief ? `Project brief:\n${projectBrief}\n` : ""}${taskBrief ? `Task brief:\n${taskBrief}\n` : ""}${mapText ? `Repository map (ranked for this request — signatures only, read a file before you edit it):\n${mapText}\n` : ""}${reviewText ? `Change under review (computed facts):\n${reviewText}\n` : ""}${diffText ? `Diff:\n${diffText}\n` : ""}Operating rules:
+${workflow ? `${workflow}\n` : ""}${projectBrief ? `Project brief:\n${projectBrief}\n` : ""}${taskBrief ? `Task brief:\n${taskBrief}\n` : ""}${constitutionText ? `Project rules (constitution):\n${constitutionText}\n` : ""}${specText ? `Active feature spec (${specPaths?.dir ?? ""}):\n${specText.slice(0, 1200)}\n` : ""}${chatText ? `${chatText}\n` : ""}${mapText ? `Repository map (ranked for this request — signatures only, read a file before you edit it):\n${mapText}\n` : ""}${reviewText ? `Change under review (computed facts):\n${reviewText}\n` : ""}${diffText ? `Diff:\n${diffText}\n` : ""}Operating rules:
 - Inspect the repository before making changes (read/list/glob/grep).
 - Prefer small, reviewable edits. Never overwrite unrelated code.
 - Use checkpoints/undo for risky changes. Verify with tests, lint, or typecheck when possible.

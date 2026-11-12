@@ -1,3 +1,4 @@
+import { ChatFilesStore } from "./core/chat-files";
 import { loadConfig, saveGlobalConfig, type LoadedConfig } from "./config/config";
 import { globalConfigPath } from "./config/paths";
 import { exists, readJson, writeJson } from "./util/fs";
@@ -30,6 +31,8 @@ export class Runtime {
   readonly mcp: McpManager;
   readonly tools: ToolRegistry;
   agent: Agent;
+  /** the working set: the files the agent may change, plus read-only references */
+  readonly chatFiles = new ChatFilesStore();
 
   constructor(
     readonly cwd: string,
@@ -107,6 +110,7 @@ export class Runtime {
   } = {}): Agent {
     const mode = overrides.mode ?? (this.session.meta.agentMode as AgentMode | undefined) ?? "build";
     return new Agent({
+      chatFiles: this.chatFiles,
       cwd: this.cwd,
       config: this.config,
       session: this.session,

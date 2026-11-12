@@ -4,6 +4,35 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.21.0] — 2026-11-12
+
+**Everything that was left is done: durable specs, a real condenser, an explicit run state, the architect split, the working set, skill validation and the trajectory.**
+
+### Added
+
+- **Durable feature artifacts** (`src/core/spec/`): `spec.md`, `plan.md` and `tasks.md` per feature under `.xminal/features/<NNN-slug>/`, a pointer file, sequential numbering, idempotent creation. The spec carries `FR-###` requirements, user stories with acceptance scenarios, edge cases and success criteria; the task list uses the machine-checkable `- [ ] T001 [P] [US1] …` form.
+- **A traceability analyzer** (`src/core/spec/coverage.ts`): requirement → task → file, with the gaps (uncovered requirement, unmapped task, `[NEEDS CLARIFICATION]` marker, duplicated requirement) and a deterministic report.
+- **A versioned project constitution** (`src/core/spec/constitution.ts`): `MUST` / `SHOULD` / `MUST NOT` principles, semantic versioning, injected into the prompt and checked against the change — a dependency added against a "no new dependency" rule is a **critical** finding.
+- **A bounded clarification session** (`src/core/spec/clarify.ts`): the spec is scanned against twelve requirement categories, at most five questions are asked (scope → security → UX → technical), and every answer is written back into the spec.
+- **A real condenser** (`src/core/condenser.ts`): condensation triggers on the real token budget (not a message count), protects the head, keeps a suffix sized to the budget, never splits a tool call from its result, refuses to drop less than 10 %, and summarises with the model — cumulatively, so the summary never decays. The mechanical digest is the fallback when no model answers.
+- **An explicit run state** (`src/core/run-state.ts`): idle / running / awaiting_confirmation / paused / stopped / finished / error / stuck, one mutation funnel, illegal transitions refused, every transition recorded (`/state`).
+- **The architect/editor split** (`src/core/architect.ts`): a read-only planner writes the plan, a fresh editor implements it — the long-dead `plannerModel` / `executorModel` settings now work (`/architect`).
+- **The working set** (`src/core/chat-files.ts`): `/add`, `/drop`, `/ls`, `/read` and `/tokens`. Files in the chat are excluded from the repository map and the prompt states what may be changed.
+- **Skill progressive disclosure** (`src/skills/manifest.ts`): the `skill` tool gained `outline` (sections + shipped files) and `read` (one file, path traversal blocked) — a skill no longer dumps 40 KB.
+- **Skill validation** (`src/skills/validate.ts`): `xminal skill validate` checks the frontmatter, the name, the description, the size, stray dev files and missing references.
+- **The trajectory** (`src/core/trajectory.ts`): every action of a run is written to `.xminal/sessions/<id>/trajectory.json` as it happens, and `/traj` aggregates the runs (`xminal stats`).
+- A CI job for a **self-hosted Termux runner** (label `android-termux`, disabled until one is registered).
+
+### Fixed
+
+- The action/observation pair is now recorded per tool call, so a denied action is distinguishable from a failed tool.
+- The permission prompt moves the run into `awaiting_confirmation` and back, so a crash while waiting is visible.
+
+### Notes
+
+- 195/195 tests green. The reference repositories were read locally (superpowers, spec-kit, aider, OpenHands, SWE-agent); nothing was copied and nothing depends on them.
+
+
 ## [0.20.0] — 2026-11-12
 
 **The agent got smarter: it reads the repo as a graph, edits like a pro, refuses to loop, and judges commands by what they actually do.**

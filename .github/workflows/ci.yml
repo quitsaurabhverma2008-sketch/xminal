@@ -41,6 +41,23 @@ jobs:
       - run: npm ci
       - run: bash scripts/package-smoke.sh
 
+  tui-android:
+    # Termux on a self-hosted runner (a phone). The runner must be registered
+    # with the label "android-termux". It runs the same suite as the desktop
+    # jobs, plus the TUI end-to-end tests on a real Android shell.
+    runs-on: [self-hosted, android-termux]
+    if: ${{ false }}   # enable once a Termux runner is registered
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: the TUI on a real terminal
+        run: node scripts/media/capture-screenshots.py /tmp/xminal-shots
+
   secret-scan:
     # fails the build when a credential-shaped string is committed
     runs-on: ubuntu-latest

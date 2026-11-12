@@ -167,6 +167,73 @@ async function main(): Promise<void> {
       commandConfig(cwd, args.positionals);
       return;
 
+    case "spec": {
+      // the feature artifacts: create, show, list, analyze
+      const { createFeature, resolveFeature, readArtifact, listFeatures } = require("./core/spec/store") as typeof import("./core/spec/store");
+      const { analyzeCoverage, renderCoverageReport } = require("./core/spec/coverage") as typeof import("./core/spec/coverage");
+      const action = (args.positionals[0] ?? "show").toLowerCase();
+      const title = args.positionals.slice(1).join(" ");
+      if (action === "create") {
+        if (!title) {
+          renderer.warn("usage: xminal spec create <feature title>");
+          process.exitCode = 1;
+          return;
+        }
+        const created = createFeature(cwd, title);
+        renderer.info(`${created.created ? "created" : "reusing"} ${created.paths.dir} → ${created.paths.spec}`);
+        return;
+      }
+      if (action === "list") {
+        const features = listFeatures(cwd);
+        renderer.info(features.length ? features.join("\n") : "(no features yet)");
+        return;
+      }
+      if (action === "analyze") {
+        const spec = readArtifact(cwd, "spec") ?? "";
+        const tasks = readArtifact(cwd, "tasks") ?? "";
+        if (!spec) {
+          renderer.warn("no active feature spec — xminal spec create <title>");
+          process.exitCode = 1;
+          return;
+        }
+        renderer.info(renderCoverageReport(analyzeCoverage({ spec, tasks, changedFiles: [] })));
+        return;
+      }
+      const paths = resolveFeature(cwd);
+      if (!paths) {
+        renderer.info("(no active feature — xminal spec create <title>)");
+        return;
+      }
+      renderer.info(`feature: ${paths.dir}`);
+      for (const name of ["spec", "plan", "tasks"] as const) {
+        const content = readArtifact(cwd, name);
+        if (content) renderer.info(`\n--- ${name}.md ---\n${content.slice(0, 4000)}`);
+      }
+      return;
+    }
+
+    case "skill": {
+      // skill maintenance: validate the installed skills
+      const { validateAll } = require("./skills/validate") as typeof import("./skills/validate");
+      const path = require("node:path") as typeof import("node:path");
+      const home = process.env.HOME ?? "";
+      const roots = [
+        path.join(cwd, ".xminal", "skills"),
+        path.join(cwd, ".opencode", "skills"),
+        path.join(cwd, ".claude", "skills"),
+        path.join(home, ".agents", "skills"),
+        path.join(home, ".claude", "skills"),
+        path.join(home, ".xminal", "skills"),
+      ];
+      const report = validateAll(cwd, roots);
+      renderer.info(`${report.skills} skill(s) checked · ${report.issues.length} issue(s)`);
+      for (const issue of report.issues) {
+        renderer.info(`  [${issue.severity}] ${issue.code} — ${issue.skill}: ${issue.message}`);
+      }
+      if (!report.ok) process.exitCode = 1;
+      return;
+    }
+
     case "verify": {
       // headless verification: run the project's own check and report it
       const { config } = loadConfig(cwd);

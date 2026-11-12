@@ -56,6 +56,8 @@ const KNOWN_COMMANDS = new Set([
   "config",
   "verify",
   "map",
+  "spec",
+  "skill",
   "version",
   "help",
   "telegram",

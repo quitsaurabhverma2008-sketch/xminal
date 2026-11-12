@@ -136,6 +136,7 @@ export class AuditLog {
 export class PermissionManager {
   mode: PermissionMode;
   private audit: AuditLog;
+  private askHook?: (done: () => void) => void;
 
   constructor(
     private readonly cwd: string,
@@ -155,6 +156,33 @@ export class PermissionManager {
 
   setAskHandler(handler: AskHandler | undefined): void {
     this.askHandler = handler;
+  }
+
+  /**
+   * A hook that fires around a confirmation prompt.
+   *
+   * The agent uses it to move into the "awaiting_confirmation" state, so the
+   * UI (and a crash log) can show that the run is waiting for a human.
+   */
+  setAskHook(hook: ((done: () => void) => void) | undefined): void {
+    this.askHook = hook;
+  }
+
+  /** Ask the human, with the state hook around the prompt. */
+  private async ask(tool: string, reason: string): Promise<boolean> {
+    if (!this.askHandler) return false;
+    let released = false;
+    const release = (): void => {
+      if (released) return;
+      released = true;
+      this.askHook?.(() => undefined);
+    };
+    this.askHook?.(release);
+    try {
+      return await this.askHandler(tool, reason);
+    } finally {
+      release();
+    }
   }
 
   classifyTool(tool: string, args: Record<string, unknown>): { risk: RiskLevel; reason: string } {
@@ -270,7 +298,7 @@ export class PermissionManager {
     }
 
     if (this.mode === "ask") {
-      const ok = this.askHandler ? await this.askHandler(tool, `${risk}: ${reason}`) : false;
+      const ok = await this.ask(tool, `${risk}: ${reason}`);
       this.audit.append(tool, ok ? "allow" : "deny", { args, reason, mode: this.mode });
       return { allowed: ok, needsPrompt: true, reason, risk };
     }

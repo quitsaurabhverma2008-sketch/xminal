@@ -217,6 +217,63 @@ The same failing action twice, or a streak of failed calls, produces one
 corrective nudge (`src/core/stuck.ts`) — the agent is told not to retry
 unchanged, instead of burning the turn budget on it.
 
+## The run state
+
+The agent's state is explicit (`src/core/run-state.ts`):
+
+```
+idle → running → awaiting_confirmation → running → finished
+                ↘ paused / stopped / error / stuck
+```
+
+One funnel writes the state; an illegal transition is refused instead of
+quietly corrupting the loop. Every transition is recorded in the session log,
+so `/state` shows what happened and why.
+
+## Durable artifacts
+
+| Artifact | Where | What it is |
+|---|---|---|
+| feature spec | `.xminal/features/<NNN-slug>/spec.md` | the requirements (FR-###), the user stories, the acceptance criteria |
+| plan | `…/plan.md` | the technical context and the constitution check |
+| tasks | `…/tasks.md` | the machine-checkable task list (`- [ ] T001 [P] [US1] …`) |
+| clarification log | `…/clarify.json` | the questions that were asked and answered |
+| constitution | `.xminal/constitution.md` | the project's versioned rules (`MUST` / `MUST NOT`) |
+| trajectory | `.xminal/sessions/<id>/trajectory.json` | every action of a run, with its observation and duration |
+
+```bash
+xminal spec create "user sign-in"   # a new feature directory
+xminal spec analyze                 # which requirements have no task yet
+xminal skill validate               # lint the installed skills
+```
+
+In the TUI: `/spec`, `/constitution`, `/traj`, `/state`.
+
+The constitution is not decoration: a `MUST NOT: add a runtime dependency`
+plus a changed `package.json` is a **critical** finding, exactly like a
+constitution conflict upstream.
+
+## The working set
+
+`/add` puts a file in the chat (editable), `/read` puts it there as a
+read-only reference. Files in the chat are excluded from the repository map
+(they are already in the context) and the prompt says what may be changed.
+
+```bash
+/add src/billing.ts     # editable
+/read  docs/ARCH.md     # read-only reference
+/tokens                 # how much of the context window is used
+```
+
+## Skills, progressively
+
+A skill is a procedure; the heavy material lives next to it. The `skill` tool
+now loads a skill in parts:
+
+- `skill(action=load, name=…)` — the procedure (capped at 20 KB);
+- `skill(action=outline, name=…)` — its sections and the files it ships with;
+- `skill(action=read, name=…, file="references/notes.md")` — one file.
+
 ## Verification is not optional
 
 After a turn that changed files, XMINAL runs the project's verify command and

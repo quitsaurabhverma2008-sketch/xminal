@@ -1,4 +1,13 @@
+import { summarizeTrajectories, renderTrajectorySummary } from "../core/trajectory";
+import { resolveChatPath, expandDirectory } from "../core/chat-files";
+import { repoMapSummary } from "../core/repo-map";
+import { validateAll } from "../skills/validate";
+import { createFeature, resolveFeature, readArtifact, writeArtifact, listFeatures } from "../core/spec/store";
+import { analyzeCoverage, renderCoverageReport } from "../core/spec/coverage";
+import { selectQuestions, integrateAnswer, renderQuestion } from "../core/spec/clarify";
+import { loadConstitution } from "../core/spec/constitution";
 import { spawnSync } from "node:child_process";
+import { existsSync as exists, statSync } from "node:fs";
 import { loadMcpCatalog, searchMcpServers } from "../mcp/catalog";
 import fs from "node:fs";
 import path from "node:path";
@@ -30,6 +39,19 @@ export interface CommandContext {
 }
 
 const MODES: AgentMode[] = ["plan", "build", "compose", "review", "yolo"];
+
+/** Where skills may live — the same roots the registry reads. */
+function skillRoots(cwd: string): string[] {
+  const home = process.env.HOME ?? "";
+  return [
+    path.join(cwd, ".xminal", "skills"),
+    path.join(cwd, ".opencode", "skills"),
+    path.join(cwd, ".claude", "skills"),
+    path.join(home, ".agents", "skills"),
+    path.join(home, ".claude", "skills"),
+    path.join(home, ".xminal", "skills"),
+  ];
+}
 const PERMISSION_MODES: PermissionMode[] = ["ask", "auto", "full"];
 
 const HELP = `Commands
@@ -271,6 +293,196 @@ export async function handleCommand(input: string, ctx: CommandContext): Promise
       return true;
     }
 
+    case "spec": {
+      const action = (rest.split(/\s+/)[0] ?? "show").toLowerCase();
+      const title = rest.split(/\s+/).slice(1).join(" ");
+      if (action === "create") {
+        if (!title) {
+          renderer.warn("usage: /spec create <feature title>");
+          return true;
+        }
+        const created = createFeature(runtime.cwd, title);
+        renderer.success(`${created.created ? "created" : "reusing"} feature ${created.paths.dir}`);
+        renderer.info(created.paths.spec);
+        renderer.info("Fill the spec, then run /spec analyze to see what is still uncovered.");
+        return true;
+      }
+      if (action === "list") {
+        const features = listFeatures(runtime.cwd);
+        renderer.info(features.length ? features.join("\n") : "(no features yet — /spec create <title>)");
+        return true;
+      }
+      if (action === "analyze") {
+        const spec = readArtifact(runtime.cwd, "spec") ?? "";
+        const tasks = readArtifact(runtime.cwd, "tasks") ?? "";
+        if (!spec) {
+          renderer.warn("no active feature spec — /spec create <title>");
+          return true;
+        }
+        const analysis = analyzeCoverage({ spec, tasks, changedFiles: [] });
+        renderer.info(renderCoverageReport(analysis));
+        return true;
+      }
+      if (action === "clarify") {
+        const spec = readArtifact(runtime.cwd, "spec") ?? "";
+        if (!spec) {
+          renderer.warn("no active feature spec — /spec create <title>");
+          return true;
+        }
+        const questions = selectQuestions(spec, 5);
+        if (!questions.length) {
+          renderer.info("nothing to clarify — the spec covers the known categories");
+          return true;
+        }
+        let current = spec;
+        for (const question of questions) {
+          renderer.info(renderQuestion(question));
+          const answer = await ctx.ask(`Your answer for "${question.topic}" (or press enter to skip)`);
+          if (!answer) continue;
+          const integrated = integrateAnswer(current, question, answer);
+          current = integrated.spec;
+        }
+        const paths = resolveFeature(runtime.cwd);
+        if (paths) writeArtifact(runtime.cwd, "spec", current);
+        renderer.success("the answers were written into the spec");
+        return true;
+      }
+      // show
+      const paths = resolveFeature(runtime.cwd);
+      if (!paths) {
+        renderer.info("(no active feature — /spec create <title>)");
+        return true;
+      }
+      renderer.info(`feature: ${paths.dir}`);
+      for (const name of ["spec", "plan", "tasks"] as const) {
+        const content = readArtifact(runtime.cwd, name);
+        if (content) renderer.info(`\n--- ${name}.md ---\n${truncateText(content, 4000)}`);
+      }
+      return true;
+    }
+
+    case "constitution": {
+      const constitution = loadConstitution(runtime.cwd);
+      if (!constitution) {
+        renderer.info("(no constitution — create .xminal/constitution.md to pin the project rules)");
+        return true;
+      }
+      renderer.info(`version ${constitution.version} · ${constitution.principles.length} principle(s)`);
+      for (const principle of constitution.principles) {
+        renderer.info(`  ${principle.id} ${principle.title}`);
+      }
+      return true;
+    }
+
+    case "traj":
+    case "trajectory": {
+      const summary = summarizeTrajectories(runtime.cwd);
+      renderer.info(renderTrajectorySummary(summary));
+      return true;
+    }
+
+    case "state": {
+      renderer.info(`run state: ${runtime.agent.runState()}`);
+      const transitions = runtime.agent.stateHistory();
+      if (transitions.length) {
+        renderer.info(transitions.slice(-6).map((t) => `  ${t.from} → ${t.to}${t.reason ? ` (${t.reason})` : ""}`).join("\n"));
+      }
+      return true;
+    }
+
+    case "add": {
+      if (!rest) {
+        renderer.warn("usage: /add <file or directory>");
+        return true;
+      }
+      const target = resolveChatPath(runtime.cwd, rest);
+      if (!exists(target)) {
+        renderer.warn(`not found: ${rest}`);
+        return true;
+      }
+      let stat = statSync(target);
+      const files = stat.isDirectory() ? expandDirectory(target) : [target];
+      let added = 0;
+      for (const file of files) if (runtime.chatFiles.add(file, "editable")) added += 1;
+      renderer.success(`added ${added} file(s) to the chat (editable).`);
+      return true;
+    }
+
+    case "drop": {
+      if (!rest) {
+        renderer.info("files in the chat:");
+        for (const file of runtime.chatFiles.all()) renderer.info(`  ${file.path}`);
+        return true;
+      }
+      const target = resolveChatPath(runtime.cwd, rest);
+      const removed = runtime.chatFiles.drop(target);
+      renderer.info(removed ? `dropped ${rest}` : `${rest} was not in the chat`);
+      return true;
+    }
+
+    case "ls": {
+      const inChat = runtime.chatFiles.relativePaths(runtime.cwd);
+      renderer.info(`editable in the chat: ${inChat.length ? inChat.join(", ") : "(none)"}`);
+      const map = runtime.agent.repoMap();
+      renderer.info(`repository map: ${repoMapSummary(map)}`);
+      return true;
+    }
+
+    case "read": {
+      if (!rest) {
+        renderer.warn("usage: /read <file or directory> (read-only reference)");
+        return true;
+      }
+      const target = resolveChatPath(runtime.cwd, rest);
+      if (!exists(target)) {
+        renderer.warn(`not found: ${rest}`);
+        return true;
+      }
+      const stat = statSync(target);
+      const files = stat.isDirectory() ? expandDirectory(target) : [target];
+      let added = 0;
+      for (const file of files) if (runtime.chatFiles.add(file, "read-only")) added += 1;
+      renderer.success(`added ${added} file(s) as read-only reference.`);
+      return true;
+    }
+
+    case "tokens": {
+      const cost = runtime.agent.getCost();
+      const model = runtime.agent.modelSpec;
+      let window = 128000;
+      try {
+        window = resolveModel(runtime.config, model).contextWindow ?? window;
+      } catch {
+        // keep the fallback
+      }
+      const used = cost.inputTokens;
+      const pct = Math.min(100, Math.round((100 * used) / window));
+      renderer.info(
+        `context: ${used.toLocaleString("en-US")} / ${window.toLocaleString("en-US")} tokens (${pct}%)`,
+      );
+      renderer.info(`cost: $${cost.costUsd.toFixed(4)} · turns: ${cost.turns}`);
+      renderer.info(`files in the chat: ${runtime.chatFiles.all().length}`);
+      return true;
+    }
+
+    case "architect":
+    case "ask": {
+      if (!rest) {
+        renderer.warn(`usage: /architect <what to build>${runtime.agent.modelSpec ? "" : ""}`);
+        return true;
+      }
+      const plannerModel = runtime.config.plannerModel ?? runtime.agent.modelSpec;
+      const editorModel = runtime.config.executorModel ?? runtime.agent.modelSpec;
+      renderer.info(`architect: ${plannerModel} plans, ${editorModel} edits…`);
+      const result = await runtime.agent.runArchitect(rest, { plannerModel, editorModel });
+      renderer.info(`plan (${result.plan.steps.length} step(s)):`);
+      for (const [index, step] of result.plan.steps.entries()) {
+        renderer.info(`  ${index + 1}. ${step.action} ${step.path}${step.rationale ? ` — ${step.rationale}` : ""}`);
+      }
+      renderer.info(result.editorText || "(the editor said nothing)");
+      return true;
+    }
+
     case "git": {
       const result = await runShellCommand(`git ${rest || "status --short --branch"}`, {
         cwd: runtime.cwd,
@@ -395,6 +607,16 @@ export async function handleCommand(input: string, ctx: CommandContext): Promise
     }
 
     case "skills": {
+      if (rest.includes("--validate") || rest.includes("--check")) {
+        const roots = skillRoots(runtime.cwd);
+        const report = validateAll(runtime.cwd, roots);
+        renderer.info(`${report.skills} skill(s) checked · ${report.issues.length} issue(s)`);
+        for (const issue of report.issues) {
+          renderer.info(`  [${issue.severity}] ${issue.code} — ${issue.skill}: ${issue.message}`);
+        }
+        if (!report.ok) renderer.warn("some skills have errors");
+        return true;
+      }
       if (rest.startsWith("install ")) {
         const target = rest.slice("install ".length).trim();
         const isGlobal = target.endsWith(" --global");

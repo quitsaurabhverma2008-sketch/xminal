@@ -307,18 +307,21 @@ understand → inspect → plan → implement → verify → review → summariz
 - **Judged by what a command does** — commands are split into their real segments, so `echo "rm -rf /"` is a string while `rm -r -f /` is caught.
 - **Edits that fail usefully** — a failed edit shows the nearest matching block with line numbers, and which other edits of the same call already succeeded.
 - **No loops** — the same failing action twice produces one corrective nudge instead of burning turns.
+- **Durable artifacts** — feature specs (`FR-###` requirements, user stories, task lists), a versioned project constitution, and a per-run trajectory: `/spec`, `/constitution`, `/traj`, `/state`.
+- **A real condenser** — the context is summarised by the model when it outgrows the window, cumulatively, without ever splitting a tool call from its result.
+- **The architect split** — `/architect` plans with one model and edits with another.
 
 Details: [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
 
 ## Status (honest)
 
-**v0.20.0** — live on npm, 148/148 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.21.0** — live on npm, 195/195 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Development
 
 ```bash
 npm run build            # tsc → dist/
-npm test                 # 148 tests (node:test, offline)
+npm test                 # 195 tests (node:test, offline)
 npm run verify           # build + test + secret scan (required before push)
 npm run verify:package   # pack → install into a temp prefix → run the CLI
 npm run verify:secrets   # fail if a credential-shaped string is committed
