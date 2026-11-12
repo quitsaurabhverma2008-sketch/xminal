@@ -38,7 +38,7 @@ export interface Trajectory {
   readonly trajectory: TrajectoryStep[];
 }
 
-export function trajectoryPath(cwd: string, sessionId: string): string {
+function trajectoryPath(cwd: string, sessionId: string): string {
   return path.join(cwd, ".xminal", "sessions", sessionId, "trajectory.json");
 }
 
@@ -54,7 +54,7 @@ export function writeTrajectory(cwd: string, sessionId: string, trajectory: Traj
   return file;
 }
 
-export function readTrajectory(cwd: string, sessionId: string): Trajectory | undefined {
+function readTrajectory(cwd: string, sessionId: string): Trajectory | undefined {
   try {
     const raw = fs.readFileSync(trajectoryPath(cwd, sessionId), "utf8");
     return JSON.parse(raw) as Trajectory;

@@ -9,33 +9,19 @@ import { visibleWidth, graphemeSlice, stripAnsi as stripAnsiW, splitGraphemes, w
 import { formatAssistantText, isLikelyDiff, tintDiffRow } from "./format";
 import { renderMarkdown } from "./markdown";
 import { redactSecrets } from "../util/redact";
+import { openExternal } from "../util/open-external";
 import { logEvent } from "../util/log";
 import { renderRepoMap, repoMapSummary, buildRepoMap } from "../core/repo-map";
 import { renderFindings, reviewSummary } from "../core/review";
 import { runVerify, renderVerifyResult } from "../core/verify-runner";
 import type { ProviderConfig, ModelConfig } from "../config/types";
+import { WORDMARK } from "../util/ansi";
 import { Renderer } from "../cli/render";
 import { handleCommand } from "../cli/commands";
 import { spawnSync } from "node:child_process";
 import { T, rgb, bgRgb, RESET, BOLD, fgMuted, fgText, fgAccent, fgAmber, fgGreen, fgRed, fgCyan, fgYellow, modeColor } from "./theme";
 import { makeActivity, completeActivity, renderActivity, spinnerFrame, toolTarget, SPINNER_FRAMES, type ActivityLine } from "./output/tool-activity";
 
-function openExternal(url: string): boolean {
-  const platform = process.platform;
-  const candidates: Array<[string, string[]]> =
-    platform === "darwin"
-      ? [["open", [url]]]
-      : platform === "win32"
-        ? [["cmd", ["/c", "start", "", url]]]
-        : [["termux-open-url", [url]], ["xdg-open", [url]], ["gio", ["open", url]]];
-  for (const [bin, args] of candidates) {
-    try {
-      const r = spawnSync(bin, args, { stdio: "ignore" });
-      if (r.status === 0) return true;
-    } catch { /* try next */ }
-  }
-  return false;
-}
 import { loadTodos, detectGitBranch } from "./state";
 import type { AgentCallbacks, AgentMode } from "../core/agent";
 
@@ -510,18 +496,26 @@ const sessionRows = (query: string): SessionRow[] => {
         }
         return rows;
       }
-      // opencode: an edit/write diff is a block card (rule + raised panel)
+      // opencode: an edit/write diff is a block card — ┃ rule, raised panel,
+      // and ± rows get the diff background bands (#20303b / #37222c)
       if (a.preview && a.preview.length) {
         const cardW = Math.max(8, w);
         const rule = `${rgb(T.bg)}┃${RESET}`;
-        const fill = bgRgb(T.panel);
+        const panel = bgRgb(T.panel);
+        const addBg = bgRgb(T.diffAddedBg);
+        const remBg = bgRgb(T.diffRemovedBg);
         const rows: string[] = [];
         for (const row of a.preview) {
+          const bare = stripAnsiW(row).trimStart();
+          const isAdd = bare.startsWith("+") && !bare.startsWith("+++");
+          const isRem = bare.startsWith("-") && !bare.startsWith("---");
+          const fill = isAdd ? addBg : isRem ? remBg : panel;
           const tinted = tintDiffRow(row, () => row, fgMuted, fgAccent, fgGreen, fgRed);
           rows.push(`${rule}${fill} ${keepBg(fill, tinted)}${" ".repeat(Math.max(0, cardW - 2 - visible(tinted)))}${RESET}`);
         }
         if (a.extraPreviewLines) {
-          rows.push(`${rule}${fill} ${fgMuted(`… ${a.extraPreviewLines} more diff lines`)}${" ".repeat(Math.max(0, cardW - 2 - 30))}${RESET}`);
+          const more = fgMuted(`… ${a.extraPreviewLines} more diff lines`);
+          rows.push(`${rule}${panel} ${keepBg(panel, more)}${" ".repeat(Math.max(0, cardW - 2 - visible(more)))}${RESET}`);
         }
         return rows;
       }
@@ -635,14 +629,7 @@ const sessionRows = (query: string): SessionRow[] => {
     [134, 225, 252], [115, 180, 255], [130, 170, 255],
     [139, 140, 247], [187, 154, 247], [192, 153, 255],
   ];
-  const LOGO = [
-    "██╗  ██╗███╗   ███╗██╗███╗   ██╗ █████╗ ██╗     ",
-    "╚██╗██╔╝████╗ ████║██║████╗  ██║██╔══██╗██║     ",
-    " ╚███╔╝ ██╔████╔██║██║██╔██╗ ██║███████║██║     ",
-    " ██╔██╗ ██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║     ",
-    "██╔╝ ██╗██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗",
-    "╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝ ╚═══╝╚═╝  ╚═╝╚══════╝",
-  ];
+  const LOGO = WORDMARK;
   const homeLines = (): string[] => {
     const cw = contentWidth();
     if (cw < 60) {

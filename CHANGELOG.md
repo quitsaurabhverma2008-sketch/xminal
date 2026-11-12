@@ -39,7 +39,15 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 - `ink`, `react`, `react-reconciler` moved to **optionalDependencies** — the built-in TUI needs nothing; phones can `npm install -g xminal --omit=optional`.
 - Mouse reporting is **off by default on Android** (it broke tap-to-scroll in Termux).
-- Dead code removed: `DANGEROUS_PATTERNS`/`RISKY_PATTERNS` (the live risk engine is `core/risk.ts`), `src/tui/layout.ts`, and several uncalled exports.
+- **Dead code removed**: `DANGEROUS_PATTERNS`/`RISKY_PATTERNS` (the live risk engine is `core/risk.ts`), `src/tui/layout.ts`, the **60 exported symbols** no file referenced (19 deleted outright, 39 demoted to internal), `Agent.phase()`, `provider-defaults.ts`.
+- **Single provider catalog** (`src/config/providers.ts`): the TUI list, the router's `PROVIDER_DEFAULT_MODELS` and `defaultConfig()`'s providers were three copies that had drifted (togetherai, siliconflow `.com`/`.cn`, minimax anthropic vs openai, gemini's adapter type). One canonical 46-entry list; everything reads it.
+- **The diff card gained the opencode ± background bands** (`#20303b` added / `#37222c` removed — the theme tokens existed, nothing rendered them) with a `… N more diff lines` footer.
+- **Code fences**: a thin left gutter on every code row, `↪` continuation markers for wrapped long lines, and keyword highlighting for 16 languages (was 4).
+- **Tables**: the grid is budgeted `cols*2+1` and **measures rendered cells**, so a column of `**bold**` no longer overruns its slot.
+- **Checkpoint blobs** are written `0600`, checkpoint directories `0700` (best effort; documented as a no-op on shared storage).
+- **Session resume repair is tested**: interrupted tool-call turns get synthetic tool responses (`tests/session-repair.test.js`).
+- **SECURITY.md** documents the checkpoint plaintext reality and the shared-storage no-op mode.
+
 
 
 ## [0.21.0] — 2026-11-12

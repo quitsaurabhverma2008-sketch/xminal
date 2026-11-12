@@ -54,10 +54,6 @@ export function redactSecrets(text: string): RedactionResult {
   return { text: out, count };
 }
 
-export function redactSecretsInPlace(content: string): { content: string; count: number } {
-  const { text, count } = redactSecrets(content);
-  return { content: text, count };
-}
 
 /** Secret-ish field names whose values must never be printed in full. */
 const SECRET_FIELDS = new Set(["apikey", "key", "token", "secret", "password", "authorization"]);

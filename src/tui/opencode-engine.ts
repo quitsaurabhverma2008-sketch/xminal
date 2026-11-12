@@ -31,7 +31,7 @@ export interface EngineLocation {
 }
 
 /** Candidate roots, in priority order. */
-export function engineCandidates(root: string): string[] {
+function engineCandidates(root: string): string[] {
   const out: string[] = [];
   const external = process.env.XMINAL_OPENCODE_ENGINE?.trim();
   if (external) out.push(external);
@@ -42,7 +42,7 @@ export function engineCandidates(root: string): string[] {
 }
 
 /** Locate the vendored OpenCode checkout, or undefined when it is not present. */
-export function findEngine(root = xminalRoot()): EngineLocation | undefined {
+function findEngine(root = xminalRoot()): EngineLocation | undefined {
   for (const candidate of engineCandidates(root)) {
     const cli = path.join(candidate, "packages", "cli", "src", "index.ts");
     const preload = path.join(candidate, "packages", "xminal-bridge", "src", "preload.ts");
@@ -66,7 +66,7 @@ function bunCandidate(): string {
   return process.env.XMINAL_BUN ?? process.env.BUN ?? "bun";
 }
 
-export class EngineMissingError extends Error {
+class EngineMissingError extends Error {
   constructor(readonly searched: string[]) {
     super(
       "opencode engine not installed: no OpenCode checkout found. " +

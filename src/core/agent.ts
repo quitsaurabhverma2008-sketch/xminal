@@ -848,7 +848,7 @@ function canonicalToolArguments(raw: string): string {
   return JSON.stringify({ __raw: raw ?? "" });
 }
 
-export function effortCap(effort: AgentEffort, modelMax: number, configMax: number): number {
+function effortCap(effort: AgentEffort, modelMax: number, configMax: number): number {
   // configMax <= 0 means "no per-turn cap" — the model's own limit governs
   const limit = configMax > 0 ? configMax : Number.POSITIVE_INFINITY;
   return Math.floor(Math.min(modelMax, limit, EFFORT_CAP[effort]));

@@ -19,7 +19,7 @@ export interface StuckThresholds {
   readonly errorStreakNudge: number;
 }
 
-export const DEFAULT_STUCK_THRESHOLDS: StuckThresholds = {
+const DEFAULT_STUCK_THRESHOLDS: StuckThresholds = {
   actionErrorWindow: 10,
   repeatThreshold: 3,
   errorStreakNudge: 3,
@@ -146,7 +146,7 @@ export class StuckDetector {
 }
 
 /** A short description of an action, for the nudge message. */
-export function describeAction(action: StuckAction): string {
+function describeAction(action: StuckAction): string {
   const command = action.args.command ?? action.args.path ?? action.args.pattern ?? action.args.query;
   if (typeof command === "string" && command.trim()) return command.trim().slice(0, 120);
   return action.tool;

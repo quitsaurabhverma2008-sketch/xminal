@@ -13,7 +13,7 @@
 
 export type WorkflowPhase = "understand" | "inspect" | "plan" | "implement" | "verify" | "review" | "summarize";
 
-export const WORKFLOW_ORDER: readonly WorkflowPhase[] = [
+const WORKFLOW_ORDER: readonly WorkflowPhase[] = [
   "understand",
   "inspect",
   "plan",
@@ -75,7 +75,7 @@ export function currentPhase(state: WorkflowState): WorkflowPhase {
 }
 
 /** The rule for a phase — one line, injected into the prompt. */
-export const PHASE_RULES: Record<WorkflowPhase, string> = {
+const PHASE_RULES: Record<WorkflowPhase, string> = {
   understand: "Restate the goal, the constraints and what 'done' means before touching anything.",
   inspect: "Read the relevant files, the project instructions and the tests. Do not guess a file's content.",
   plan: "Write a short plan (or a todo list) with the concrete steps before editing.",

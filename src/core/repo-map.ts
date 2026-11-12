@@ -85,7 +85,7 @@ const STOPWORDS = new Set([
 ]);
 
 /** Ranking multipliers (tuned the same way aider tunes them). */
-export const RANK_MUL = {
+const RANK_MUL = {
   /** an identifier the request mentions */
   mentionedIdent: 10,
   /** a long, distinctive identifier (snake/kebab/camel, >= 8 chars) */
@@ -159,7 +159,7 @@ export function extractReferences(content: string): MapTag[] {
 }
 
 /** The module specifiers a file imports. */
-export function extractImports(content: string): string[] {
+function extractImports(content: string): string[] {
   const out: string[] = [];
   for (const pattern of REF_PATTERNS) {
     pattern.lastIndex = 0;
@@ -200,7 +200,7 @@ function addEdge(graph: Graph, from: string, to: string, weight: number): void {
  * Pure iteration — no dependency, deterministic, and good enough for a few
  * hundred files.
  */
-export function pagerank(graph: Graph, options: { damping?: number; iterations?: number } = {}): Map<string, number> {
+function pagerank(graph: Graph, options: { damping?: number; iterations?: number } = {}): Map<string, number> {
   const damping = options.damping ?? 0.85;
   const iterations = options.iterations ?? 24;
   const nodes = [...graph.nodes];

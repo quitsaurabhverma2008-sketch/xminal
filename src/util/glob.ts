@@ -1,4 +1,4 @@
-export function globToRegExp(glob: string): RegExp {
+function globToRegExp(glob: string): RegExp {
   let out = "^";
   for (let i = 0; i < glob.length; i++) {
     const char = glob[i];

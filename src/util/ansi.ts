@@ -47,7 +47,7 @@ export function stripAnsi(text: string): string {
   return text.replace(/\u001b\[[0-9;]*m/g, "");
 }
 
-export function visibleLength(text: string): number {
+function visibleLength(text: string): number {
   return stripAnsi(text).length;
 }
 
@@ -61,14 +61,15 @@ export function truncate(text: string, width: number): string {
   return text.slice(0, Math.max(0, width - 1)) + "…";
 }
 
+export const WORDMARK: string[] = [
+  "██╗  ██╗███╗   ███╗██╗███╗   ██╗ █████╗ ██╗",
+  "╚██╗██╔╝████╗ ████║██║████╗  ██║██╔══██╗██║",
+  " ╚███╔╝ ██╔████╔██║██║██╔██╗ ██║███████║██║",
+  " ██╔██╗ ██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║",
+  "██╔╝ ██╗██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗",
+  "╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝",
+];
+
 export function banner(version: string): string {
-  const logo = [
-    "██╗  ██╗███╗   ███╗██╗███╗   ██╗ █████╗ ██╗",
-    "╚██╗██╔╝████╗ ████║██║████╗  ██║██╔══██╗██║",
-    " ╚███╔╝ ██╔████╔██║██║██╔██╗ ██║███████║██║",
-    " ██╔██╗ ██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║",
-    "██╔╝ ██╗██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗",
-    "╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝",
-  ].join("\n");
-  return `${ansi.cyan(logo)}\n${ansi.gray(`v${version} · all-in-one terminal coding agent · /help for commands`)}`;
+  return `${ansi.cyan(WORDMARK.join("\n"))}\n${ansi.gray(`v${version} · all-in-one terminal coding agent · /help for commands`)}`;
 }

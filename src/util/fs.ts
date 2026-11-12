@@ -78,10 +78,6 @@ export function sha256(text: string): string {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
 
-export function shortHash(text: string, length = 8): string {
-  return sha256(text).slice(0, length);
-}
-
 export function truncateText(text: string, maxChars: number, note = "…[truncated]"): string {
   if (text.length <= maxChars) return text;
   const head = Math.floor(maxChars * 0.75);
@@ -121,11 +117,6 @@ export function walkFiles(root: string, options: { maxFiles?: number; ignore?: s
 export function relativeTo(base: string, file: string): string {
   const rel = path.relative(base, file);
   return rel === "" ? "." : rel;
-}
-
-export function copyFileWithDirs(src: string, dest: string): void {
-  ensureDir(path.dirname(dest));
-  fs.copyFileSync(src, dest);
 }
 
 export function removeDir(dir: string): void {

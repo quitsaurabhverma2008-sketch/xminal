@@ -1,6 +1,7 @@
-import { ansi } from "../util/ansi";
+import { ansi, WORDMARK } from "../util/ansi";
 import type { ChatUsage, ToolCall } from "../providers/types";
 import type { ResolvedModel } from "../config/types";
+import { costOf } from "../core/cost";
 import type { ToolResult } from "../tools/types";
 
 export class Renderer {
@@ -9,15 +10,7 @@ export class Renderer {
   private lastUsage?: { input: number; output: number; cost: number };
 
   banner(version: string, model: string, mode: string): void {
-    const logo = [
-      "██╗  ██╗███╗   ███╗██╗███╗   ██╗ █████╗ ██╗",
-      "╚██╗██╔╝████╗ ████║██║████╗  ██║██╔══██╗██║",
-      " ╚███╔╝ ██╔████╔██║██║██╔██╗ ██║███████║██║",
-      " ██╔██╗ ██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║",
-      "██╔╝ ██╗██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗",
-      "╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝",
-    ].join("\n");
-    console.log(ansi.cyan(logo));
+    console.log(ansi.cyan(WORDMARK.join("\n")));
     console.log(ansi.gray(`v${version} · model ${model} · mode ${mode}`));
     console.log(ansi.gray("Type /help for commands, /exit to quit. Ctrl+C aborts the current turn.\n"));
   }
@@ -71,9 +64,7 @@ export class Renderer {
   }
 
   usage(usage: ChatUsage, model: ResolvedModel): void {
-    const cost =
-      (usage.inputTokens / 1_000_000) * model.inputPricePerMTok +
-      (usage.outputTokens / 1_000_000) * model.outputPricePerMTok;
+    const cost = costOf(usage, model);
     this.lastUsage = {
       input: (this.lastUsage?.input ?? 0) + usage.inputTokens,
       output: (this.lastUsage?.output ?? 0) + usage.outputTokens,

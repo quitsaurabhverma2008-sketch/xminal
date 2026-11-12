@@ -141,7 +141,7 @@ export function analyzeRequest(text: string, options: { verifyCommand?: string }
 }
 
 /** Render the brief for the prompt — bounded. */
-export function renderTaskBrief(brief: Omit<TaskBrief, "summary">, maxChars = 800): string {
+function renderTaskBrief(brief: Omit<TaskBrief, "summary">, maxChars = 800): string {
   const lines: string[] = [];
   lines.push(`Goal: ${brief.goal}`);
   lines.push(`Kind: ${brief.kind}${brief.ambiguity === "high" ? " (ambiguous — ask one question first)" : brief.ambiguity === "low" ? " (slightly vague — state your assumption)" : ""}`);

@@ -2,7 +2,7 @@
 // Design: stable per-block rendering. Code fences parse byte-exact. Tables are
 // width-capped. Incomplete trailing structures degrade gracefully (never throw).
 import { rgb, bgRgb, RESET, BOLD, ITALIC, T, inlineCode, fgMuted, fgAmber, fgGreen, fgPurple, fgAccent, fgOrange } from "./theme";
-import { visibleWidth, splitGraphemes, stripAnsi, wrapAnsi as wrapPlain } from "./width";
+import { visibleWidth, splitGraphemes, stripAnsi, wrapAnsi as wrapPlain, sliceToWidth } from "./width";
 
 const C = {
   heading: fgAmber,
@@ -15,7 +15,7 @@ const C = {
 };
 
 // ─── inline rendering ──────────────────────────────────────────────
-export function renderInline(text: string): string {
+function renderInline(text: string): string {
   // escape sequences that already exist (they were produced by us) pass through untouched
   let out = "";
   let rest = text;
@@ -170,10 +170,25 @@ export function renderMarkdown(input: string, options: RenderOptions): string[] 
 const KEYWORDS: Record<string, string> = {
   ts: "const let var function return if else for while import from export default async await try catch finally throw new class extends interface type enum public private readonly static switch case break continue typeof instanceof in of do yield delete void null undefined",
   js: "const let var function return if else for while import from export default async await try catch finally throw new class extends switch case break continue typeof instanceof in of do yield delete void null undefined",
+  jsx: "const let var function return if else for while import from export default async await try catch finally throw new class extends interface type switch case break continue typeof instanceof in of do yield delete void null undefined",
+  tsx: "const let var function return if else for while import from export default async await try catch finally throw new class extends interface type enum public private readonly static switch case break continue typeof instanceof in of do yield delete void null undefined",
   py: "def return if elif else for while import from as with try except finally raise lambda pass break continue in not and or is None True False class yield async await global nonlocal assert del print",
   sh: "if then else elif fi for while do done case esac function in return echo exit local export",
+  bash: "if then else elif fi for while do done case esac function in return echo exit local export",
+  zsh: "if then else elif fi for while do done case esac function in return echo exit local export",
+  go: "func return if else for range switch case default break continue goto fallthrough select case struct interface map chan go defer recover panic var const type package import range",
+  rs: "fn let mut const static if else match while for loop break continue return struct enum trait impl pub use mod crate super self where async await move box dyn ref",
+  rust: "fn let mut const static if else match while for loop break continue return struct enum trait impl pub use mod crate super self where async await move box dyn ref",
+  c: "int char float double void return if else for while do switch case default break continue static const struct union typedef enum sizeof malloc free include define",
+  cpp: "int char float double void return if else for while do switch case default break continue static const struct union typedef enum public private protected class namespace template virtual override new delete auto using namespace",
+  java: "int long float double boolean void return if else for while do switch case default break continue static final public private protected class interface extends implements new try catch finally throw throws package import",
+  ruby: "def return if elsif else unless for while until case when break next redo in not and or class module end require include extend alias true false nil self yield begin rescue ensure",
+  php: "function return if else elseif for while do switch case break continue echo print new class extends public private protected static interface namespace use try catch finally throw fn match true false null",
+  sql: "select from where and or not insert into values update set delete create table index view join left right full inner outer on group by order having limit offset union all distinct as asc desc between like in is null true false",
+  toml: "",
   json: "",
   yaml: "",
+  md: "",
   markdown: "",
 };
 function highlightCode(line: string, lang: string): string {
@@ -200,21 +215,29 @@ function highlightCode(line: string, lang: string): string {
 function renderCodeLine(line: string, width: number, lang = ""): string[] {
   const bare = stripAnsi(line);
   const inner = width; // code surface spans the full content width
+  // a thin left gutter separates the code surface from the prose
+  const gutter = `${rgb(T.panel3)}│${RESET}`;
   const bgLine = (content: string, visibleLen: number): string =>
     `${bgRgb(T.panel2)}${content}${" ".repeat(Math.max(0, inner - visibleLen))}${RESET}`;
-  const limit = Math.max(4, inner - 2); // two spaces of padding inside the surface
+  const pad = 2; // one gutter column + one space
+  const limit = Math.max(4, inner - pad - 1); // gutter + leading space
+  const tint = (piece: string): string => (lang ? highlightCode(piece, lang) : rgb(T.green) + escapeProse2(piece) + RESET);
   if (visibleWidth(bare) <= limit) {
-    const body = (lang ? highlightCode(bare, lang) : rgb(T.green) + escapeProse2(bare) + RESET);
-    return [bgLine(`  ${body}`, 2 + visibleWidth(bare))];
+    return [bgLine(`${gutter} ${tint(bare)}`, pad + 1 + visibleWidth(bare))];
   }
-  // wrap long code lines — preserve verbatim chars, never modify
+  // wrap long lines — preserve verbatim chars, and MARK the continuation
+  // rows so a split line is never mistaken for two code lines
   const out: string[] = [];
   let rest = bare;
+  let first = true;
   while (rest.length > 0) {
-    const chunk = graphemeSlice(rest, limit);
-    rest = rest.slice(chunk.columns === 0 ? 1 : chunk.consumed);
-    out.push(bgLine(`  ${rgb(T.green)}${chunk.text}${RESET}`, 2 + chunk.columns));
+    const marker = first ? "" : `${fgMuted("↪")} `;
+    const room = Math.max(1, limit - visibleWidth(marker));
+    const chunk = graphemeSlice(rest, room);
     if (chunk.columns === 0) break;
+    out.push(bgLine(`${gutter} ${marker}${tint(chunk.text)}`, pad + visibleWidth(marker) + 1 + chunk.columns));
+    rest = rest.slice(chunk.consumed);
+    first = false;
   }
   return out;
 }
@@ -244,20 +267,28 @@ function renderTable(block: string[], width: number): string[] {
     return out;
   }
   const cols = header.length;
+  // measure the RENDERED cell (markdown becomes ANSI) — measuring the raw
+  // source overshot every column containing **bold** or `code`
+  const cellWidth = (text: string): number => visibleWidth(renderInline(text));
   const colWidths = header.map((h, i) => {
     const cells = [h, ...body.map((r) => r[i] ?? "")];
-    return Math.min(60, Math.max(...cells.map((c) => visibleWidth(c)), 3));
+    return Math.min(60, Math.max(...cells.map((c) => cellWidth(c)), 3));
   });
-  const total = colWidths.reduce((a, b) => a + b, 0) + cols * 3 + 1;
-  const scale = total > width ? (width - cols * 3 - 1) / colWidths.reduce((a, b) => a + b, 0) : 1;
+  const sumCols = colWidths.reduce((a, b) => a + b, 0);
+  const gridBudget = (ws: number[]): number => ws.reduce((a, b) => a + b, 0) + cols * 2 + 1;
+  const scale = gridBudget(colWidths) > width ? (width - cols * 2 - 1) / Math.max(1, sumCols) : 1;
   const widths = colWidths.map((w) => Math.max(3, Math.floor(w * scale)));
-  const bar = `${rgb(T.muted)}${"─".repeat(Math.max(1, Math.min(width, total)))}${RESET}`;
+  const rowWidth = Math.min(width, gridBudget(widths));
+  const bar = `${rgb(T.muted)}${"─".repeat(Math.max(1, rowWidth))}${RESET}`;
   const out: string[] = [];
   const cell = (text: string, w: number) => {
-    const clipped = visibleWidth(text) > w ? graphemeSlice(text, Math.max(1, w - 1)) + "…" : text;
-    const rendered = renderInline(clipped);
-    const pad = " ".repeat(Math.max(0, w - visibleWidth(clipped)));
-    return rendered + pad;
+    const rendered = renderInline(text);
+    if (visibleWidth(rendered) <= w) {
+      return rendered + " ".repeat(Math.max(0, w - visibleWidth(rendered)));
+    }
+    // shrink by rendered width, keep the escape sequences intact
+    const clip = sliceToWidth(rendered, Math.max(1, w - 1)).text + "…";
+    return clip + " ".repeat(Math.max(0, w - visibleWidth(clip)));
   };
   const headerLine = widths.map((w, i) => ` ${BOLD}${cell(header[i] ?? "", w)}${RESET}`).join(`${rgb(T.muted)}│${RESET}`);
   out.push(`${rgb(T.muted)}│${RESET}${headerLine}${rgb(T.muted)}│${RESET}`);

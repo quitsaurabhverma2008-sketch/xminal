@@ -308,9 +308,3 @@ export function analyzeText(text: string, field: "output" | "reasoning" = "outpu
   }
 }
 
-/** A one-line summary for the TUI and the audit log. */
-export function riskSummary(analysis: RiskAnalysis): string {
-  if (analysis.findings.length === 0) return "no risk rules matched";
-  const first = analysis.findings[0];
-  return `${analysis.risk}: ${first.description}${analysis.findings.length > 1 ? ` (+${analysis.findings.length - 1} more)` : ""}`;
-}

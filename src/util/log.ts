@@ -23,10 +23,6 @@ function initialLevel(): LogLevel {
 
 let level: LogLevel = initialLevel();
 
-export function setLogLevel(next: LogLevel): void {
-  level = next;
-}
-
 function enabled(target: LogLevel): boolean {
   return order[target] >= order[level];
 }

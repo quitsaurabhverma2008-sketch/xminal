@@ -182,11 +182,6 @@ export function invalidateModelsCatalog(): void {
   cachedFile = undefined;
 }
 
-export function isFreeAlias(config: { models: Record<string, ModelConfig> }, alias: string): boolean {
-  const m = effectiveModelMap(config.models).models[alias];
-  return Boolean(m) && isZeroCost(m.inputPricePerMTok, m.outputPricePerMTok);
-}
-
 export async function refreshModelsCatalog(opts: { force?: boolean } = {}): Promise<RefreshResult> {
   const cache = readCache();
   if (!opts.force && cache && Number.isFinite(TTL_MS) && Date.now() - Date.parse(cache.fetchedAt) < TTL_MS) {

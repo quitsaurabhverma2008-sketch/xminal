@@ -107,7 +107,7 @@ const TOOL_PENDING: Record<string, string> = {
   bash: "Running…",
   task: "Delegating…",
 };
-export function toolGlyph(name: string): string {
+function toolGlyph(name: string): string {
   return TOOL_GLYPH[name] ?? "·";
 }
 export const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -199,7 +199,7 @@ export function completeActivity(
 }
 
 /** Human label for a tool call — opencode renders "Read <path>", "Glob …". */
-export function toolLabel(name: string, argsRaw: string): string {
+function toolLabel(name: string, argsRaw: string): string {
   let args: Record<string, unknown> = {};
   try {
     const parsed: unknown = JSON.parse(argsRaw || "{}");

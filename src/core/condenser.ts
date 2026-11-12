@@ -1,3 +1,4 @@
+import { estimateTokens } from "./tool-usage";
 /**
  * The condenser — what happens when the context grows past the window.
  *
@@ -52,11 +53,6 @@ export interface CondensationResult {
   readonly reason?: CondensationReason;
   /** why the condensation did not happen */
   readonly skipped?: string;
-}
-
-/** A rough token estimate — four characters per token, plus the schema overhead. */
-export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
 }
 
 /** The estimated size of a message list, including the tool schemas. */
@@ -156,8 +152,7 @@ For code tasks also include:
 CODE_STATE: (file paths, function signatures, data structures)
 TESTS: (failing cases, error messages, outputs)
 CHANGES: (code edits)
-DEPS: (dependencies, imports, external calls)
-VERSION_CONTROL_STATUS: (branch, commits)
+DEPS: (dependencies, VERSION_CONTROL_STATUS: (branch, commits)
 
 Write the summary in the USER's voice ("I asked you…", "you changed…").
 Be concise. Do not invent facts that are not in the input.`;

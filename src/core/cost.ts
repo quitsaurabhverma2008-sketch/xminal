@@ -9,6 +9,17 @@ export interface CostSummary {
   turns: number;
 }
 
+/** What one usage event costs. The single place that knows the formula. */
+export function costOf(usage: ChatUsage, model: ResolvedModel): number {
+  let cost =
+    (usage.inputTokens / 1_000_000) * model.inputPricePerMTok +
+    (usage.outputTokens / 1_000_000) * model.outputPricePerMTok;
+  if (usage.reasoningTokens) {
+    cost += (usage.reasoningTokens / 1_000_000) * model.outputPricePerMTok;
+  }
+  return cost;
+}
+
 export class CostTracker {
   inputTokens = 0;
   outputTokens = 0;
@@ -20,12 +31,7 @@ export class CostTracker {
   add(usage: ChatUsage, model: ResolvedModel): void {
     this.inputTokens += usage.inputTokens;
     this.outputTokens += usage.outputTokens;
-    this.costUsd +=
-      (usage.inputTokens / 1_000_000) * model.inputPricePerMTok +
-      (usage.outputTokens / 1_000_000) * model.outputPricePerMTok;
-    if (usage.reasoningTokens) {
-      this.costUsd += (usage.reasoningTokens / 1_000_000) * model.outputPricePerMTok;
-    }
+    this.costUsd += costOf(usage, model);
   }
 
   nextTurn(): void {

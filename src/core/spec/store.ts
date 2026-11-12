@@ -138,7 +138,7 @@ export function createFeature(cwd: string, title: string): { paths: FeaturePaths
 }
 
 /** The paths of one feature directory (does not touch the disk). */
-export function featurePaths(cwd: string, dir: string): FeaturePaths {
+function featurePaths(cwd: string, dir: string): FeaturePaths {
   const root = path.join(featuresDir(cwd), dir);
   return {
     dir: root,

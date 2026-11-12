@@ -130,10 +130,6 @@ export function addGlobalMcpServer(name: string, server: McpServerConfig): { pat
   return { path: file, backup };
 }
 
-export function saveProjectConfig(cwd: string, config: XminalConfig): void {
-  writeJson(projectConfigPath(cwd), config);
-}
-
 export function initProject(cwd: string): { configPath: string } {
   const file = projectConfigPath(cwd);
   ensureDir(path.dirname(file));
@@ -266,6 +262,3 @@ function defaultModelName(providerKey: string): string {
   return PROVIDER_DEFAULT_MODELS[providerKey] ?? "gpt-4o-mini";
 }
 
-export function resolveFallbacks(config: XminalConfig): string[] {
-  return [...config.fallbackModels];
-}

@@ -20,6 +20,7 @@ import type { AgentMode } from "../core/agent";
 import type { PermissionMode } from "../config/types";
 import { runRalph } from "../orchestration/ralph";
 import { runShellCommand } from "../tools/bash-tool";
+import { openExternal } from "../util/open-external";
 import { detectVerifyCommand } from "../tools/verify-tool";
 import { readJson, truncateText } from "../util/fs";
 import { VERSION } from "../version";
@@ -892,29 +893,6 @@ function parseRalphArgs(input: string): { task: string; verify?: string; iterati
     task = task.replace(iterationsMatch[0], " ");
   }
   return { task: task.replace(/\s+/g, " ").trim(), verify, iterations };
-}
-
-function openExternal(url: string): boolean {
-  const platform = process.platform;
-  const candidates: Array<[string, string[]]> =
-    platform === "darwin"
-      ? [["open", [url]]]
-      : platform === "win32"
-        ? [["cmd", ["/c", "start", "", url]]]
-        : [
-            ["termux-open-url", [url]],
-            ["xdg-open", [url]],
-            ["gio", ["open", url]],
-          ];
-  for (const [bin, args] of candidates) {
-    try {
-      const result = spawnSync(bin, args, { stdio: "ignore" });
-      if (result.status === 0) return true;
-    } catch {
-      // try next candidate
-    }
-  }
-  return false;
 }
 
 function ensureGitignore(cwd: string): void {

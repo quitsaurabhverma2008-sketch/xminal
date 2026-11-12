@@ -34,7 +34,7 @@ export interface ObservationOptions {
 }
 
 /** Keep the head and the tail of a long output — the middle is the least useful. */
-export function clipOutput(text: string, maxChars: number): { text: string; elided: number } {
+function clipOutput(text: string, maxChars: number): { text: string; elided: number } {
   if (text.length <= maxChars) return { text, elided: 0 };
   const head = Math.floor(maxChars * 0.65);
   const tail = Math.max(0, maxChars - head);
@@ -123,20 +123,3 @@ export function renderObservation(result: ToolResult, options: ObservationOption
   };
 }
 
-/** A short, human-readable line for the TUI (the tool row). */
-export function observationSummary(observation: Observation): string {
-  switch (observation.outcome) {
-    case "ok":
-      return "ok";
-    case "empty":
-      return "ok · no output";
-    case "failed":
-      return `failed (exit ${observation.exitCode ?? "?"})`;
-    case "timeout":
-      return "timed out";
-    case "denied":
-      return "denied";
-    default:
-      return "error";
-  }
-}

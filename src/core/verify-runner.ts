@@ -103,7 +103,3 @@ export function verifySummary(result: VerifyResult | undefined): string {
   return result.passed ? "verify ✓" : result.timedOut ? "verify timeout" : "verify ✗";
 }
 
-/** Where the verify output should be kept — next to the project state. */
-export function verifyLogPath(cwd: string): string {
-  return path.join(cwd, ".xminal", "verify.log");
-}

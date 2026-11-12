@@ -55,7 +55,7 @@ export interface ConstitutionFinding {
 }
 
 /** The file written when a project has no constitution yet. */
-export const CONSTITUTION_TEMPLATE = `# Project Constitution
+const CONSTITUTION_TEMPLATE = `# Project Constitution
 **Version**: 0.1.0 | **Ratified**: <not ratified> | **Last Amended**: <not amended>
 
 ## Core Principles
@@ -227,15 +227,6 @@ export function checkConstitution(
   }
 
   return findings;
-}
-
-/** Write the template constitution into a project (only when there is none). */
-export function writeConstitutionTemplate(cwd: string): string {
-  const file = path.join(cwd, ".xminal", "constitution.md");
-  if (fs.existsSync(file)) return file;
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, CONSTITUTION_TEMPLATE, "utf8");
-  return file;
 }
 
 // ── internals ─────────────────────────────────────────────────────────

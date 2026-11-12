@@ -7,7 +7,7 @@ import { matchesGlob } from "../util/glob";
 import { diffPreview, diffStat } from "../util/diff";
 import { nearestLines, renderEditFailure } from "../core/edit-report";
 
-export function resolveToolPath(cwd: string, input: string): string {
+function resolveToolPath(cwd: string, input: string): string {
   if (!input) throw new Error("Path is required.");
   return path.resolve(cwd, expandHome(input));
 }

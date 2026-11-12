@@ -38,21 +38,16 @@ export const T = {
   quote: [229, 192, 123] as const,     // #e5c07b markdown.blockQuote / emphasis
 };
 export const fgAccent = (t: string) => `${rgb(T.accent)}${t}${RESET}`;
-export const fgAccent2 = (t: string) => `${rgb(T.cyan)}${t}${RESET}`;
 export const fgAmber = (t: string) => `${rgb(T.yellow)}${t}${RESET}`;
 export const fgGreen = (t: string) => `${rgb(T.green)}${t}${RESET}`;
 export const fgPurple = (t: string) => `${rgb(T.violet)}${t}${RESET}`;
 export const fgRed = (t: string) => `${rgb(T.red)}${t}${RESET}`;
 export const fgMuted = (t: string) => `${rgb(T.muted)}${t}${RESET}`;
 export const fgText = (t: string) => `${rgb(T.text)}${t}${RESET}`;
-export const fgInfo = (t: string) => `${rgb(T.info)}${t}${RESET}`;
 export const fgCyan = (t: string) => `${rgb(T.cyan)}${t}${RESET}`;
 export const fgOrange = (t: string) => `${rgb(T.orange)}${t}${RESET}`;
 export const fgYellow = (t: string) => `${rgb(T.yellow)}${t}${RESET}`;
 
-export const fgSuccess = fgGreen;
-export const fgWarning = fgAmber;
-export const fgError = fgRed;
 
 /**
  * Agent (mode) colors — opencode assigns the categorical palette in order:
@@ -70,7 +65,7 @@ export function modeColor(mode: string): string {
 }
 
 /** Decrease a color toward background (used for composer tint + hover). */
-export function decrease(c: readonly [number, number, number], amount = 18): [number, number, number] {
+function decrease(c: readonly [number, number, number], amount = 18): [number, number, number] {
   return [Math.max(0, c[0] - amount), Math.max(0, c[1] - amount), Math.max(0, c[2] - amount)];
 }
 

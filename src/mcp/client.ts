@@ -14,7 +14,7 @@ export interface McpTool {
   inputSchema?: Record<string, unknown>;
 }
 
-export class McpClient {
+class McpClient {
   private child: ChildProcessWithoutNullStreams;
   private buffer = "";
   private nextId = 1;

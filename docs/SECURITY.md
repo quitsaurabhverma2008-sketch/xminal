@@ -17,15 +17,33 @@ radius — they do not make an autonomous run safe to leave unattended.
   config file, so a tampered config can redirect a key.
 - The provider wizard masks what you type (only the last four characters are
   shown) and `xminal models` prints credential *status*, never the key.
-- **XMINAL does not chmod the config file** — it is created with your umask
-  (typically `0644`). Lock it down yourself:
+- XMINAL **does** restrict the config: `saveGlobalConfig` writes `~/.xminal/config.json`
+  with mode `0600`, `~/.xminal` is chmod'ed `0700` at startup (best effort on
+  shared storage), and `xminal keys`/`setProviderKey` always write `0600`.
+  The model catalog cache (`~/.xminal/cache/models.json`) is also `0600`.
+  If your config was written by an older version, run `xminal config global`
+  once — the startup hook hardens permissions every launch.
+- Provider keys **cannot** be read by the agent itself: `~/.xminal` and
+  `~/.config/xminal` are in the default `protectedPaths`, so a prompt-injection
+  payload telling the model to `read ~/.xminal/config.json` is refused before
+  the model ever sees the bytes.
 
-```bash
-chmod 600 ~/.xminal/config.json
-```
+## Checkpoints are copies of your files
 
-  The model catalog cache (`~/.xminal/cache/models.json`) *is* written with
-  mode `600` by XMINAL.
+`.xminal/checkpoints/<id>/blobs/` stores verbatim copies of every file the
+agent touches before editing it — that is the whole point of an undo.
+Consequences:
+
+- checkpoint blobs are written `0600` and the checkpoint directories `0700`
+  (best effort — FAT/exFAT shared storage has no modes, and on such
+  filesystems the copy is only as private as the filesystem itself)
+- **a checkpoint is plaintext** — it will contain anything you edited,
+  including files with secrets
+- `.xminal/` is gitignored by `xminal init`; never `git add` it
+- delete checkpoint directories you no longer need:
+  `rm -rf .xminal/checkpoints/*` — the agent can always be rolled back with
+  git instead
+
 - `xminal config global` prints the whole config, keys included. Do not paste
   it into a bug report.
 

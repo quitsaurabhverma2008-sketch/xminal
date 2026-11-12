@@ -74,7 +74,3 @@ export const PROVIDER_DEFAULT_MODELS: Record<string, string> = Object.fromEntrie
   PROVIDER_CATALOG.map((entry) => [entry.key, entry.defaultModel]),
 );
 
-/** keyless? (local servers + opencode free) */
-export function isKeylessProvider(entry: ProviderCatalogEntry): boolean {
-  return entry.kind !== "byok";
-}

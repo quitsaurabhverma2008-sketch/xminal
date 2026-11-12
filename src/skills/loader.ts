@@ -23,11 +23,11 @@ export interface SkillVerification {
   lockPath: string;
 }
 
-export function skillLockPath(cwd: string, lockPath?: string): string {
+function skillLockPath(cwd: string, lockPath?: string): string {
   return lockPath ?? path.join(cwd, ".xminal", "skills.lock.json");
 }
 
-export function hashSkills(skills: SkillInfo[]): Record<string, string> {
+function hashSkills(skills: SkillInfo[]): Record<string, string> {
   const hashes: Record<string, string> = {};
   for (const skill of skills) {
     hashes[skill.name] = sha256(readText(skill.path));
@@ -35,7 +35,7 @@ export function hashSkills(skills: SkillInfo[]): Record<string, string> {
   return hashes;
 }
 
-export function hashProjectSkills(cwd: string): Record<string, string> {
+function hashProjectSkills(cwd: string): Record<string, string> {
   const projectSkills = new SkillRegistry(cwd).list().filter((skill) => skill.source === "project");
   return hashSkills(projectSkills);
 }

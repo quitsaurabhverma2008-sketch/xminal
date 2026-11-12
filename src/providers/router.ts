@@ -10,7 +10,7 @@ import { logEvent } from "../util/log";
 
 export { ProviderError } from "./types";
 
-export function createAdapter(model: ResolvedModel): ProviderAdapter {
+function createAdapter(model: ResolvedModel): ProviderAdapter {
   switch (model.providerConfig.type) {
     case "anthropic":
       return new AnthropicAdapter();
@@ -38,7 +38,7 @@ const THROTTLE = /rate limit|rate_limit|too many requests|429|tpm|rpm|requests p
 const AUTH = /unauthor|forbidden|invalid api key|invalid credential|authentication|api key not|missing api key|permission denied/i;
 
 /** Why a request failed — drives what we do next, and what we say. */
-export function classifyFailure(error: unknown): {
+function classifyFailure(error: unknown): {
   kind: "auth" | "quota" | "throttle" | "model" | "server" | "network" | "unknown";
   retryable: boolean;
   retryAfterMs?: number;

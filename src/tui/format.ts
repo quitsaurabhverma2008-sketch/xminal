@@ -72,7 +72,3 @@ export function tintDiffRow(row: string, tint: (t: string) => string, muted: (t:
   return row;
 }
 
-export function hasUnbalancedBoldMarkers(text: string): boolean {
-  const outsideCode = segment(text).filter((s) => s.kind === "prose").map((s) => s.text).join("");
-  return (outsideCode.match(/\*\*/g) ?? []).length % 2 !== 0;
-}

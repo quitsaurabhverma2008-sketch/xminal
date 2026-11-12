@@ -30,7 +30,7 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-export function usageFile(cwd: string): string {
+function usageFile(cwd: string): string {
   return path.join(projectReceiptsDir(cwd), "tool-usage.jsonl");
 }
 

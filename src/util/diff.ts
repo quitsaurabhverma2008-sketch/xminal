@@ -37,7 +37,7 @@ export interface FileDiff {
 }
 
 /** Trim the common prefix and suffix, then LCS-diff the remainder. */
-export function diffLines(a: string[], b: string[], options: { context?: number } = {}): DiffHunk[] {
+function diffLines(a: string[], b: string[], options: { context?: number } = {}): DiffHunk[] {
   const context = Math.max(0, options.context ?? 3);
   let start = 0;
   while (start < a.length && start < b.length && a[start] === b[start]) start += 1;
@@ -156,7 +156,7 @@ function linesOf(text: string): string[] {
   return text.replace(/\r\n?/g, "\n").split("\n");
 }
 
-export function diffFiles(before: string, after: string, options: { context?: number; path?: string } = {}): FileDiff {
+function diffFiles(before: string, after: string, options: { context?: number; path?: string } = {}): FileDiff {
   const a = linesOf(before);
   const b = linesOf(after);
   const hunks = diffLines(a, b, { context: options.context });
@@ -173,7 +173,7 @@ export function diffFiles(before: string, after: string, options: { context?: nu
 }
 
 /** The classic unified-diff text (for logs, patches, copy-paste). */
-export function renderUnifiedDiff(diff: FileDiff, options: { maxLines?: number } = {}): string {
+function renderUnifiedDiff(diff: FileDiff, options: { maxLines?: number } = {}): string {
   const maxLines = options.maxLines ?? 60;
   const out: string[] = [];
   if (diff.isNew) out.push(`new file ${diff.path}`);
