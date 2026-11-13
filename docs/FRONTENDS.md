@@ -15,6 +15,9 @@ sessions, providers and model catalog. Only the pixels differ.
 
 ## The Web UI (`xminal web-ui`)
 
+Screenshots + GIFs (real session, mid-turn, InkFlow built live, all pages): see the Web UI section of the README and `assets/webui-*`.
+
+
 `xminal web-ui` (or `/web-ui` in the TUI) starts the local server and opens a
 full agent chat page in your browser. Served at `http://127.0.0.1:8787` (port
 auto-finds if busy), it talks to the same `Runtime` over the new

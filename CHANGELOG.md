@@ -4,6 +4,12 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+### Added
+
+- **Web UI assets for the README** — every screenshot and GIF of the browser UI, captured from the real build (WeasyPrint render of the page's own JS + jsdom): the chat with a real session, mid-turn, empty intro, InkFlow app, terminal, and three tour GIFs covering all 13 pages.
+- **`examples/inkflow/`** — a single-file dark todo app **built by the agent itself** from the web UI (`/v1/agent/stream`, free model `groq/openai/gpt-oss-120b`), three turns: build → self-reported filter bug fixed (`grep`-verified) → first-run TDZ crash fixed (`grep`-verified; jsdom smoke test renders the 3 sample todos). Kept verbatim — bugs and all fixed as the agent fixed them.
+- **Docs**: README's Web UI section rewritten with inline screenshots and GIFs.
+
 ## [0.27.1] — 2026-11-13
 
 **`xminal web-ui` actually serves the web UI now.**

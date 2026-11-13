@@ -327,7 +327,42 @@ Details: [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
 **v0.27.1** — live on npm, 264/264 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Web UI
-`xminal web-ui` starts the local server and opens a full browser chat UI (same agent, same providers, same sessions). Or press `/web-ui` inside the TUI. Served by `xminal serve` at `http://127.0.0.1:8787` — light Ekko-Studio-style page: icon rail + session sidebar (search, pin, rename, delete), live turn/token/cost chip, context-window %, streaming answers with reasoning blocks and tool-call cards, markdown + KaTeX math (CDN, optional), `/` slash-command menu, `Ctrl+K` command palette, dedicated pages for Model / Mode / Effort / Permissions / Approvals / Usage / Connection / Share-Export / Settings, and **in-browser approval cards** — the agent's ask-permission prompts stream as SSE events and resolve through `/v1/agent/permission` (Approve / Deny / always-allow-for-session). Zero deps, no external service.
+
+`xminal web-ui` starts the local server and opens a full browser chat UI (same agent, same providers, same sessions). Or press `/web-ui` inside the TUI. Served by `xminal serve` at `http://127.0.0.1:8787` — a light, Ekko-Studio-style page: icon rail with 13 dedicated pages, a collapsible session sidebar (search · pin · rename · delete), a live turn/token/cost chip with context-window %, streaming answers with reasoning blocks and live tool-call cards, markdown + KaTeX math, a `/` slash-command menu, a `Ctrl+K` command palette, and **in-browser approval cards** — the agent's ask-permission prompts stream as SSE events and resolve through `/v1/agent/permission` (Approve / Deny / always-allow-for-session). Zero deps, no external service, MIT.
+
+**A real project, built from the browser in three turns** — InkFlow ([`examples/inkflow/index.html`](examples/inkflow/index.html)), a dark single-file todo app, written by the agent end-to-end through `/v1/agent/stream` on a free model: build → self-reported bug fixed → a first-run crash found and fixed → verified in jsdom (3 sample todos render):
+
+<img src="assets/webui-inkflow.gif" width="900" alt="InkFlow built by XMINAL from the web UI: working → reply → the running app" />
+
+**The chat page** — a real session: reasoning block, tool-call cards with args and output, model pill, token/cost chip:
+
+<img src="assets/webui-chat.png" width="900" alt="XMINAL web UI: a real session with tool calls and a full answer" />
+
+**While a turn is running** — the write tool done, `bash` spinning, chip at $0.0000:
+
+<img src="assets/webui-working.png" width="900" alt="XMINAL web UI: a turn in progress with a spinning tool card" />
+
+**From empty to answered** — intro → working → complete:
+
+<img src="assets/webui-chat.gif" width="760" alt="XMINAL web UI: intro, tool run, final answer" />
+
+**Every page, one by one** — sessions → model picker (258 models · FREE badges · context windows) → mode → effort → permissions:
+
+<img src="assets/webui-tour-a.gif" width="760" alt="XMINAL web UI: sessions, model, mode, effort, permissions pages" />
+
+**Approvals → usage → connection → commands** — pending approvals with history, per-session cost and context meter, provider/health status, Ctrl+K palette:
+
+<img src="assets/webui-tour-b.gif" width="760" alt="XMINAL web UI: approvals, usage, status, commands pages" />
+
+**Share/Export → settings → about → back to chat** — copy as Markdown, download session JSON, defaults, danger zone:
+
+<img src="assets/webui-tour-c.gif" width="760" alt="XMINAL web UI: export, settings, about pages" />
+
+**Terminal** — startup and the full verify suite:
+
+<img src="assets/webui-terminal.png" width="760" alt="xminal web-ui startup and npm run verify in a terminal" />
+
+<img src="assets/webui-terminal.gif" width="640" alt="xminal web-ui: typing the command, server up, health check" />
 
 ## Development
 
