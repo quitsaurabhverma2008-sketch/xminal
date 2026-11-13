@@ -326,6 +326,9 @@ Details: [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
 
 **v0.23.1** — live on npm, 243/243 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
+## Web UI
+`xminal web-ui` starts the local server and opens a full browser chat UI (same agent, same providers, same sessions). Or press `/web-ui` inside the TUI. The page is served by `xminal serve` at `http://127.0.0.1:8787` — dark theme, session sidebar, SSE-streamed answers, code fences with copy button, cost/turn pills, model autodetect.
+
 ## Development
 
 ```bash

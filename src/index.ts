@@ -21,6 +21,7 @@ import { McpManager } from "./mcp/client";
 import { runRalph } from "./orchestration/ralph";
 import { detectVerifyCommand } from "./tools/verify-tool";
 import { startServer } from "./server/http";
+import { openExternal } from "./util/open-external";
 import { startMcpStdioServer } from "./mcp/server";
 import { startTelegram } from "./bridges/telegram";
 import { verifyAudit, tailAudit } from "./cli/audit";
@@ -303,6 +304,10 @@ async function main(): Promise<void> {
 
     case "serve":
       await commandServe(cwd, args);
+      return;
+
+    case "web-ui":
+      await commandWebUI(cwd, args);
       return;
 
     case "telegram":
@@ -613,6 +618,32 @@ function commandWorktree(
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
   if (result.status !== 0) process.exitCode = result.status ?? 1;
+}
+
+async function commandWebUI(cwd: string, args: ReturnType<typeof parseArgs>): Promise<void> {
+  const port = parseNumberFlag(args.flags, "port", 8787);
+  const host = stringFlag(args.flags.host) ?? "127.0.0.1";
+  const token = stringFlag(args.flags.token) ?? process.env.XMINAL_SERVER_TOKEN;
+  const running = await startServer({
+    cwd,
+    host,
+    port,
+    token,
+    mode: modeFlag(args.flags.mode),
+    model: stringFlag(args.flags.model) ?? stringFlag(args.flags.m),
+  });
+  const url = `http://${host}:${port}`;
+  console.log(`xminal web UI listening on ${url}`);
+  console.log("  GET  /health · GET /v1/models · GET /v1/sessions · POST /v1/agent (SSE-capable)");
+  console.log("  opening your browser…  (Ctrl+C to stop)");
+  if (token) console.log("  auth: Authorization: Bearer <token>");
+  openExternal(url);
+  const shutdown = async () => {
+    await running.close();
+    process.exit(0);
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
 }
 
 async function commandServe(cwd: string, args: ReturnType<typeof parseArgs>): Promise<void> {

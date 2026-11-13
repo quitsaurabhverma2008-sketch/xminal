@@ -6,11 +6,26 @@ the other two are opt-in through `XMINAL_TUI_ENGINE`.
 | Frontend | Enable with | Needs | Runs on | Status |
 |---|---|---|---|---|
 | **Built-in TUI** (default) | — | Node ≥ 18, zero native deps | macOS, Linux, Windows, **Android/Termux** | Default everywhere |
+| **Web UI** | `xminal web-ui` or `/web-ui` in the TUI | A browser, same machine | macOS, Linux, Windows, **Android/Termux** (browser) | Shipped in-process |
 | **Ink engine** | `XMINAL_TUI_ENGINE=ink` | Node **≥ 22** (Ink 8 `engines`), 4 pure-JS deps | Everywhere Node ≥ 22 runs, Termux included | Opt-in, feature-light |
 | **Vendored OpenCode engine** | `XMINAL_TUI_ENGINE=opencode` | **Bun** + a checkout containing `vendor/` | macOS / Linux / Windows only | Opt-in, desktop only |
 
-All three drive the same runtime: the same agent loop, tools, permissions,
+All four drive the same runtime: the same agent loop, tools, permissions,
 sessions, providers and model catalog. Only the pixels differ.
+
+## The Web UI (`xminal web-ui`)
+
+`xminal web-ui` (or `/web-ui` in the TUI) starts the local server and opens a
+full chat page in your browser. The page is served at `http://127.0.0.1:8787`
+(port auto-finds if busy) and talks to the same `Runtime` over the
+OpenAI-compatible `/v1/chat/completions` endpoint (SSE streaming). It ships in
+the package — zero deps, no external service.
+
+Features: dark theme matching the TUI · session sidebar (live list from
+`/v1/sessions`) · streaming answers (SSE) · code fences with copy button ·
+model/mode/turns/cost pills (model auto-detected) · `Esc` to stop a turn ·
+`Ctrl+C` in the terminal stops the server. For multi-machine access, pass
+`--token` and `--host 0.0.0.0`.
 
 ## Fallbacks
 

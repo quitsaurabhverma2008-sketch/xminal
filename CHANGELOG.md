@@ -4,6 +4,23 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.25.0] — 2026-11-12
+
+**`xminal web-ui` — XMINAL ka apna browser UI, zero deps, MIT, in-family.**
+
+### Added
+
+- **The XMINAL web UI**: `xminal web-ui` starts the local server and opens it in your browser (`/web-ui` in the TUI does the same, opening `http://127.0.0.1:8787` by default). The page is a full chat client: dark theme matching the TUI, session sidebar (from `/v1/sessions`), SSE-streamed answers, markdown-ish rendering with code fences + copy button, model/mode/turns/cost pills, Esc to stop, clear-conversation button. Built into XMINAL itself — no external service, no new dependency.
+- **TUI `/web-ui` (and `/web`)**: starts (or reuses) the local server on the first free port from 8787, prints the URL in the transcript, opens your browser.
+- **Server routes for the UI**: `POST /v1/chat/completions` (already OpenAI-compatible, SSE streaming), plus `GET /health`, `GET /v1/models`, `GET /v1/sessions` — all covered by new HTTP-level tests.
+- **`xminal web-ui [--port N] [--host H] [--token T]`**: same as `xminal serve` but opens the browser automatically.
+- The web page auto-detects the configured default model and fills the pill; Ctrl+C in the terminal stops the server.
+
+### Changed
+
+- **Tests**: 6 new HTTP-level tests for the web UI (page serves, content-type, /health, /v1/models, /v1/sessions, /v1/chat/completions rejects empty prompt offline). 257/257 green.
+- The TUI browser-open for `/web-ui` is skipped during tests (`XMINAL_WEB_UI_NO_OPEN=1`).
+
 ## [0.24.0] — 2026-11-12
 
 **The skills.sh catalog — 20,000 skills, offline, searchable from everywhere.**

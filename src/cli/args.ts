@@ -140,6 +140,7 @@ Usage:
   xminal ralph <task> --verify <cmd> [--iterations N]
   xminal worktree <list|create|remove|merge> [options]
   xminal serve [--port 8787] [--host 127.0.0.1] [--token T]
+  xminal web-ui [--port N] [--host H] [--token T]   start the web UI and open it in your browser
   xminal telegram [--token T]
   xminal skills | mcp [--serve] | config | audit [verify|tail] | version | help
   xminal verify                   run the project's verify command (headless)

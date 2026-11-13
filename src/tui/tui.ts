@@ -10,6 +10,8 @@ import { installFromRegistry } from "../skills/registry";
 import { visibleWidth, graphemeSlice, stripAnsi as stripAnsiW, splitGraphemes, wrapAnsi } from "./width";
 import { redactSecrets } from "../util/redact";
 import { openExternal } from "../util/open-external";
+import { startServer } from "../server/http";
+import type { RunningServer } from "../server/http";
 import { logEvent } from "../util/log";
 import { renderStyledLine, type Line, type LineKind } from "./chat-lines";
 import { renderRepoMap, repoMapSummary, buildRepoMap } from "../core/repo-map";
@@ -104,6 +106,7 @@ const COMMANDS: Cmd[] = [
   { name: "/skill-install", desc: "install a skill from the skills.sh registry", group: "Skills" },
 
   { name: "/mcp", desc: "list MCP servers + tools", group: "MCP" },
+  { name: "/web-ui", desc: "open the local web UI in your browser", group: "Web" },
 
   { name: "/build", desc: "build mode (shorthand for /mode build)", group: "Agent" },
   { name: "/ralph", desc: "iterate impl until verify passes", group: "Dev" },
@@ -410,6 +413,8 @@ const sessionRows = (query: string): SessionRow[] => {
   let cursor = 0;
   let scroll = 0;
   let overlay: Overlay = { kind: "none" };
+  /** the in-process web UI server, started on first /web-ui */
+  let webServer: RunningServer | undefined;
   const overlayKind = (): Overlay["kind"] => overlay.kind;
   let paletteIndex = 0;
   let pendingPermission: { tool: string; reason: string; resolve: (allow: boolean) => void } | null = null;
@@ -1208,6 +1213,36 @@ const sessionRows = (query: string): SessionRow[] => {
       // and friends keep the classic flag-style handler
       if (parts.length <= 1) { overlay = { kind: "skills", query: "", index: 0 }; input = ""; cursor = 0; render(); return true; }
       void runClassicInTui(cmdLine);
+      return true;
+    }
+    if (name === "/web-ui" || name === "/web") {
+      // start (or reuse) the local web UI server and open it in the browser
+      void (async () => {
+        try {
+          if (webServer) {
+            pushLine("system", "web UI already running — reopening in your browser");
+            openExternal("http://127.0.0.1:8787");
+            render();
+            return;
+          }
+          const net = await import("node:net");
+          const probe = (port: number) => new Promise<number>((resolve) => {
+            const srv = net.createServer();
+            srv.once("error", () => resolve(-1));
+            srv.once("listening", () => { srv.close(() => resolve(port)); });
+            srv.listen(port, "127.0.0.1");
+          });
+          let port = 8787;
+          for (let i = 0; i < 20 && (await probe(port)) === -1; i += 1) port += 1;
+          webServer = await startServer({ cwd, host: "127.0.0.1", port });
+          pushLine("ok", `web UI listening on http://127.0.0.1:${port}  (Ctrl+C in the terminal to stop)`);
+          if (process.env.XMINAL_WEB_UI_NO_OPEN !== "1") openExternal(`http://127.0.0.1:${port}`);
+          render();
+        } catch (error) {
+          pushLine("err", `web UI failed to start: ${(error as Error)?.message ?? String(error)}`);
+          render();
+        }
+      })();
       return true;
     }
     if (name === "/new") {
