@@ -131,6 +131,59 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/v1/agent/stream") {
+        const body = await readJsonBody(req);
+        const prompt = String(body.prompt ?? body.input ?? "");
+        if (!prompt.trim()) {
+          sendJson(res, 400, { error: { message: "prompt is required", type: "invalid_request" } });
+          return;
+        }
+        const writeSse = (event: string, data: unknown) => {
+          res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        };
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+          "x-accel-buffering": "no",
+        });
+        const callbacks: AgentCallbacks = {
+          onText: (text) => writeSse("text", { text }),
+          onReasoning: (text) => writeSse("reasoning", { text }),
+          onToolCall: (call) => writeSse("tool_call", { id: call.id, name: call.name, arguments: call.arguments }),
+          onToolResult: (name, result) =>
+            writeSse("tool_result", { name, content: result.content, isError: Boolean(result.isError) }),
+          onStatus: (message) => writeSse("status", { message }),
+          onUsage: (usage, model) => writeSse("usage", { usage, model: model?.alias }),
+        };
+        const runtime = new Runtime(options.cwd, {
+          mode: normalizeMode(body.mode) ?? options.mode,
+          model: typeof body.model === "string" ? body.model : options.model,
+          sessionId: typeof body.sessionId === "string" ? body.sessionId : undefined,
+          newSession: !body.sessionId,
+          callbacks,
+        });
+        try {
+          writeSse("session", { sessionId: runtime.session.id, mode: body.mode ?? options.mode ?? "build" });
+          const result = await runtime.agent.run(prompt);
+          writeSse("done", {
+            sessionId: runtime.session.id,
+            model: result.model,
+            turns: result.turns,
+            costUsd: result.cost.costUsd,
+            inputTokens: result.cost.inputTokens,
+            outputTokens: result.cost.outputTokens,
+            stoppedReason: result.stoppedReason,
+          });
+        } catch (error) {
+          writeSse("error", { message: (error as Error)?.message ?? String(error) });
+        } finally {
+          runtime.close();
+          res.end();
+        }
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/v1/chat/completions") {
         const body = await readJsonBody(req);
         const messages = Array.isArray(body.messages) ? body.messages : [];

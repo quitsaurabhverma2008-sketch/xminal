@@ -16,16 +16,21 @@ sessions, providers and model catalog. Only the pixels differ.
 ## The Web UI (`xminal web-ui`)
 
 `xminal web-ui` (or `/web-ui` in the TUI) starts the local server and opens a
-full chat page in your browser. The page is served at `http://127.0.0.1:8787`
-(port auto-finds if busy) and talks to the same `Runtime` over the
-OpenAI-compatible `/v1/chat/completions` endpoint (SSE streaming). It ships in
-the package — zero deps, no external service.
+full agent chat page in your browser. Served at `http://127.0.0.1:8787` (port
+auto-finds if busy), it talks to the same `Runtime` over the new
+`/v1/agent/stream` SSE endpoint. It ships in the package — zero deps, no
+external service.
 
-Features: dark theme matching the TUI · session sidebar (live list from
-`/v1/sessions`) · streaming answers (SSE) · code fences with copy button ·
-model/mode/turns/cost pills (model auto-detected) · `Esc` to stop a turn ·
-`Ctrl+C` in the terminal stops the server. For multi-machine access, pass
-`--token` and `--host 0.0.0.0`.
+Dark Ekko-grade client:
+
+- **Session sidebar** — live list from `/v1/sessions`, click to reuse; “+ New chat”
+- **Streaming answers** with live tool-call cards (spinning `◐` + tool name, args, collapsible output — red on error)
+- **Markdown** — headings, bold/italic, links, inline code, fenced code blocks with `COPY` button
+- **Turn / token / cost counters** and a model-autodetect pill (from `/v1/models`)
+- **Free-quota fallback messages** stream as `status` events (e.g. `groq/openai/gpt-oss-120b`)
+- `Esc` stops a turn · `Ctrl+C` stops the server · `Enter` sends · `Shift+Enter` new line
+
+For multi-machine access pass `--token` + `--host 0.0.0.0`.
 
 ## Fallbacks
 

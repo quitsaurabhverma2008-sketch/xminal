@@ -4,6 +4,22 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.26.0] — 2026-11-13
+
+**The web UI grew up — a real agent chat client, dark and Ekko-grade, in zero deps.**
+
+### Added
+
+- **Full agent chat client** served by `xminal serve`: sidebar with live sessions (rename/switch via `/v1/sessions`), mode & model pills (model autodetected from `/v1/models`), turn/token/cost counters, and **streaming answers with live tool-call cards** (◐ spinning `bash: …` / `read: …` / etc with collapsible args and output, red when the tool errored). Markdown-ish rendering with fenced code blocks, `COPY` buttons, inline code, bold, headings, links.
+- **`/v1/agent/stream`** — new SSE endpoint streaming structured events: `session`, `status` (includes free-quota fallback messages, e.g. `groq/openai/gpt-oss-120b`), `text`, `reasoning` (for thinking models), `tool_call`, `tool_result`, `usage`, `done` (with `stoppedReason`), `error`. `xminal web-ui` and `/web-ui` in the TUI now serve this client instead of the bare page.
+- **`xminal web-ui`** opens it in your browser automatically (`/web-ui` in the TUI does the same on 127.0.0.1:8787, or the next free port).
+- **Empty-prompt guards**: `/v1/agent/stream` returns 400 without touching the model.
+- **Tests**: 258/258 (new: empty-prompt rejection for `/v1/agent/stream`; the web UI test now asserts the full client markers: `id="sidebar"`, `id="modelSelect"`, `tool-head`).
+
+### Fixed
+
+- **The served page had a JavaScript syntax error** (raw `\n` inside regex literals and string literals in the template literal rendered as real newlines — every client threw on load). The renderer is now syntax-validated in CI-style checks: the built page's `<script>` is extracted and checked with `node --check` during release verification.
+
 ## [0.25.0] — 2026-11-12
 
 **`xminal web-ui` — XMINAL ka apna browser UI, zero deps, MIT, in-family.**
