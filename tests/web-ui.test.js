@@ -16,10 +16,13 @@ test("the web UI page serves with the XMINAL wordmark", async () => {
   const body = await res.text();
   assert.match(body, /XMINAL/);
   assert.match(body, /<script>/);
-  assert.match(body, /id="sidebar"/);
-  assert.match(body, /id="modelSelect"/);
-  assert.match(body, /tool-head/);
+  assert.match(body, /id="sbar"/);
+  assert.match(body, /id="rail"/);
+  assert.match(body, /id="ta"/);
+  assert.match(body, /data-act="send"/);
+  assert.match(body, /class="tools"/);
   assert.match(body, /\/v1\/agent\/stream/);
+  assert.match(body, /\/v1\/agent\/permission/);
   await running.close();
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -85,16 +88,50 @@ test("/v1/sessions is a JSON list", async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("/v1/agent/stream rejects an empty prompt without calling the model", async () => {
+test("/v1/agent/permission rejects an unknown id", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "xminal-web-"));
   const running = await startServer({ cwd: dir, host: "127.0.0.1", port: 0 });
   const port = running.server.address().port;
-  const res = await fetch(`http://127.0.0.1:${port}/v1/agent/stream`, {
+  const res = await fetch(`http://127.0.0.1:${port}/v1/agent/permission`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ prompt: "" }),
+    body: JSON.stringify({ id: "perm-does-not-exist", approve: true }),
   });
-  assert.equal(res.status, 400);
+  assert.equal(res.status, 404);
+  const body = await res.json();
+  assert.equal(body.error.type, "not_found");
   await running.close();
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("invalid JSON bodies are rejected with 400, not 500", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "xminal-web-"));
+  const running = await startServer({ cwd: dir, host: "127.0.0.1", port: 0 });
+  const port = running.server.address().port;
+  for (const pathname of ["/v1/agent/stream", "/v1/agent/permission", "/v1/chat/completions"]) {
+    const res = await fetch(`http://127.0.0.1:${port}${pathname}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "not json",
+    });
+    assert.equal(res.status, 400, `${pathname} should reject malformed JSON`);
+  }
+  await running.close();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("/v1/agent/stream rejects an empty prompt without calling the model", async () => {
+  for (const promptBody of [{ prompt: "" }, { message: "" }, { input: "" }]) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "xminal-web-"));
+    const running = await startServer({ cwd: dir, host: "127.0.0.1", port: 0 });
+    const port = running.server.address().port;
+    const res = await fetch(`http://127.0.0.1:${port}/v1/agent/stream`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(promptBody),
+    });
+    assert.equal(res.status, 400);
+    await running.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -4,6 +4,32 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.27.0] — 2026-11-13
+
+**The browser UI grew a spine — a complete Ekko-Studio-style agent workspace, wired end-to-end into the agent's permission system.**
+
+### Added
+
+- **Rewritten web client** (`xminal web-ui` / `/web-ui` / `GET /`): light, Ekko-Studio-style page. Left icon rail with dedicated pages — Chat, Sessions, Model, Mode, Effort, Permissions, Approvals, Usage, Connection, Commands, Share/Export, Settings, About — plus a collapsible session sidebar (search, pin, rename, delete, per-session cost), a top bar with session title · turns/tokens/cost chip with context-window % · connection pill · Stop button, and a composer with model/mode/effort/permission pills.
+- **Approval flow, end to end**: the agent's ask-permission prompts now stream as SSE `permission` events (`id`, `tool`, `arguments`, `risk`, `reason`) and resolve through **`POST /v1/agent/permission`** (`{id, approve|decision, always}`). "Approve & always allow" sticks for the rest of the browser session — server-side, session-keyed; your global config is never rewritten, and protected-path hard-denies always apply. If the browser tab closes mid-approval the pending ask auto-denies (with a connection-close hook and a finally-block sweep) so the agent can never hang on a ghost prompt.
+- **Effort + permission mode per request**: `/v1/agent/stream` accepts `effort` (`low|medium|high|max` → per-turn output token budget) and `permissionMode` (`ask|auto|full`) and applies them to the run before it starts.
+- **Enriched `/v1/models`**: every entry now carries `context_window`, `max_output_tokens`, `pricing` (prompt/completion per MTok) and a `free` flag (all-zero pricing counts as free). 258 models · 46 providers.
+- **Command palette (Ctrl+K)** in the page: fuzzy search across commands, pages, sessions and models; arrow keys + Enter.
+- **Slash-command menu** in the composer: `/mode /model /variant /compact /clear /verify /map /diff /constitution /spec /skills /mcp /tools /cost /audit /status /help` with Tab/arrows/Enter navigation.
+- **Message actions** (hover / always on touch): copy, edit & resend, regenerate, thumbs up/down, delete; file attachments (paperclip or drag-drop, 2 MB cap, sent as `--- file: name ---` blocks); KaTeX math rendering via CDN (auto-rendered, silently skipped offline — nothing else breaks); **Share/Export** page (copy conversation as Markdown, download session JSON, copy session ID); **Usage** page (turns, tokens, cost bar, context-window meter, per-session breakdown); **Approvals** page (pending + decision history); **Permissions** page (see/reset always-allowed tools).
+- **Malformed JSON → 400** (was 500) on every POST endpoint.
+- **Tests**: 260/260 — new: malformed-JSON 400 for all POST routes, `/v1/agent/permission` unknown-id 404, enriched page markers (`id="sbar"`, `id="rail"`, `id="ta"`, permission-endpoint wiring), `message`/`input` accepted as prompt aliases.
+
+### Changed
+
+- The web client page source is still embedded in `src/server/web.ts` (byte-exact — round-trip verified against the raw source during release verification) and now replaces the previous dark client wholesale.
+- The permissions core passes tool **args** through to the ask handler (TUI/REPL handlers unchanged — extra parameter is additive), and gains a session-scoped `allowTool()` so "always allow" never leaks across sessions or past the protected-path hard-deny.
+
+### Notes
+
+- Risk vocabulary mapping: permission manager `dangerous` → `high`, `risky` → `medium`, `safe` → `low`. In `ask` mode every non-safe tool prompts; in `auto` mode only dangerous tools prompt (risky auto-allows); in `full` mode nothing prompts; protected-path reads/writes always deny without asking.
+- KaTeX is the page's only CDN fetch (math rendering); everything else — including all agent functionality — is self-contained and works offline against a local `xminal serve`.
+
 ## [0.26.0] — 2026-11-13
 
 **The web UI grew up — a real agent chat client, dark and Ekko-grade, in zero deps.**

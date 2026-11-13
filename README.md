@@ -324,16 +324,16 @@ Details: [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
 
 ## Status (honest)
 
-**v0.23.1** — live on npm, 243/243 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
+**v0.27.0** — live on npm, 260/260 tests, CI green on Ubuntu/macOS/Windows × Node 20/22 (plus a package-install smoke job and a secret-scan job). Known limitations: the Ink engine needs Node ≥ 22 (the built-in TUI works on Node ≥ 18), the OpenCode-vendored engine needs Bun + a checkout with `vendor/` (it is not in the npm tarball) + a desktop OS, no single-binary distribution yet, benchmark harness is minimal, some niche providers' model lists lag the catalog, Upstream OAuth/device-code flow for GitHub Models is not yet automated. Live agent runs verified against OpenRouter (free), Groq (`openai/gpt-oss-120b`), NVIDIA NIM (`nvidia/nemotron-3.5-super-vl-120b-a12b`).
 
 ## Web UI
-`xminal web-ui` starts the local server and opens a full browser chat UI (same agent, same providers, same sessions). Or press `/web-ui` inside the TUI. Dark Ekko-grade agent client: session sidebar, streaming answers with live tool-call cards, fenced code blocks with copy buttons, model autodetect, turn/token/cost counters — served by `xminal serve` at `http://127.0.0.1:8787`. Zero deps, no external service.
+`xminal web-ui` starts the local server and opens a full browser chat UI (same agent, same providers, same sessions). Or press `/web-ui` inside the TUI. Served by `xminal serve` at `http://127.0.0.1:8787` — light Ekko-Studio-style page: icon rail + session sidebar (search, pin, rename, delete), live turn/token/cost chip, context-window %, streaming answers with reasoning blocks and tool-call cards, markdown + KaTeX math (CDN, optional), `/` slash-command menu, `Ctrl+K` command palette, dedicated pages for Model / Mode / Effort / Permissions / Approvals / Usage / Connection / Share-Export / Settings, and **in-browser approval cards** — the agent's ask-permission prompts stream as SSE events and resolve through `/v1/agent/permission` (Approve / Deny / always-allow-for-session). Zero deps, no external service.
 
 ## Development
 
 ```bash
 npm run build            # tsc → dist/
-npm test                 # 243 tests (node:test, offline)
+npm test                 # 260 tests (node:test, offline)
 npm run verify           # build + test + secret scan (required before push)
 npm run verify:package   # pack → install into a temp prefix → run the CLI
 npm run verify:secrets   # fail if a credential-shaped string is committed

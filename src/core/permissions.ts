@@ -15,7 +15,7 @@ export interface PermissionDecision {
   risk: RiskLevel;
 }
 
-export type AskHandler = (question: string, detail?: string) => Promise<boolean>;
+export type AskHandler = (question: string, detail?: string, args?: Record<string, unknown>) => Promise<boolean>;
 
 const READ_ONLY_TOOLS = new Set([
   "read",
@@ -156,6 +156,7 @@ export class PermissionManager {
   mode: PermissionMode;
   private audit: AuditLog;
   private askHook?: (done: () => void) => void;
+  private readonly allowedTools = new Set<string>();
 
   constructor(
     private readonly cwd: string,
@@ -187,8 +188,17 @@ export class PermissionManager {
     this.askHook = hook;
   }
 
+  /**
+   * Permanently allow a tool for the life of this manager (session-scoped).
+   * Used by the web server to implement "Approve & always allow" for the
+   * current browser session without touching the user's global config.
+   */
+  allowTool(tool: string): void {
+    this.allowedTools.add(tool);
+  }
+
   /** Ask the human, with the state hook around the prompt. */
-  private async ask(tool: string, reason: string): Promise<boolean> {
+  private async ask(tool: string, reason: string, args?: Record<string, unknown>): Promise<boolean> {
     if (!this.askHandler) return false;
     let released = false;
     const release = (): void => {
@@ -198,7 +208,7 @@ export class PermissionManager {
     };
     this.askHook?.(release);
     try {
-      return await this.askHandler(tool, reason);
+      return await this.askHandler(tool, reason, args);
     } finally {
       release();
     }
@@ -319,6 +329,11 @@ export class PermissionManager {
       return { allowed: false, needsPrompt: false, reason, risk };
     }
 
+    if (this.allowedTools.has(tool)) {
+      this.audit.append(tool, "allow", { args, reason: "always allowed this session", mode: this.mode });
+      return { allowed: true, needsPrompt: false, reason: "always allowed this session", risk };
+    }
+
     if (risk === "safe") {
       this.audit.append(tool, "allow", { args, reason, mode: this.mode });
       return { allowed: true, needsPrompt: false, reason, risk };
@@ -330,7 +345,7 @@ export class PermissionManager {
     }
 
     if (this.mode === "ask") {
-      const ok = await this.ask(tool, `${risk}: ${reason}`);
+      const ok = await this.ask(tool, `${risk}: ${reason}`, args);
       this.audit.append(tool, ok ? "allow" : "deny", { args, reason, mode: this.mode });
       return { allowed: ok, needsPrompt: true, reason, risk };
     }
@@ -340,7 +355,7 @@ export class PermissionManager {
       return { allowed: true, needsPrompt: false, reason, risk };
     }
 
-    const ok = this.askHandler ? await this.askHandler(tool, `${risk}: ${reason}`) : false;
+    const ok = this.askHandler ? await this.ask(tool, `${risk}: ${reason}`, args) : false;
     this.audit.append(tool, ok ? "allow" : "deny", { args, reason, mode: this.mode });
     return { allowed: ok, needsPrompt: true, reason, risk };
   }

@@ -21,12 +21,16 @@ auto-finds if busy), it talks to the same `Runtime` over the new
 `/v1/agent/stream` SSE endpoint. It ships in the package — zero deps, no
 external service.
 
-Dark Ekko-grade client:
+Light Ekko-Studio-style client (icon rail + pages):
 
-- **Session sidebar** — live list from `/v1/sessions`, click to reuse; “+ New chat”
-- **Streaming answers** with live tool-call cards (spinning `◐` + tool name, args, collapsible output — red on error)
-- **Markdown** — headings, bold/italic, links, inline code, fenced code blocks with `COPY` button
-- **Turn / token / cost counters** and a model-autodetect pill (from `/v1/models`)
+- **Icon rail + session sidebar** — search, pin, rename, delete; list from `/v1/sessions`, click to reuse; "+ New chat"
+- **Streaming answers** with reasoning blocks and live tool-call cards (spinner + tool name, args, collapsible output — red on error)
+- **Markdown** — headings, bold/italic, tables, links, inline code, fenced code blocks with `COPY` button, KaTeX math (CDN, optional)
+- **Slash menu** in the composer (`/` fuzzy-filtered) and a **Ctrl+K command palette** (commands, pages, sessions, models)
+- **Turn / token / cost chip** with context-window %, plus **Usage**, **Connection** and **Share / Export** (Markdown + JSON) pages
+- **In-browser approval cards** — the agent's ask-permission prompts stream as SSE `permission` events; the page resolves them through `POST /v1/agent/permission` (Approve / Deny / always-allow for the session). Session-keyed, server-process scope; protected paths still hard-deny
+- **Effort + permission mode per turn** — `/v1/agent/stream` accepts `effort` (`low|medium|high|max`) and `permissionMode` (`ask|auto|full`)
+- **Enriched `/v1/models`** — `context_window`, `max_output_tokens`, `pricing` and a `free` flag per entry
 - **Free-quota fallback messages** stream as `status` events (e.g. `groq/openai/gpt-oss-120b`)
 - `Esc` stops a turn · `Ctrl+C` stops the server · `Enter` sends · `Shift+Enter` new line
 
