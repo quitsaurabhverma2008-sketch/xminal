@@ -4,6 +4,19 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.27.1] — 2026-11-13
+
+**`xminal web-ui` actually serves the web UI now.**
+
+### Fixed
+
+- **`xminal web-ui` silently became `xminal run "web-ui"`** — the dispatch had a `case "web-ui"` but `web-ui` was missing from `KNOWN_COMMANDS` in the argument parser, so the words `web-ui` were passed to the agent as a *prompt*. The whole CLI (0.25.0 → 0.27.0) was affected; the TUI's `/web-ui` command was not (it calls the server directly). Reported by a live run: the agent received "web-ui" and correctly answered it had nothing to implement.
+- **Regression guard**: `tests/cli-routing.test.js` pins the invariant — `parseArgs(["web-ui"])` must route to `web-ui`, and every `case "x"` label in the CLI dispatch must exist in `KNOWN_COMMANDS` (prevents the whole class of "documented but unroutable" commands).
+
+### Tests
+
+- 264/264 (+4: web-ui routing, flags, dispatch↔KNOWN_COMMANDS invariant, unknown-words→`run` fallback preserved).
+
 ## [0.27.0] — 2026-11-13
 
 **The browser UI grew a spine — a complete Ekko-Studio-style agent workspace, wired end-to-end into the agent's permission system.**

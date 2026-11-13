@@ -40,7 +40,7 @@ const BOOLEAN_FLAGS = new Set([
   "no-tui",
 ]);
 
-const KNOWN_COMMANDS = new Set([
+export const KNOWN_COMMANDS = new Set([
   "run",
   "repl",
   "init",
@@ -62,6 +62,7 @@ const KNOWN_COMMANDS = new Set([
   "help",
   "telegram",
   "audit",
+  "web-ui",
 ]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
