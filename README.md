@@ -407,6 +407,21 @@ npm run verify:secrets   # fail if a credential-shaped string is committed
 npm run eval             # the eval suite: one task per feature, real agent, real checks
 ```
 
+### The showcase — XMINAL built a project with itself
+
+**[quillmark](https://github.com/quitsaurabhverma2008-sketch/quillmark)** — a dependency-free Markdown → static-site generator, built **end-to-end by XMINAL**, in three runs:
+
+| Phase | What | Turns | Tool calls | Time | Cost |
+|---|---|---|---|---|---|
+| plan | `PLAN.md` → the agent's own implementation plan | 2 | 1 | 8.7 s | $0.0046 |
+| build | every source file, the tests, the docs, both commits | 40 | 73 | 6 m 14 s | $0.0024 |
+| finish | the remaining steps, the build log, git hygiene | 9 | 11 | 2 m 15 s | $0.0000 |
+| | **total** | **51** | **85** | **8 m 38 s** | **$0.0070** |
+
+Sixteen distinct tools were exercised — `write` · `edit` · `read` · `bash` · `grep` · `glob` · `list` · `todo` · `task` (a subagent) · `memory` · `checkpoint` · `verify` · `capabilities` · `skill` · `mcp_call` · `worktree` — and the agent found and fixed a real bug in its own code (`require('./src/markdown')` from inside `src/`) before the tests went green.
+
+The repo carries three records: the agent's own account ([`BUILD-REPORT.md`](https://github.com/quitsaurabhverma2008-sketch/quillmark/blob/main/BUILD-REPORT.md)), the harness-measured numbers ([`BUILD-MEASUREMENTS.md`](https://github.com/quitsaurabhverma2008-sketch/quillmark/blob/main/BUILD-MEASUREMENTS.md)) and the raw session transcript.
+
 ### The eval suite
 
 `npm run eval` runs one task per feature against the **real agent** in a throwaway project and checks an *observable* outcome — a file that must exist, a test that must pass, a tool that must show up in the session transcript. Nineteen tasks cover the file tools, search, the shell, todos, memory, git, worktrees, the verify runner, checkpoints, MCP, subagents, plan mode, capability discovery — and one kitchen-sink task that builds a real project (code, tests, docs) and makes the tests pass.
