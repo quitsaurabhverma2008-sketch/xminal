@@ -23,6 +23,7 @@ import { detectVerifyCommand } from "./tools/verify-tool";
 import { startServer } from "./server/http";
 import { openExternal } from "./util/open-external";
 import { startMcpStdioServer } from "./mcp/server";
+import { startAcpAgent } from "./acp/server";
 import { startTelegram } from "./bridges/telegram";
 import { verifyAudit, tailAudit } from "./cli/audit";
 import { loadToolUsage } from "./core/tool-usage";
@@ -308,6 +309,10 @@ async function main(): Promise<void> {
 
     case "web-ui":
       await commandWebUI(cwd, args);
+      return;
+
+    case "acp":
+      await commandAcp(cwd, args);
       return;
 
     case "telegram":
@@ -640,6 +645,28 @@ async function commandWebUI(cwd: string, args: ReturnType<typeof parseArgs>): Pr
   openExternal(url);
   const shutdown = async () => {
     await running.close();
+    process.exit(0);
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+}
+
+/**
+ * `xminal acp` — the Agent Client Protocol agent.
+ *
+ * The client (Zed, Cursor, …) launches this process and talks JSON-RPC 2.0
+ * over stdio. stdout carries the protocol and nothing else, so every log
+ * line goes to stderr.
+ */
+async function commandAcp(cwd: string, args: ReturnType<typeof parseArgs>): Promise<void> {
+  const agent = startAcpAgent({
+    cwd,
+    mode: modeFlag(args.flags.mode),
+    model: stringFlag(args.flags.model) ?? stringFlag(args.flags.m),
+  });
+  console.error(`xminal ${VERSION} — ACP agent ready on stdio (protocol v1)`);
+  const shutdown = () => {
+    agent.close();
     process.exit(0);
   };
   process.once("SIGINT", shutdown);

@@ -118,6 +118,18 @@ export class Session {
     return new Session(cwd, meta, events);
   }
 
+  /** Delete a session and drop it from the index. */
+  static remove(cwd: string, id: string): boolean {
+    const dir = path.join(projectSessionsDir(cwd), id);
+    if (!exists(dir)) return false;
+    fs.rmSync(dir, { recursive: true, force: true });
+    const indexFile = path.join(projectSessionsDir(cwd), "index.json");
+    const index = readJson<SessionMeta[]>(indexFile, []);
+    const next = index.filter((entry) => entry.id !== id);
+    writeJson(indexFile, next);
+    return true;
+  }
+
   static list(cwd: string): SessionMeta[] {
     const indexFile = path.join(projectSessionsDir(cwd), "index.json");
     const index = readJson<SessionMeta[]>(indexFile, []);

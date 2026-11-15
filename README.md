@@ -186,7 +186,7 @@ Providers without a public free model (Anthropic, OpenAI, DeepSeek, xAI, MiniMax
 - **`xminal run`** — non-interactive headless mode for CI (`--json`, `--quiet`, `--max-turns`, `--permission`)
 - **`xminal serve`** — OpenAI-compatible HTTP server (`POST /v1/chat/completions` with SSE streaming) + `GET /health`
 - **Telegram bridge** (`xminal telegram`) — experimental; implemented but never live-tested (needs a bot token)
-- **ACP-compatible** — Agent Client Protocol for editor integration
+- **ACP agent** (`xminal acp`) — the [Agent Client Protocol](https://agentclientprotocol.com) over stdio: drive XMINAL from Zed, Cursor or any ACP client
 
 ### Ergonomics
 - `/` **command palette** — every command one keystroke away, amber-highlighted, filterable
@@ -364,17 +364,49 @@ Details: [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
 
 <img src="assets/webui-terminal.gif" width="640" alt="xminal web-ui: typing the command, server up, health check" />
 
+## ACP — the Agent Client Protocol
+
+`xminal acp` starts an [Agent Client Protocol](https://agentclientprotocol.com) agent on stdio. Any ACP client — Zed, Cursor, Neovim — can launch it and drive a real coding session, with the same agent, the same providers and the same sessions as the terminal.
+
+```sh
+xminal acp
+```
+
+In Zed's `settings.json`:
+
+```json
+{
+  "context_servers": {
+    "xminal": { "command": "xminal", "args": ["acp"] }
+  }
+}
+```
+
+**What it implements** — ACP v1, the stable protocol:
+
+- **Sessions** — `session/new` · `load` (full history replay) · `resume` · `close` · `delete` · `list`
+- **Turns** — `session/prompt` streams reasoning, tool calls and the answer as `session/update` notifications; `session/cancel` aborts the turn and answers every open permission request
+- **Approvals** — risky tools raise `session/request_permission` with Allow once / Allow always / Reject / Reject always; "always" is remembered for the session only
+- **Modes** — `session/set_mode` switches build · plan · review · compose · yolo
+- **Pickers** — `session/set_config_option` carries the model list and the effort level
+- **Terminals** — when the client offers one, shell commands run in the *client's* terminal and stream back into the tool card
+- **MCP** — the servers the client lists are connected for that session
+
+**Verified, not claimed**: every payload this agent sends was validated against the official `schema/v1/schema.json` of `agentclientprotocol/agent-client-protocol`, and a full turn — tool call, approval, diff, answer — was driven end-to-end by the official `@agentclientprotocol/sdk` client.
+
+Details: [`docs/ACP.md`](docs/ACP.md).
+
 ## Development
 
 ```bash
 npm run build            # tsc → dist/
-npm test                 # 264 tests (node:test, offline)
+npm test                 # 280 tests (node:test, offline)
 npm run verify           # build + test + secret scan (required before push)
 npm run verify:package   # pack → install into a temp prefix → run the CLI
 npm run verify:secrets   # fail if a credential-shaped string is committed
 ```
 
-Layout: `src/core/` (agent loop, sessions, permissions, cost) · `src/providers/` (OpenAI/Anthropic/Gemini adapters + router) · `src/tools/` (20+ tools) · `src/cli/` (REPL, commands, renderer) · `src/tui/` (fullscreen TUI) · `src/mcp/` (MCP client + server) · `src/orchestration/` (Ralph loop) · `src/skills/` · `src/memory/`
+Layout: `src/core/` (agent loop, sessions, permissions, cost) · `src/providers/` (OpenAI/Anthropic/Gemini adapters + router) · `src/tools/` (20+ tools) · `src/cli/` (REPL, commands, renderer) · `src/tui/` (fullscreen TUI) · `src/mcp/` (MCP client + server) · `src/acp/` (Agent Client Protocol agent) · `src/orchestration/` (Ralph loop) · `src/skills/` · `src/memory/`
 
 ## License
 

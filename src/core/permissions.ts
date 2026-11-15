@@ -157,6 +157,7 @@ export class PermissionManager {
   private audit: AuditLog;
   private askHook?: (done: () => void) => void;
   private readonly allowedTools = new Set<string>();
+  private readonly deniedTools = new Set<string>();
 
   constructor(
     private readonly cwd: string,
@@ -195,6 +196,30 @@ export class PermissionManager {
    */
   allowTool(tool: string): void {
     this.allowedTools.add(tool);
+  }
+
+  /** Permanently deny a tool for the life of this manager (session-scoped). */
+  denyTool(tool: string): void {
+    this.deniedTools.add(tool);
+  }
+
+  /**
+   * Would `check()` ask the human for this call?
+   *
+   * Answers the same question as `check()` without any side effect — no
+   * audit entry, no prompt. The ACP bridge uses it to show the right tool
+   * status before the ask actually happens.
+   */
+  willAsk(tool: string, args: Record<string, unknown>): boolean {
+    const { risk, reason } = this.classifyTool(tool, args);
+    if (risk === "dangerous" && reason.startsWith("protected path")) return false;
+    if (this.allowedTools.has(tool)) return false;
+    if (this.deniedTools.has(tool)) return false;
+    if (risk === "safe") return false;
+    if (this.mode === "full" || this.allowAll) return false;
+    if (this.mode === "ask") return true;
+    if (this.mode === "auto" && risk === "risky") return false;
+    return Boolean(this.askHandler);
   }
 
   /** Ask the human, with the state hook around the prompt. */
@@ -332,6 +357,11 @@ export class PermissionManager {
     if (this.allowedTools.has(tool)) {
       this.audit.append(tool, "allow", { args, reason: "always allowed this session", mode: this.mode });
       return { allowed: true, needsPrompt: false, reason: "always allowed this session", risk };
+    }
+
+    if (this.deniedTools.has(tool)) {
+      this.audit.append(tool, "deny", { args, reason: "always denied this session", mode: this.mode });
+      return { allowed: false, needsPrompt: false, reason, risk };
     }
 
     if (risk === "safe") {

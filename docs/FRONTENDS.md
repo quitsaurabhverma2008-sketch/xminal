@@ -1,17 +1,22 @@
 # XMINAL — Frontends
 
-XMINAL ships three frontends. The **built-in TUI is the default everywhere**;
-the other two are opt-in through `XMINAL_TUI_ENGINE`.
+XMINAL ships four frontends. The **built-in TUI is the default everywhere**;
+the Ink and OpenCode engines are opt-in through `XMINAL_TUI_ENGINE`, and the web UI and ACP bridge are separate commands.
 
 | Frontend | Enable with | Needs | Runs on | Status |
 |---|---|---|---|---|
 | **Built-in TUI** (default) | — | Node ≥ 18, zero native deps | macOS, Linux, Windows, **Android/Termux** | Default everywhere |
 | **Web UI** | `xminal web-ui` or `/web-ui` in the TUI | A browser, same machine | macOS, Linux, Windows, **Android/Termux** (browser) | Shipped in-process |
+| **ACP agent** | `xminal acp` | An ACP client (Zed, Cursor, …) | macOS, Linux, Windows | Speaks ACP v1 over stdio |
 | **Ink engine** | `XMINAL_TUI_ENGINE=ink` | Node **≥ 22** (Ink 8 `engines`), 4 pure-JS deps | Everywhere Node ≥ 22 runs, Termux included | Opt-in, feature-light |
 | **Vendored OpenCode engine** | `XMINAL_TUI_ENGINE=opencode` | **Bun** + a checkout containing `vendor/` | macOS / Linux / Windows only | Opt-in, desktop only |
 
 All four drive the same runtime: the same agent loop, tools, permissions,
 sessions, providers and model catalog. Only the pixels differ.
+
+## The ACP bridge (`xminal acp`)
+
+The fourth front end: the [Agent Client Protocol](https://agentclientprotocol.com) over stdio, so any ACP client (Zed, Cursor, …) drives the same agent, the same providers and the same sessions. Details in [`ACP.md`](ACP.md).
 
 ## The Web UI (`xminal web-ui`)
 

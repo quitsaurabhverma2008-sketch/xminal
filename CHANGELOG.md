@@ -4,7 +4,36 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [0.28.0] — 2026-11-15
+
+**`xminal acp` — XMINAL now speaks the Agent Client Protocol, so any IDE can drive it.**
+
 ### Added
+
+- **ACP agent (`xminal acp`)** — a top-level command that starts an [Agent Client Protocol](https://agentclientprotocol.com) v1 agent on stdio (newline-delimited JSON-RPC 2.0). Zed, Cursor, Neovim or any ACP client can launch it and run a full agent session with the same providers, tools, permissions and sessions as the terminal.
+  - **Sessions**: `session/new` · `session/load` (replays the whole conversation as `session/update` notifications) · `session/resume` · `session/close` · `session/delete` · `session/list`.
+  - **Turns**: `session/prompt` streams reasoning (`agent_thought_chunk`), the answer (`agent_message_chunk`), tool calls (`tool_call` / `tool_call_update` with a real diff), mode, config, usage and notice updates. `session/cancel` aborts the turn and answers every open permission request with `cancelled`.
+  - **Approvals**: risky tools raise `session/request_permission` with Allow once / Allow always / Reject / Reject always. "Always" is remembered for the life of the session — never written to disk.
+  - **Modes**: `session/set_mode` switches build · plan · review · compose · yolo.
+  - **Pickers**: `session/set_config_option` carries the model list and the effort level; `session/set_model` is the convenience alias.
+  - **Terminals**: when the client advertises the `terminal` capability, shell commands run in the *client's* terminal (`terminal/create` → `wait_for_exit` → `output` → `release`) and stream back into the tool card.
+  - **MCP**: the servers a client lists in `session/new` / `load` / `resume` are connected for that session and merged with the project's own.
+- **`src/acp/`** — the protocol layer: `protocol.ts` (wire types), `mapping.ts` (tool kind, title, locations, diffs), `server.ts` (the agent). Zero dependencies, no code generation.
+- **`PermissionManager.willAsk()`** — answers "would this call prompt the human?" with no side effect, so the agent can show the right tool status before the ask happens. `denyTool()` adds the session-scoped "reject always" the permission cards promise.
+- **`Session.remove()`** — deletes a session from disk and drops it from the index (used by `session/delete`).
+- **`Runtime` accepts extra MCP servers** — the ones a client hands over at session setup.
+- **Docs**: [`docs/ACP.md`](docs/ACP.md) — the protocol surface, the editor setup and the honesty notes.
+
+### Verified
+
+- Every payload the agent sends was validated against the **official** `schema/v1/schema.json` of `agentclientprotocol/agent-client-protocol` (13/13 payload shapes valid, including the tool-call diff and the permission request).
+- A full turn — tool call → permission request → approval → diff → final answer → `stopReason: end_turn` — was driven end-to-end by the **official `@agentclientprotocol/sdk` client**. The schema check caught two real bugs before release: a select option carries `value`, not `id`, and `config_option_update` needed the schema's exact shape.
+
+### Tests
+
+- 280/280 (+16: initialize negotiation, session/new modes and pickers, unknown method → -32601, malformed line → -32700 and the connection survives, empty prompt → -32602, unknown session → -32002, mode switching, config options, session list and delete, history replay on load, a streamed turn, a tool call with approval, a denied approval, the official-schema wire shapes, the permission request shape, the CLI routing, and the subprocess speaking JSON-RPC on stdout).
+
+### Also in this release
 
 - **Web UI assets for the README** — every screenshot and GIF of the browser UI, captured from the real build (WeasyPrint render of the page's own JS + jsdom): the chat with a real session, mid-turn, empty intro, InkFlow app, terminal, and three tour GIFs covering all 13 pages.
 - **`examples/inkflow/`** — a single-file dark todo app **built by the agent itself** from the web UI (`/v1/agent/stream`, free model `groq/openai/gpt-oss-120b`), three turns: build → self-reported filter bug fixed (`grep`-verified) → first-run TDZ crash fixed (`grep`-verified; jsdom smoke test renders the 3 sample todos). Kept verbatim — bugs and all fixed as the agent fixed them.

@@ -10,7 +10,7 @@ import { SkillRegistry } from "./skills/loader";
 import { McpManager } from "./mcp/client";
 import { ToolRegistry } from "./tools/registry";
 import { allTools } from "./tools/index";
-import type { XminalConfig } from "./config/types";
+import type { McpServerConfig, XminalConfig } from "./config/types";
 
 export interface RuntimeOptions {
   mode?: AgentMode;
@@ -19,6 +19,8 @@ export interface RuntimeOptions {
   newSession?: boolean;
   callbacks?: AgentCallbacks;
   askHandler?: AskHandler;
+  /** extra MCP servers to connect to (e.g. handed over by an ACP client) */
+  mcpServers?: Record<string, McpServerConfig>;
 }
 
 export class Runtime {
@@ -42,7 +44,7 @@ export class Runtime {
     this.config = this.loaded.config;
     this.memory = new MemoryStore(cwd);
     this.skills = new SkillRegistry(cwd);
-    this.mcp = new McpManager(this.config.mcpServers);
+    this.mcp = new McpManager({ ...this.config.mcpServers, ...(this.options.mcpServers ?? {}) });
     this.tools = new ToolRegistry();
     this.tools.registerAll(allTools());
 
