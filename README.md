@@ -404,7 +404,16 @@ npm test                 # 280 tests (node:test, offline)
 npm run verify           # build + test + secret scan (required before push)
 npm run verify:package   # pack → install into a temp prefix → run the CLI
 npm run verify:secrets   # fail if a credential-shaped string is committed
+npm run eval             # the eval suite: one task per feature, real agent, real checks
 ```
+
+### The eval suite
+
+`npm run eval` runs one task per feature against the **real agent** in a throwaway project and checks an *observable* outcome — a file that must exist, a test that must pass, a tool that must show up in the session transcript. Nineteen tasks cover the file tools, search, the shell, todos, memory, git, worktrees, the verify runner, checkpoints, MCP, subagents, plan mode, capability discovery — and one kitchen-sink task that builds a real project (code, tests, docs) and makes the tests pass.
+
+The last full run — `groq/openai/gpt-oss-120b` (free) — was **19/19 passed**: 281 s, 557,916 tokens, **$0.0151** for the whole suite (report: [`docs/eval-report.json`](docs/eval-report.json)).
+
+Details and the task list: [`docs/EVAL.md`](docs/EVAL.md).
 
 Layout: `src/core/` (agent loop, sessions, permissions, cost) · `src/providers/` (OpenAI/Anthropic/Gemini adapters + router) · `src/tools/` (20+ tools) · `src/cli/` (REPL, commands, renderer) · `src/tui/` (fullscreen TUI) · `src/mcp/` (MCP client + server) · `src/acp/` (Agent Client Protocol agent) · `src/orchestration/` (Ralph loop) · `src/skills/` · `src/memory/`
 

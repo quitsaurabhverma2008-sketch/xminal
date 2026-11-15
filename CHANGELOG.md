@@ -4,6 +4,13 @@ All notable changes to XMINAL are documented here. Format: [Keep a Changelog](ht
 
 ## [Unreleased]
 
+### Added
+
+- **The eval suite** (`npm run eval`) — one task per feature, run against the **real agent** in a throwaway project and checked against an **observable outcome**: a file that must exist, a test that must pass, a tool that must show up in the session transcript. Nineteen tasks cover the file tools (write · edit · multi-edit · read), search (grep · glob), the shell (run · failure diagnosis), todos, memory, git, worktrees, the verify runner, checkpoints, MCP (the agent reads a file *through* an MCP server), subagents, plan mode, capability discovery — plus a kitchen-sink task that builds a real project (code + tests + README) and makes the tests pass. The runner writes `eval-report.json` (per-task result, duration, turns, tokens, cost) and exits non-zero on a failure.
+- **`scripts/run-eval.cjs`** — the runner. Every task lives in `mktemp -d` and is deleted afterwards; `--only`, `--model` and `--keep` are supported.
+- **Docs**: [`docs/EVAL.md`](docs/EVAL.md) — the task list and how the checks work.
+- **First full run: 19/19 passed** on `groq/openai/gpt-oss-120b` (a free model) — 281 s, 557,916 tokens, **$0.0151** for the whole suite. The report is checked in as [`docs/eval-report.json`](docs/eval-report.json).
+
 ## [0.28.0] — 2026-11-15
 
 **`xminal acp` — XMINAL now speaks the Agent Client Protocol, so any IDE can drive it.**

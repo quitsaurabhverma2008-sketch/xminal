@@ -32,7 +32,8 @@
     "build:ink": "node scripts/build-ink.mjs",
     "typecheck:ink": "tsc -p tsconfig.ink.json --noEmit",
     "verify:package": "bash scripts/package-smoke.sh",
-    "verify:secrets": "node scripts/secret-scan.cjs"
+    "verify:secrets": "node scripts/secret-scan.cjs",
+    "eval": "node scripts/run-eval.cjs"
   },
   "engines": {
     "node": ">=18"

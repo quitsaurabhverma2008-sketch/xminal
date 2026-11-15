@@ -6,6 +6,7 @@ dist/
 !.env.example
 .xminal/
 coverage/
+/eval-report.json
 .DS_Store
 *.tgz
 .agents/
